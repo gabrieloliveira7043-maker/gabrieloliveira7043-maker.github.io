@@ -401,17 +401,21 @@ tr:hover td { background: var(--surface2); }
     flex-shrink: 0; width: 240px;
     background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--r2); overflow: hidden;
+    display: flex; flex-direction: column; max-height: calc(100vh - 220px);
   }
   .kanban-col-header {
     padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border); flex-shrink: 0;
   }
   .kanban-col-title { font-size: 12px; font-weight: 600; color: var(--text); letter-spacing: 0.02em; }
   .kanban-col-count {
     font-size: 11px; font-weight: 500; padding: 2px 7px;
     border-radius: 10px; font-family: 'JetBrains Mono', monospace;
   }
-  .kanban-cards { padding: 10px; min-height: 80px; display: flex; flex-direction: column; gap: 8px; }
+  .kanban-cards { padding: 10px; min-height: 80px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+  .kanban-cards::-webkit-scrollbar { width: 4px; }
+  .kanban-cards::-webkit-scrollbar-track { background: transparent; }
+  .kanban-cards::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
   .kanban-card {
     background: var(--surface2); border: 1px solid var(--border);
     border-radius: var(--r); padding: 12px 14px;
@@ -502,6 +506,74 @@ tr:hover td { background: var(--surface2); }
   .move-stage-btn.current { border-color: var(--accent); background: var(--accent-glow); color: var(--accent2); pointer-events: none; }
   .move-stage-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .card-origem { font-size: 10px; color: var(--accent2); margin-bottom: 3px; font-style: italic; }
+.card-rede { font-size: 10px; color: var(--muted); margin-bottom: 2px; }
+  .card-valor { font-size: 12px; font-weight: 600; color: #34d399; margin: 4px 0 2px; }
+  .card-proxima { font-size: 11px; color: #fbbf24; margin-bottom: 2px; }
+
+  /* Toast notifications */
+  #toast-container {
+    position: fixed; bottom: 24px; right: 24px;
+    display: flex; flex-direction: column; gap: 8px;
+    z-index: 99999; pointer-events: none;
+  }
+  .toast {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 16px;
+    font-size: 13px; color: var(--text);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    pointer-events: all; min-width: 240px; max-width: 340px;
+    animation: toastIn .2s ease; transition: opacity .3s ease;
+  }
+  .toast.out { opacity: 0; }
+  .toast-icon { font-size: 16px; flex-shrink: 0; }
+  .toast-msg { flex: 1; line-height: 1.4; }
+  .toast.success { border-left: 3px solid #34d399; }
+  .toast.error { border-left: 3px solid #f87171; }
+  .toast.info { border-left: 3px solid var(--accent2); }
+  .toast.warning { border-left: 3px solid #fbbf24; }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  /* Modal de confirmação no padrão do sistema */
+  #confirm-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    display: none; align-items: center; justify-content: center;
+    z-index: 99998; backdrop-filter: blur(4px);
+  }
+  #confirm-modal.open { display: flex; }
+  .confirm-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 28px 28px 24px;
+    max-width: 400px; width: 90%; box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+    animation: toastIn .15s ease;
+  }
+  .confirm-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 10px; }
+  .confirm-msg { font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 24px; }
+  .confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .confirm-btn-cancel {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    border-radius: 8px; padding: 8px 18px; font-size: 13px; cursor: pointer; font-family: inherit;
+  }
+  .confirm-btn-cancel:hover { border-color: var(--text); color: var(--text); }
+  .confirm-btn-ok {
+    background: #f87171; border: none; color: #fff;
+    border-radius: 8px; padding: 8px 20px; font-size: 13px;
+    cursor: pointer; font-weight: 600; font-family: inherit;
+  }
+  .confirm-btn-ok:hover { background: #ef4444; }
+  .confirm-btn-ok.safe { background: var(--accent2); }
+  .confirm-btn-ok.safe:hover { opacity: .85; }
+  .col-search-wrap { padding: 8px 10px 4px; }
+  .col-search-input {
+    width: 100%; box-sizing: border-box;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px 8px 5px 28px;
+    font-size: 12px; color: var(--fg); outline: none;
+    font-family: inherit;
+  }
+  .col-search-input:focus { border-color: var(--accent); }
+  .col-search-wrap { position: relative; }
+  .col-search-icon { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
 .card-proxima { font-size: 10px; color: var(--amber); margin-top: 4px; }
 .card-obs { font-size: 11px; color: var(--muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .btn-manage-stages {
@@ -585,7 +657,7 @@ tr:hover td { background: var(--surface2); }
 
     /* Kanban */
     .kanban-board { flex-direction: column; gap: 12px; overflow-x: visible; padding-bottom: 0; }
-    .kanban-col { width: 100%; box-sizing: border-box; }
+    .kanban-col { width: 100%; box-sizing: border-box; max-height: 400px; }
     .kanban-card { width: 100%; box-sizing: border-box; overflow: hidden; }
     .card-email { max-width: 100%; }
     .crm-header { flex-direction: column; align-items: flex-start; gap: 10px; }
@@ -780,7 +852,8 @@ function renderContatos() {
 
   const STAGES = typeof getStages === 'function' ? getStages(filterAct || '') : [];
   list.innerHTML = leads.map(lead => {
-    const stageLabel = STAGES.find(s => s.id === lead.stage)?.label || lead.stage || '';
+    const leadStages = typeof getStages === 'function' ? getStages(lead.act || filterAct || '') : STAGES;
+    const stageLabel = leadStages.find(s => s.id === lead.stage)?.label || STAGES.find(s => s.id === lead.stage)?.label || lead.stage || '';
     const color = stageColor2(lead.stage);
     const ini = initials(lead.name);
     const waPhone = lead.phone ? lead.phone.replace(/\D/g,'') : '';
@@ -823,10 +896,11 @@ function renderAtendimento() {
 }
 
 function getActForStages() {
-  // Para admin: pegar do dropdown. Para cliente: pegar do activeClient
+  // Para admin: pegar do dropdown ou crmClientFilter
   if (isAdmin) {
     const sel = document.getElementById('crm-client-select');
-    return sel && sel.value !== 'all' ? sel.value : null;
+    const fromSel = sel && sel.value !== 'all' ? sel.value : null;
+    return fromSel || crmClientFilter || (activeClient ? activeClient.account : null);
   }
   return crmClientFilter || (activeClient ? activeClient.account : null);
 }
@@ -860,7 +934,7 @@ function openStagesModal() {
     item.dataset.stageid = s.id;
     const inp = document.createElement('input');
     inp.type = 'text';
-    inp.value = s.label;
+    inp.value = (s.label && !s.label.startsWith('col_') && !s.label.startsWith('stage_')) ? s.label : '';
     inp.placeholder = 'Nome da coluna';
     const del = document.createElement('button');
     del.className = 'btn-del-stage';
@@ -900,12 +974,18 @@ function addCustomStageItem() {
 function saveStagesFromModal() {
   const act = getActForStages();
   if (!act) return;
-  const items = document.querySelectorAll('#stages-list .stage-item input');
+  const items = document.querySelectorAll('#stages-list .stage-item');
   const stages = [];
-  items.forEach((inp, i) => {
-    const label = inp.value.trim();
-    if (!label) return;
-    const id = 'stage_' + i + '_' + Date.now();
+  let newIdx = 0;
+  items.forEach((item, i) => {
+    const inp = item.querySelector('input');
+    const label = inp ? inp.value.trim() : '';
+    // Ignorar colunas sem label ou com label parecendo ID interno
+    if (!label || label.startsWith('col_') || label.startsWith('stage_')) return;
+    // Preservar ID original se existir, senão gerar novo para colunas novas
+    const existingId = item.dataset.stageid || item.dataset.stageId;
+    const id = existingId || ('col_new_' + newIdx + '_' + Date.now());
+    newIdx++;
     stages.push({ id, label, cls: stageColor(i) });
   });
   if (stages.length < 1) { alert('Adicione pelo menos uma coluna.'); return; }
@@ -1080,6 +1160,7 @@ function switchView(view) {
     document.getElementById('pw-confirm').value = '';
     document.getElementById('pw-error').style.display = 'none';
     document.getElementById('pw-success').style.display = 'none';
+    if (isAdmin) renderAdminLogins();
   }
 }
 
@@ -1097,9 +1178,14 @@ function setupCrmForClient() {
 
 function renderKanban() {
   const sel = document.getElementById('crm-client-select');
-  const filterAct = isAdmin ? (sel ? (sel.value === 'all' ? null : sel.value) : null) : crmClientFilter;
+  const fromSel = sel && sel.value !== 'all' ? sel.value : null;
+  const filterAct = isAdmin ? (fromSel || crmClientFilter) : crmClientFilter;
   let leads = getLeads();
   if (filterAct) leads = leads.filter(l => l.act === filterAct);
+  // Filtrar por período selecionado
+  leads = typeof filterLeadsByPeriodo === 'function' ? filterLeadsByPeriodo(leads) : leads;
+  // Popular select de período com meses disponíveis
+  populatePeriodoSelect(getLeads().filter(l => !filterAct || l.act === filterAct));
 
   const STAGES = getStages(filterAct || (activeClient ? activeClient.account : ''));
 
@@ -1118,7 +1204,7 @@ function renderKanban() {
   board.innerHTML = '';
   buildCrmChart(leads, STAGES);
 
-  // Calcular valor fechado total (todos os leads fechados com valor)
+  // Calcular faturamento: soma todos os leads em fechou/fechado com valor
   let totalFechado = 0;
   let qtdFechado = 0;
   leads.forEach(l => {
@@ -1137,6 +1223,8 @@ function renderKanban() {
     document.getElementById('valor-fechado-total').textContent = 'R$ ' + totalFechado.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
     document.getElementById('valor-fechado-qtd').textContent = qtdFechado > 0 ? '(' + qtdFechado + ' fechamento' + (qtdFechado > 1 ? 's' : '') + ')' : '';
   }
+
+
 
   STAGES.forEach(stage => {
     const stageLeads = leads.filter(l => l.stage === stage.id);
@@ -1217,17 +1305,34 @@ function renderKanban() {
       }
     });
 
+    // Lupinha de busca na coluna
+    const searchWrap = document.createElement('div');
+    searchWrap.className = 'col-search-wrap';
+    searchWrap.innerHTML = `
+      <svg class="col-search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input class="col-search-input" placeholder="Buscar..." oninput="filtrarColuna('${stage.id}', this.value)">`;
+    col.appendChild(searchWrap);
+
     // Cards container
     const cardsDiv = document.createElement('div');
     cardsDiv.className = 'kanban-cards';
     cardsDiv.id = 'col-' + stage.id;
-    if (stageLeads.length === 0) {
-      const empty = document.createElement('div');
-      empty.style.cssText = 'font-size:12px;color:var(--muted);text-align:center;padding:12px 0;';
-      empty.textContent = 'Nenhum lead';
-      cardsDiv.appendChild(empty);
-    }
-    stageLeads.forEach(lead => {
+
+    function renderColCards(filterText) {
+      cardsDiv.innerHTML = '';
+      const filteredLeads = filterText
+        ? stageLeads.filter(l =>
+            (l.name||'').toLowerCase().includes(filterText) ||
+            (l.phone||'').includes(filterText) ||
+            (l.email||'').toLowerCase().includes(filterText))
+        : stageLeads;
+      if (filteredLeads.length === 0) {
+        const empty = document.createElement('div');
+        empty.style.cssText = 'font-size:12px;color:var(--muted);text-align:center;padding:12px 0;';
+        empty.textContent = filterText ? 'Nenhum resultado' : 'Nenhum lead';
+        cardsDiv.appendChild(empty);
+      }
+      filteredLeads.forEach(lead => {
       const card = document.createElement('div');
       card.className = 'kanban-card';
       card.draggable = true;
@@ -1236,10 +1341,12 @@ function renderKanban() {
       card.addEventListener('dragend', onDragEnd);
       let cardHTML = '';
       if (lead.origem) cardHTML += `<div class="card-origem">📍 ${lead.origem}</div>`;
+      if (lead.redeSocial) cardHTML += `<div class="card-rede">📱 ${lead.redeSocial}</div>`;
       cardHTML += `<div class="card-name">${lead.name}</div>`;
       cardHTML += `<div class="card-phone">${lead.phone || '—'}</div>`;
       cardHTML += `<div class="card-email">${lead.email || '—'}</div>`;
       if (lead.obs) cardHTML += `<div class="card-obs">💬 ${lead.obs}</div>`;
+      if (lead.valor) cardHTML += `<div class="card-valor">💰 R$ ${lead.valor}</div>`;
       if (lead.proximaAcao) cardHTML += `<div class="card-proxima">⏰ ${lead.proximaAcao}${lead.proximaData ? ' · ' + new Date(lead.proximaData + 'T12:00:00').toLocaleDateString('pt-BR') : ''}</div>`;
       if (lead.createdAt) cardHTML += `<div style="font-size:10px;color:var(--muted);margin-top:4px;">Entrada: ${new Date(lead.createdAt).toLocaleDateString('pt-BR')}</div>`;
       const waPhone = lead.phone ? lead.phone.replace(/\D/g,'') : '';
@@ -1254,6 +1361,8 @@ function renderKanban() {
       card.innerHTML = cardHTML;
       cardsDiv.appendChild(card);
     });
+    } // fim renderColCards
+    renderColCards('');
     col.appendChild(cardsDiv);
 
     board.appendChild(col);
@@ -1279,7 +1388,6 @@ function dropCard(stageId) {
     leads[idx].updatedAt = new Date().toISOString();
     if (!leads[idx].history) leads[idx].history = [];
     leads[idx].history.push({ stage: stageLabel, at: new Date().toLocaleString('pt-BR') });
-    _leadsCache = leads;
     saveLeadToDb(leads[idx]);
   }
   renderKanban();
@@ -1296,17 +1404,19 @@ function openLeadModal() {
   document.getElementById('lead-valor').value = '';
   document.getElementById('lead-stage').value = 'novo';
   document.getElementById('lead-origem').value = '';
+  document.getElementById('lead-rede-social').value = '';
   document.getElementById('lead-obs').value = '';
   document.getElementById('lead-motivo').value = '';
   document.getElementById('lead-proxima-acao').value = '';
   document.getElementById('lead-proxima-data').value = '';
+  if (document.getElementById('lead-chegada')) document.getElementById('lead-chegada').value = new Date().toISOString().slice(0,10);
   document.getElementById('modal-title').textContent = 'Novo lead';
   document.getElementById('field-plantao').style.display = clinica ? 'block' : 'none';
   document.getElementById('field-valor').style.display = 'block';
   document.getElementById('field-motivo-perda').style.display = 'none';
   // update stage options
   const stageSelect = document.getElementById('lead-stage');
-  const stages = clinica ? STAGES_CLINICA : STAGES_DEFAULT;
+  const stages = act ? getStages(act) : (clinica ? STAGES_CLINICA : STAGES_DEFAULT);
   stageSelect.innerHTML = stages.map(s => `<option value="${s.id}">${s.label}</option>`).join('');
   document.getElementById('lead-stage').addEventListener('change', function() {
     const isPerdido = ['perdido','ncompareceu'].includes(this.value);
@@ -1326,15 +1436,20 @@ function editLead(id) {
   document.getElementById('lead-plantao').value = lead.plantao || '';
   document.getElementById('lead-valor').value = lead.valor || '';
   document.getElementById('lead-origem').value = lead.origem || '';
+  document.getElementById('lead-rede-social').value = lead.redeSocial || '';
   document.getElementById('lead-obs').value = lead.obs || '';
   document.getElementById('lead-motivo').value = lead.motivo || '';
   document.getElementById('lead-proxima-acao').value = lead.proximaAcao || '';
   document.getElementById('lead-proxima-data').value = lead.proximaData || '';
+  if (document.getElementById('lead-chegada')) {
+    const chegada = lead.createdAt ? new Date(lead.createdAt).toISOString().slice(0,10) : '';
+    document.getElementById('lead-chegada').value = chegada;
+  }
   document.getElementById('field-plantao').style.display = clinica ? 'block' : 'none';
   document.getElementById('field-valor').style.display = 'block';
   document.getElementById('field-motivo-perda').style.display = (lead.stage === 'perdido' || lead.stage === 'ncompareceu') ? 'block' : 'none';
   const stageSelect = document.getElementById('lead-stage');
-  const stages = clinica ? STAGES_CLINICA : STAGES_DEFAULT;
+  const stages = (lead && lead.act) ? getStages(lead.act) : (clinica ? STAGES_CLINICA : STAGES_DEFAULT);
   stageSelect.innerHTML = stages.map(s => `<option value="${s.id}">${s.label}</option>`).join('');
   stageSelect.value = lead.stage;
   document.getElementById('modal-title').textContent = 'Editar lead';
@@ -1371,13 +1486,18 @@ async function saveLead() {
     plantao: document.getElementById('lead-plantao').value,
     valor: document.getElementById('lead-valor').value.trim(),
     origem: document.getElementById('lead-origem').value.trim(),
+    redeSocial: document.getElementById('lead-rede-social').value,
     obs: document.getElementById('lead-obs').value.trim(),
     motivo: document.getElementById('lead-motivo').value.trim(),
     proximaAcao: document.getElementById('lead-proxima-acao').value.trim(),
     proximaData: document.getElementById('lead-proxima-data').value,
     stage: newStage,
     act, history,
-    createdAt: existing ? existing.createdAt : new Date().toISOString(),
+    createdAt: (() => {
+      const chegadaEl = document.getElementById('lead-chegada');
+      if (chegadaEl && chegadaEl.value) return new Date(chegadaEl.value + 'T12:00:00').toISOString();
+      return existing ? existing.createdAt : new Date().toISOString();
+    })(),
     updatedAt: new Date().toISOString(),
     _docId: existing ? (existing._docId || null) : null
   };
@@ -1391,7 +1511,7 @@ async function saveLead() {
 }
 
 async function deleteLead(id) {
-  if (!confirm('Remover este lead?')) return;
+  if (!await showConfirm('Esta ação não pode ser desfeita.', 'Remover lead?', 'Remover')) return;
   await deleteLeadFromDb(id);
   renderKanban();
 }
@@ -1455,7 +1575,6 @@ function moveLeadTo(id, stageId) {
     leads[idx].stage = stageId;
     if (!leads[idx].history) leads[idx].history = [];
     leads[idx].history.push({ stage: stageLabel, at: new Date().toLocaleString('pt-BR') });
-    _leadsCache = leads;
     saveLeadToDb(leads[idx]);
   }
   document.getElementById('move-modal').classList.remove('open');
@@ -1714,7 +1833,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function doLogout() {
-  if (!confirm('Deseja sair?')) return;
+  if (!await showConfirm('Você será desconectado do sistema.', 'Sair', 'Sair', false)) return;
   clearSession();
   if (window._fb) await window._fb.logoutUser();
   location.reload();
@@ -1723,6 +1842,10 @@ async function doLogout() {
 function updateSidebarForUser() {
   const configBtn = document.getElementById('btn-config');
   if (configBtn) configBtn.style.display = isAdmin ? 'flex' : 'none';
+  const camposBtn = document.getElementById('btn-cfg-campos');
+  if (camposBtn) camposBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+  const limparBtn2 = document.getElementById('btn-limpar-crm');
+  if (limparBtn2) limparBtn2.style.display = isAdmin ? 'inline-flex' : 'none';
   const logoutBtn = document.getElementById('btn-logout');
   if (logoutBtn) logoutBtn.style.display = 'flex';
   const footer = document.getElementById('sidebar-footer');
@@ -1740,7 +1863,18 @@ async function loadExtraClients() {
     extras.forEach(c => {
       CREDENTIALS[c.login] = { pass: c.pass, act: c.act };
       CLIENT_NAMES[c.act] = c.name;
+      if (c.layout === 'clinica' && !CLINICA_ACTS.includes(c.act)) {
+        CLINICA_ACTS.push(c.act);
+      }
     });
+    // Repopular dropdown com clientes extras
+    if (isAdmin) {
+      const sel = document.getElementById('crm-client-select');
+      if (sel) {
+        sel.innerHTML = '<option value="all">Todos os clientes</option>' +
+          Object.entries(CLIENT_NAMES).map(([act, name]) => `<option value="${act}">${name}</option>`).join('');
+      }
+    }
     renderSidebar();
   } catch(e) { console.warn('loadExtraClients erro:', e); }
 }
@@ -1891,10 +2025,14 @@ function onCrmClientChange() {
         return snap.docs.map(d => ({ login: d.id, ...d.data() }));
       } catch(e) { return []; }
     },
-    async saveExtraClient(login, name, act, pass) {
+    async saveExtraClient(login, name, act, pass, layout) {
       const { setDoc } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
-      await setDoc(doc(db, 'extra_clients', login), { name, act, pass });
+      await setDoc(doc(db, 'extra_clients', login), { name, act, pass, layout: layout || 'default' });
       await setDoc(doc(db, 'passwords', login), { pass });
+    },
+    async updatePassword(user, pass) {
+      const { setDoc } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+      await setDoc(doc(db, 'passwords', user), { pass });
     },
     async deleteExtraClient(login) {
       await deleteDoc(doc(db, 'extra_clients', login));
@@ -1987,7 +2125,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function doLogout() {
-  if (!confirm('Deseja sair?')) return;
+  if (!await showConfirm('Você será desconectado do sistema.', 'Sair', 'Sair', false)) return;
   clearSession();
   if (window._fb) await window._fb.logoutUser();
   location.reload();
@@ -1996,6 +2134,10 @@ async function doLogout() {
 function updateSidebarForUser() {
   const configBtn = document.getElementById('btn-config');
   if (configBtn) configBtn.style.display = isAdmin ? 'flex' : 'none';
+  const camposBtn = document.getElementById('btn-cfg-campos');
+  if (camposBtn) camposBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+  const limparBtn2 = document.getElementById('btn-limpar-crm');
+  if (limparBtn2) limparBtn2.style.display = isAdmin ? 'inline-flex' : 'none';
   const logoutBtn = document.getElementById('btn-logout');
   if (logoutBtn) logoutBtn.style.display = 'flex';
   const footer = document.getElementById('sidebar-footer');
@@ -2379,10 +2521,14 @@ function onCrmClientChange() {
           <div style="font-size:12px; color:var(--muted); margin-top:2px;" id="crm-subtitle">Selecione um cliente na barra lateral</div>
         </div>
         <div class="crm-actions">
-          <select class="crm-client-select" id="crm-client-select" onchange="onCrmClientChange()">
+          <select class="crm-client-select" id="crm-client-select" onchange="onCrmClientChange()" style="display:none;">
             <option value="all">Todos os clientes</option>
           </select>
+          <select id="crm-periodo" class="btn-manage-stages" style="margin-right:8px; cursor:pointer; padding:6px 10px;" onchange="onPeriodoChange()" title="Filtrar por período">
+          </select>
           <button class="btn-manage-stages" onclick="openStagesModal()" style="margin-right:8px;">⚙ Colunas</button>
+          <button class="btn-manage-stages" id="btn-cfg-campos" onclick="openFieldsModal()" style="margin-right:8px; display:none;">⚙ Campos</button>
+          <button class="btn-manage-stages" id="btn-limpar-crm" onclick="limparCrmCliente()" style="margin-right:8px; display:none; color:var(--red); border-color:rgba(248,113,113,0.3);" title="Limpar todos os leads deste cliente">🗑 Limpar CRM</button>
           <button class="btn-manage-stages" onclick="exportLeads()" style="margin-right:8px;" title="Exportar leads para CSV">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Exportar
@@ -2391,7 +2537,7 @@ function onCrmClientChange() {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Importar
           </button>
-          <input type="file" id="import-csv-input" accept=".csv" style="display:none;" onchange="importLeads(event)">
+          <input type="file" id="import-csv-input" accept=".csv,.xlsx,.xls" style="display:none;" onchange="importLeads(event)">
           <button class="btn-add-lead" onclick="openLeadModal()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Novo lead
@@ -2400,7 +2546,7 @@ function onCrmClientChange() {
       </div>
       <div id="valor-fechado-banner" style="background:rgba(52,211,153,0.08); border:1px solid rgba(52,211,153,0.25); border-radius:8px; padding:10px 16px; margin-bottom:14px; align-items:center; gap:10px;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-        <span style="font-size:13px; color:var(--green); font-weight:500;">Fechamentos no mês: <strong id="valor-fechado-total">R$ 0,00</strong></span>
+        <span style="font-size:13px; color:var(--green); font-weight:500;">Faturamento em fechamentos: <strong id="valor-fechado-total">R$ 0,00</strong></span>
         <span style="font-size:12px; color:var(--muted); margin-left:4px;" id="valor-fechado-qtd"></span>
       </div>
       <div style="overflow-x:auto; overflow-y:visible; scrollbar-width:none; -ms-overflow-style:none; -webkit-overflow-scrolling:touch; margin:0 -2px; padding:0 2px;">
@@ -2463,11 +2609,23 @@ function onCrmClientChange() {
           <label class="modal-label">Valor do fechamento (R$)</label>
           <input type="text" class="modal-input" id="lead-valor" placeholder="Ex: 3500,00">
         </div>
-        <div class="modal-field">
+        <div class="modal-field" id="field-origem">
           <label class="modal-label">Origem</label>
           <input type="text" class="modal-input" id="lead-origem" placeholder="Ex: Anúncio Stories, Google, Indicação...">
         </div>
-        <div class="modal-field">
+        <div class="modal-field" id="field-rede-social">
+          <label class="modal-label">Rede Social</label>
+          <select class="modal-select" id="lead-rede-social">
+            <option value="">Não informado</option>
+            <option value="Instagram">Instagram</option>
+            <option value="Facebook">Facebook</option>
+            <option value="WhatsApp">WhatsApp</option>
+            <option value="TikTok">TikTok</option>
+            <option value="Google">Google</option>
+            <option value="Outro">Outro</option>
+          </select>
+        </div>
+        <div class="modal-field" id="field-obs">
           <label class="modal-label">Observações</label>
           <textarea class="modal-input" id="lead-obs" rows="2" placeholder="Anotações sobre o lead..." style="resize:vertical;"></textarea>
         </div>
@@ -2475,13 +2633,17 @@ function onCrmClientChange() {
           <label class="modal-label">Motivo da perda</label>
           <input type="text" class="modal-input" id="lead-motivo" placeholder="Ex: Preço, sem resposta, escolheu concorrente...">
         </div>
-        <div class="modal-field">
+        <div class="modal-field" id="field-proxima-acao">
           <label class="modal-label">Próxima ação</label>
           <input type="text" class="modal-input" id="lead-proxima-acao" placeholder="Ex: Ligar segunda às 10h">
         </div>
-        <div class="modal-field">
+        <div class="modal-field" id="field-proxima-data">
           <label class="modal-label">Data da próxima ação</label>
           <input type="date" class="modal-input" id="lead-proxima-data">
+        </div>
+        <div class="modal-field" id="field-chegada">
+          <label class="modal-label">Chegada do lead</label>
+          <input type="date" class="modal-input" id="lead-chegada">
         </div>
         <input type="hidden" id="lead-id">
         <div class="modal-footer">
@@ -2492,6 +2654,66 @@ function onCrmClientChange() {
     </div>
 
   
+    <!-- Import Mapping Modal -->
+    <div id="toast-container"></div>
+    <div id="confirm-modal">
+      <div class="confirm-box">
+        <div class="confirm-title" id="confirm-title">Confirmação</div>
+        <div class="confirm-msg" id="confirm-msg"></div>
+        <div class="confirm-actions">
+          <button class="confirm-btn-cancel" onclick="confirmRespond(false)">Cancelar</button>
+          <button class="confirm-btn-ok" id="confirm-btn-ok" onclick="confirmRespond(true)">Confirmar</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-overlay stages-modal" id="import-map-modal" style="display:none;">
+      <div class="modal-box" style="max-width:560px; max-height:90vh; overflow-y:auto;">
+        <div class="panel-header" style="margin-bottom:4px;">
+          <div class="modal-title">Importar leads</div>
+          <button class="btn-close-panel" onclick="closeImportModal()">×</button>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:16px;" id="import-map-info"></div>
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Associe as colunas da planilha aos campos do CRM</div>
+        <div id="import-map-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;"></div>
+        <div id="import-stage-map-section" style="display:none;margin-bottom:20px;">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Associe os valores de etapa da planilha às colunas do CRM</div>
+          <div id="import-stage-map-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="modal-btn-save" id="btn-import-confirmar" onclick="confirmarImportacao()">Importar leads</button>
+          <button class="modal-btn-cancel" onclick="closeImportModal()">Cancelar</button>
+          <span id="import-map-feedback" style="font-size:12px;color:var(--muted);"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fields Config Modal -->
+    <div class="modal-overlay stages-modal" id="fields-modal" style="display:none;">
+      <div class="modal-box" style="max-width:480px; max-height:85vh; overflow-y:auto;">
+        <div class="panel-header" style="margin-bottom:16px;">
+          <div class="modal-title">Configurar campos do lead</div>
+          <button class="btn-close-panel" onclick="document.getElementById('fields-modal').style.display='none';">×</button>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:16px;" id="fields-modal-client"></div>
+
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Campos do formulário</div>
+        <div id="fields-config-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px;"></div>
+
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Opções do select: Plantão</div>
+        <div id="fields-plantao-opts" style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px;"></div>
+        <button class="btn-add-stage" onclick="addSelectOption('plantao')">+ Adicionar opção de Plantão</button>
+
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 8px;">Opções do select: Rede Social</div>
+        <div id="fields-rede-opts" style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px;"></div>
+        <button class="btn-add-stage" onclick="addSelectOption('rede')">+ Adicionar opção de Rede Social</button>
+
+        <div style="margin-top:20px;display:flex;gap:8px;">
+          <button class="modal-btn-save" onclick="saveFieldsConfig()">Salvar configuração</button>
+          <button class="modal-btn-cancel" onclick="document.getElementById('fields-modal').style.display='none';">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Stages Manager Modal -->
     <div class="modal-overlay stages-modal" id="stages-modal" style="display:none;">
       <div class="modal-box">
@@ -2552,11 +2774,11 @@ function onCrmClientChange() {
 
     <!-- Conta View -->
     <div id="conta-view" style="display:none; padding:28px 32px;">
-      <div style="max-width:420px;">
+      <div style="max-width:520px;">
         <div style="font-size:18px; font-weight:600; color:var(--text); margin-bottom:6px;">Minha conta</div>
         <div style="font-size:13px; color:var(--muted); margin-bottom:28px;">Altere sua senha de acesso ao relatório.</div>
 
-        <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--r2); padding:24px;">
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--r2); padding:24px; margin-bottom:24px;">
           <div class="field-group">
             <label class="field-label">Senha atual</label>
             <input type="password" class="field-input" id="pw-current" placeholder="••••••••">
@@ -2572,6 +2794,12 @@ function onCrmClientChange() {
           <div id="pw-error" style="font-size:13px; color:var(--red); margin-bottom:12px; display:none;"></div>
           <div id="pw-success" style="font-size:13px; color:var(--green); margin-bottom:12px; display:none;">Senha alterada com sucesso!</div>
           <button class="btn-save" onclick="changePassword()">Salvar nova senha</button>
+        </div>
+
+        <div id="admin-logins-section" style="display:none;">
+          <div style="font-size:15px; font-weight:600; color:var(--text); margin-bottom:6px;">Logins dos clientes</div>
+          <div style="font-size:13px; color:var(--muted); margin-bottom:16px;">Visualize e edite usuário e senha de cada cliente.</div>
+          <div id="admin-logins-list" style="display:flex; flex-direction:column; gap:8px;"></div>
         </div>
       </div>
     </div>
@@ -2602,6 +2830,13 @@ function onCrmClientChange() {
     <label class="field-label">Ad Account ID</label>
     <input type="text" class="field-input mono" id="cfg-account" placeholder="act_123456789">
   </div>
+  <div class="field-group">
+    <label class="field-label">Layout do CRM</label>
+    <select class="field-input" id="cfg-layout" style="cursor:pointer;">
+      <option value="default">Padrão (Novo lead, Em contato, Proposta, Fechado, Perdido)</option>
+      <option value="clinica">Clínica (Novo lead, Conversando, Não respondeu, Agendou, Compareceu, Fechou)</option>
+    </select>
+  </div>
   <button class="btn-save" id="btn-salvar-cliente" onclick="saveClient()">Salvar cliente</button>
   <div id="cfg-feedback" style="font-size:13px;margin-top:8px;display:none;"></div>
   <div class="saved-list" id="saved-list"></div>
@@ -2622,6 +2857,7 @@ async function saveClient() {
   const login = document.getElementById('cfg-login').value.trim().toLowerCase().replace(/\s+/g,'');
   const senha = document.getElementById('cfg-senha').value.trim();
   const account = document.getElementById('cfg-account').value.trim();
+  const layout = document.getElementById('cfg-layout').value;
   const feedback = document.getElementById('cfg-feedback');
   const btn = document.getElementById('btn-salvar-cliente');
 
@@ -2643,15 +2879,19 @@ async function saveClient() {
   feedback.style.display = 'none';
 
   try {
-    await window._fb.saveExtraClient(login, name, account, senha);
-    // Atualizar dinâmicamente
+    await window._fb.saveExtraClient(login, name, account, senha, layout);
+    // Atualizar dinamicamente
     CREDENTIALS[login] = { pass: senha, act: account };
     CLIENT_NAMES[account] = name;
+    if (layout === 'clinica' && !CLINICA_ACTS.includes(account)) {
+      CLINICA_ACTS.push(account);
+    }
     // Limpar campos
     document.getElementById('cfg-name').value = '';
     document.getElementById('cfg-login').value = '';
     document.getElementById('cfg-senha').value = '';
     document.getElementById('cfg-account').value = '';
+    document.getElementById('cfg-layout').value = 'default';
     feedback.style.display = 'block';
     feedback.style.color = '#34d399';
     feedback.textContent = `Cliente "${name}" salvo com sucesso!`;
@@ -2669,7 +2909,7 @@ async function saveClient() {
 }
 
 async function removeExtraClient(login, name) {
-  if (!confirm('Remover cliente "' + name + '"? Isso também remove o login.')) return;
+  if (!await showConfirm('O cliente "' + name + '" e seu login serão removidos permanentemente.', 'Remover cliente', 'Remover')) return;
   try {
     await window._fb.deleteExtraClient(login);
     delete CREDENTIALS[login];
@@ -2707,13 +2947,12 @@ function renderSidebar() {
     return;
   }
 
-  const clients = getClients();
-  if (!clients.length) { list.innerHTML = '<div style="font-size:12px; color:var(--muted); padding: 8px 10px;">Nenhum cliente salvo</div>'; return; }
-  list.innerHTML = clients.map(cl => `
-    <div class="client-item ${activeClient && activeClient.name === cl.name ? 'active' : ''}" onclick="selectClient('${cl.name.replace(/'/g,"\\'")}')">
-      <div class="client-avatar">${initials(cl.name)}</div>
-      <span>${cl.name}</span>
-    </div>`).join('');
+  // Cliente não-admin: mostrar apenas o próprio cliente logado
+  if (activeClient) {
+    list.innerHTML = `<div class="client-item active"><div class="client-avatar">${initials(activeClient.name)}</div><span>${activeClient.name}</span></div>`;
+  } else {
+    list.innerHTML = '';
+  }
 }
 
 function selectClientByAct(act) {
@@ -2727,6 +2966,12 @@ function selectClientByAct(act) {
   const sel = document.getElementById('crm-client-select');
   if (sel) sel.value = act;
   crmClientFilter = act;
+
+  // Mostrar botão Campos e Limpar CRM só para admin
+  const camposBtn = document.getElementById('btn-cfg-campos');
+  if (camposBtn) camposBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+  const limparBtn = document.getElementById('btn-limpar-crm');
+  if (limparBtn) limparBtn.style.display = isAdmin ? 'inline-flex' : 'none';
 
   renderSidebar();
 
@@ -3208,7 +3453,8 @@ function renderFunilEvolucao() {
 
   // Idêntico ao renderKanban
   const selE = document.getElementById('crm-client-select');
-  const filterActE = isAdmin ? (selE ? (selE.value === 'all' ? null : selE.value) : null) : crmClientFilter;
+  const fromSelE = selE && selE.value !== 'all' ? selE.value : null;
+  const filterActE = isAdmin ? (fromSelE || crmClientFilter) : crmClientFilter;
   let leads = getLeads();
   if (filterActE) leads = leads.filter(l => l.act === filterActE);
 
@@ -3220,33 +3466,24 @@ function renderFunilEvolucao() {
   stages.forEach(s => { counts[s.id] = 0; });
   leads.forEach(l => { if (counts[l.stage] !== undefined) counts[l.stage]++; });
 
+  const total = leads.length;
   const colors = ['#60a5fa','#fbbf24','#f87171','#a78bfa','#34d399','#fb923c','#e879f9','#4ade80','#f472b6'];
 
   container.innerHTML = stages.map((stage, i) => {
     const count = counts[stage.id] || 0;
-    const isFirst = i === 0;
-
-    // Primeira etapa = 100%, demais comparadas com a anterior
-    const prevCount = isFirst ? count : (counts[stages[i-1].id] || 0);
-    const pct = isFirst ? 100 : (prevCount > 0 ? Math.round((count / prevCount) * 100) : 0);
+    const pct = total > 0 ? Math.round((count / total) * 100) : 0;
     const barWidth = Math.min(pct, 100);
     const color = colors[i % colors.length];
 
-    // Seta indicando queda ou manutenção
-    const arrow = isFirst ? '' : (pct < 100 ? ' ↓' : ' →');
-    const arrowColor = pct < 50 ? '#f87171' : pct < 80 ? '#fbbf24' : '#34d399';
-
     return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-      <div style="font-size:12px;color:${isFirst?'var(--text)':'var(--muted)'};min-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:${isFirst?'500':'400'};">${stage.label}</div>
+      <div style="font-size:12px;color:var(--text);min-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:400;">${stage.label}</div>
       <div style="flex:1;background:var(--surface2);border-radius:4px;height:20px;overflow:hidden;">
         <div style="height:100%;width:${barWidth}%;background:${color};border-radius:4px;transition:width 0.4s;display:flex;align-items:center;padding-left:6px;box-sizing:border-box;">
           ${pct > 5 ? `<span style="font-size:10px;color:#fff;font-weight:500;">${pct}%</span>` : ''}
         </div>
       </div>
-      <div style="font-size:12px;color:var(--text);min-width:100px;text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:4px;">
-        ${count}
-        <span style="color:var(--muted);">(${pct}%)</span>
-        ${!isFirst ? `<span style="color:${arrowColor};font-size:11px;">${arrow}</span>` : ''}
+      <div style="font-size:12px;color:var(--text);min-width:80px;text-align:right;">
+        ${count} <span style="color:var(--muted);">(${pct}%)</span>
       </div>
     </div>`;
   }).join('');
@@ -3286,79 +3523,402 @@ function exportLeads() {
   URL.revokeObjectURL(url);
 }
 
+// ===== IMPORT WITH MAPPING =====
+const IMPORT_FIELDS = [
+  { id: 'name',      label: 'Nome' },
+  { id: 'phone',     label: 'Telefone' },
+  { id: 'email',     label: 'E-mail' },
+  { id: 'stage',     label: 'Etapa/Status' },
+  { id: 'origem',    label: 'Origem/Tratativa' },
+  { id: 'redeSocial',label: 'Rede Social' },
+  { id: 'valor',     label: 'Valor de fechamento' },
+  { id: 'obs',       label: 'Observações' },
+  { id: 'chegada',   label: 'Data de entrada' },
+  { id: 'ignore',    label: '— Ignorar coluna —' },
+];
+
+let _importRows = [];
+let _importAct = null;
+let _importEvent = null;
+
 async function importLeads(event) {
   const file = event.target.files[0];
   if (!file) return;
   const act = crmClientFilter || (activeClient ? activeClient.account : null);
-  if (!act) { alert('Selecione um cliente antes de importar.'); event.target.value = ''; return; }
+  if (!act) { showToast('Selecione um cliente antes de importar.', 'warning'); event.target.value = ''; return; }
+  _importAct = act;
+  _importEvent = event;
 
-  const text = await file.text();
-  const lines = text.split(String.fromCharCode(10)).filter(l => l.trim());
-  if (lines.length < 2) { alert('Arquivo vazio ou inválido.'); return; }
+  const isXlsx = file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls');
 
-  // Detectar separador
-  const sep = lines[0].includes(';') ? ';' : ',';
+  let headers = [];
+  let rows = [];
+  let valoresColIdx = -1;
 
-  // Detectar cabeçalhos
-  const parseCSVLine = (line) => {
-    const result = []; let cur = ''; let inQ = false;
-    for (let c of line) {
-      if (c === '"') { inQ = !inQ; }
-      else if (c === sep && !inQ) { result.push(cur.trim()); cur = ''; }
-      else cur += c;
+  try {
+    if (isXlsx) {
+      if (!window.XLSX) {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+          s.onload = resolve; s.onerror = reject;
+          document.head.appendChild(s);
+        });
+      }
+      const buffer = await file.arrayBuffer();
+      const wb = window.XLSX.read(buffer, { type: 'array' });
+      for (const name of wb.SheetNames) {
+        const ws = wb.Sheets[name];
+        const data = window.XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        let headerIdx = -1;
+        for (let i = 0; i < Math.min(data.length, 5); i++) {
+          const row = data[i].map(c => String(c).toLowerCase().trim());
+          if (row.some(c => ['nome','nome do lead','telefone','phone','name'].includes(c))) { headerIdx = i; break; }
+        }
+        if (headerIdx === -1 && data.length > 0) headerIdx = 0;
+        if (headerIdx !== -1) {
+          // Detectar coluna "Valores" na linha de título
+          if (data[0]) {
+            data[0].forEach((cell, idx) => {
+              if (String(cell).toLowerCase().trim() === 'valores') valoresColIdx = idx;
+            });
+          }
+          headers = data[headerIdx].map((c, idx) => {
+            const h = String(c).trim();
+            // Se vazio mas é a coluna Valores, usar esse nome
+            if (!h && idx === valoresColIdx) return 'Valores';
+            return h || `Coluna ${idx + 1}`;
+          });
+          for (let i = headerIdx + 1; i < data.length; i++) {
+            const vals = data[i];
+            if (vals.every(v => v === '' || v === null || v === undefined)) continue;
+            rows.push(vals);
+          }
+          break;
+        }
+      }
+    } else {
+      const text = await file.text();
+      const lines = text.split('\n').filter(l => l.trim());
+      if (lines.length < 2) { alert('Arquivo vazio.'); return; }
+      const sep = lines[0].includes(';') ? ';' : ',';
+      const parseCSVLine = (line) => {
+        const result = []; let cur = ''; let inQ = false;
+        for (let c of line) {
+          if (c === '"') { inQ = !inQ; } else if (c === sep && !inQ) { result.push(cur.trim()); cur = ''; } else cur += c;
+        }
+        result.push(cur.trim()); return result;
+      };
+      headers = parseCSVLine(lines[0]).map(h => h.replace(/"/g,'').trim() || `Coluna`);
+      for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        rows.push(parseCSVLine(lines[i]).map(v => v.replace(/^"|"$/g,'').trim()));
+      }
     }
-    result.push(cur.trim());
-    return result;
-  };
+  } catch(e) { alert('Erro ao ler arquivo: ' + e.message); return; }
 
-  const headers = parseCSVLine(lines[0]).map(h => h.replace(/"/g,'').toLowerCase().trim());
-  const fieldMap = {
-    'nome': 'name', 'name': 'name',
+  if (!headers.length || !rows.length) { alert('Arquivo vazio ou não reconhecido.'); return; }
+
+  _importRows = { headers, rows, valoresColIdx };
+  openImportModal(act, headers, rows);
+}
+
+function autoMapField(headerName) {
+  const h = headerName.toLowerCase().trim();
+  const map = {
+    'nome': 'name', 'nome do lead': 'name', 'name': 'name',
     'telefone': 'phone', 'phone': 'phone', 'fone': 'phone', 'cel': 'phone', 'celular': 'phone',
     'email': 'email', 'e-mail': 'email',
-    'etapa': 'stage', 'stage': 'stage', 'status': 'stage',
-    'origem': 'origem', 'source': 'origem',
-    'observações': 'obs', 'observacoes': 'obs', 'obs': 'obs', 'notes': 'obs',
-    'valor': 'valor', 'valor fechamento': 'valor',
+    'status': 'stage', 'etapa': 'stage', 'stage': 'stage',
+    'rede social': 'redeSocial', 'rede_social': 'redeSocial',
+    'tratativa': 'origem', 'origem': 'origem', 'source': 'origem',
+    'observações': 'obs', 'observacoes': 'obs', 'obs': 'obs',
+    'fecharam': 'valor', 'valores': 'valor', 'valor': 'valor', 'valor fechamento': 'valor',
     'plantão': 'plantao', 'plantao': 'plantao',
+    'chegada (data)': 'chegada', 'chegada': 'chegada', 'data': 'chegada',
   };
+  return map[h] || 'ignore';
+}
 
-  const stages = getStages();
-  const stageLabelMap = {};
-  stages.forEach(s => {
-    stageLabelMap[s.label.toLowerCase()] = s.id;
-    stageLabelMap[s.id.toLowerCase()] = s.id;
-  });
+function openImportModal(act, headers, rows) {
+  const allClients = Object.entries(CLIENT_NAMES);
+  if (!allClients.length) { showToast('Nenhum cliente disponível.', 'warning'); return; }
+
+  const selectedAct = allClients.find(([a]) => a === act) ? act : allClients[0][0];
+
+  // Para cliente não-admin: sem select de destino
+  const infoHTML = isAdmin
+    ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+        <span style="font-size:13px;font-weight:500;">Importar para:</span>
+        <select id="import-destino-act" class="field-input" style="padding:3px 8px;font-size:13px;min-width:180px;" onchange="atualizarStageMappingDestino()">
+          ${allClients.map(([a, n]) => `<option value="${a}" ${a === selectedAct ? 'selected' : ''}>${n}</option>`).join('')}
+        </select>
+        <span style="color:var(--muted);font-size:12px;">· ${rows.length} linha${rows.length !== 1 ? 's' : ''}</span>
+      </div>`
+    : `<div style="font-size:13px;margin-bottom:4px;">
+        <input type="hidden" id="import-destino-act" value="${selectedAct}">
+        <span style="color:var(--muted);">${rows.length} linha${rows.length !== 1 ? 's' : ''} encontrada${rows.length !== 1 ? 's' : ''}</span>
+      </div>`;
+
+  document.getElementById('import-map-info').innerHTML = infoHTML;
+
+  const list = document.getElementById('import-map-list');
+  list.innerHTML = headers.map((h, i) => {
+    const auto = autoMapField(h);
+    const preview = rows.slice(0,2).map(r => String(r[i] || '').slice(0,30)).filter(Boolean).join(', ');
+    return `
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:120px;">
+        <div style="font-size:13px;font-weight:600;color:var(--text);">${h}</div>
+        ${preview ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${preview}</div>` : ''}
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        <select id="map-col-${i}" class="field-input" style="padding:4px 8px;font-size:12px;min-width:160px;" onchange="onMapColChange()">
+          ${IMPORT_FIELDS.map(f => `<option value="${f.id}" ${auto === f.id ? 'selected' : ''}>${f.label}</option>`).join('')}
+        </select>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('import-map-feedback').textContent = '';
+  document.getElementById('import-map-modal').style.display = 'flex';
+
+  // Renderizar mapeamento de stages se já houver coluna de etapa selecionada
+  setTimeout(() => renderStageMapping(), 50);
+}
+
+function getStageColIdx() {
+  const { headers } = _importRows || {};
+  if (!headers) return -1;
+  for (let i = 0; i < headers.length; i++) {
+    const sel = document.getElementById('map-col-' + i);
+    if (sel && sel.value === 'stage') return i;
+  }
+  return -1;
+}
+
+function onMapColChange() {
+  renderStageMapping();
+}
+
+function atualizarStageMappingDestino() {
+  renderStageMapping();
+}
+
+function renderStageMapping() {
+  const stageColIdx = getStageColIdx();
+  const section = document.getElementById('import-stage-map-section');
+  const stageList = document.getElementById('import-stage-map-list');
+  if (!section || !stageList) return;
+
+  if (stageColIdx === -1) {
+    section.style.display = 'none';
+    return;
+  }
+
+  // Pegar cliente de destino atual
+  const destinoSel = document.getElementById('import-destino-act');
+  const act = destinoSel ? destinoSel.value : _importAct;
+  const stages = getStages(act);
+
+  // Coletar valores únicos da coluna de status
+  const { rows } = _importRows;
+  const uniqueValues = [...new Set(
+    rows.map(r => String(r[stageColIdx] || '').trim()).filter(Boolean)
+  )];
+
+  if (!uniqueValues.length) { section.style.display = 'none'; return; }
+
+  const stageOptions = stages.map(s => `<option value="${s.id}">${s.label}</option>`).join('');
+
+  stageList.innerHTML = uniqueValues.map((val, i) => {
+    // Tentar auto-mapear
+    const autoStage = autoMapStage(val, stages);
+    return `
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div style="flex:1;font-size:13px;color:var(--text);">${val}</div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        <select id="stage-map-${i}" data-value="${val}" class="field-input" style="padding:4px 8px;font-size:12px;min-width:160px;">
+          ${stages.map(s => `<option value="${s.id}" ${s.id === autoStage ? 'selected' : ''}>${s.label}</option>`).join('')}
+        </select>
+      </div>
+    </div>`;
+  }).join('');
+
+  section.style.display = 'block';
+}
+
+function autoMapStage(val, stages) {
+  const n = val.toLowerCase().trim().replace(/\s+/g, ' ');
+
+  // 1. Tentar label exato dos stages do cliente (prioridade máxima)
+  const byLabel = stages.find(s => s.label.toLowerCase().trim() === n);
+  if (byLabel) return byLabel.id;
+
+  // 2. Tentar por ID exato
+  const byId = stages.find(s => s.id.toLowerCase() === n);
+  if (byId) return byId.id;
+
+  // 3. Mapeamento semântico padrão
+  const statusToStage = {
+    'não respondeu': 'nresp', 'nao respondeu': 'nresp',
+    'em conversa': 'conversando',
+    'respondeu e não agendou': 'contato', 'respondeu e nao agendou': 'contato',
+    'agendou e não compareceu': 'ncompareceu', 'agendou e nao compareceu': 'ncompareceu',
+    'compareceu e não fechou': 'compareceu', 'compareceu e nao fechou': 'compareceu',
+    'compareceu e fechou': 'fechou',
+    'novo lead': 'novo', 'em contato': 'contato',
+    'proposta enviada': 'proposta', 'fechado': 'fechado', 'perdido': 'perdido',
+  };
+  const mapped = statusToStage[n];
+  if (mapped) {
+    // Verificar se o stage mapeado existe neste cliente, senão buscar equivalente
+    if (stages.find(s => s.id === mapped)) return mapped;
+    // Tentar encontrar stage semelhante (fechou/fechado, nresp/perdido, etc.)
+    const equivalents = {
+      'fechou': ['fechado', 'fechou'], 'fechado': ['fechou', 'fechado'],
+      'nresp': ['perdido', 'nresp'], 'perdido': ['nresp', 'perdido'],
+      'conversando': ['contato', 'conversando'], 'contato': ['conversando', 'contato'],
+    };
+    for (const eq of (equivalents[mapped] || [])) {
+      if (stages.find(s => s.id === eq)) return eq;
+    }
+  }
+
+  return stages[0]?.id || 'novo';
+}
+
+window.onMapColChange = onMapColChange;
+window.atualizarStageMappingDestino = atualizarStageMappingDestino;
+
+async function limparCrmCliente() {
+  const act = crmClientFilter || (activeClient ? activeClient.account : null);
+  if (!act) { showToast('Selecione um cliente antes de limpar.', 'warning'); return; }
+  const clientName = CLIENT_NAMES[act] || act;
+  if (!await showConfirm('Todos os leads de "' + clientName + '" serão removidos. Esta ação não pode ser desfeita.', 'Limpar CRM', 'Remover todos')) return;
+  const leads = getLeads().filter(l => l.act === act);
+  if (!leads.length) { showToast('Nenhum lead para remover.', 'info'); return; }
+  try {
+    await Promise.all(leads.map(l => deleteLeadFromDb(l.id)));
+    await getLeadsAsync();
+    renderKanban();
+    renderFunilChart();
+    if (typeof renderFunilEvolucao === 'function') renderFunilEvolucao();
+    showToast(leads.length + ' leads removidos de "' + clientName + '"', 'success');
+  } catch(e) {
+    alert('Erro ao limpar: ' + e.message);
+  }
+}
+
+function closeImportModal() {
+  document.getElementById('import-map-modal').style.display = 'none';
+  if (_importEvent) { _importEvent.target.value = ''; _importEvent = null; }
+}
+
+async function confirmarImportacao() {
+  const destinoSel = document.getElementById('import-destino-act');
+  const act = destinoSel ? destinoSel.value : null;
+  if (!act) { showToast('Selecione o cliente de destino antes de importar.', 'warning'); return; }
+  if (!_importRows) return;
+  const { headers, rows, valoresColIdx } = _importRows;
+
+  // Ler mapeamento de colunas
+  const mapping = headers.map((h, i) => ({
+    colIdx: i,
+    field: document.getElementById('map-col-' + i)?.value || 'ignore'
+  }));
+
+  // Ler mapeamento manual de stages
+  const stageMapEls = document.querySelectorAll('#import-stage-map-list [id^="stage-map-"]');
+  const stageValueMap = {};
+  stageMapEls.forEach(sel => { stageValueMap[sel.dataset.value] = sel.value; });
+
+  const stages = getStages(act);
+
+  function resolveStage(raw) {
+    if (!raw) return stages[0]?.id || 'novo';
+    const str = String(raw).trim();
+    if (stageValueMap[str]) return stageValueMap[str];
+    return autoMapStage(str, stages);
+  }
+  function excelDateToISO(serial) {
+    if (!serial || isNaN(serial)) return new Date().toISOString();
+    return new Date((Math.floor(serial - 25569)) * 86400 * 1000).toISOString();
+  }
+
+  function normalizeValor(rawVal) {
+    if (typeof rawVal === 'number' && rawVal > 0) return rawVal.toFixed(2).replace('.', ',');
+    if (typeof rawVal === 'string') {
+      const clean = rawVal.replace(/[R$\s]/g,'').replace(',','.');
+      const num = parseFloat(clean);
+      if (!isNaN(num) && num > 0) return num.toFixed(2).replace('.', ',');
+    }
+    return '';
+  }
+
+  const rmap = {'instagram':'Instagram','facebook':'Facebook','whatsapp':'WhatsApp','tiktok':'TikTok','google':'Google'};
+
+  const fb = document.getElementById('import-map-feedback');
+  fb.textContent = 'Importando...';
+  document.getElementById('btn-import-confirmar').disabled = true;
 
   let imported = 0; let errors = 0;
   const promises = [];
 
-  for (let i = 1; i < lines.length; i++) {
-    if (!lines[i].trim()) continue;
-    const vals = parseCSVLine(lines[i]).map(v => v.replace(/^"|"$/g,'').trim());
-    const lead = { act, createdAt: new Date().toISOString(), stage: stages[0]?.id || 'novo' };
-    headers.forEach((h, idx) => {
-      const field = fieldMap[h];
-      if (field && vals[idx]) {
-        if (field === 'stage') {
-          lead.stage = stageLabelMap[vals[idx].toLowerCase()] || stages[0]?.id || 'novo';
-        } else {
-          lead[field] = vals[idx];
-        }
+  for (const row of rows) {
+    const lead = { act, stage: stages[0]?.id || 'novo', createdAt: new Date().toISOString() };
+    let rawValor = null;
+    let isFechado = false;
+
+    for (const { colIdx, field } of mapping) {
+      if (field === 'ignore') continue;
+      const rawVal = row[colIdx];
+      const val = rawVal === null || rawVal === undefined ? '' : String(rawVal).trim();
+
+      if (field === 'stage') { lead.stage = resolveStage(val); }
+      else if (field === 'chegada') { lead.createdAt = typeof rawVal === 'number' ? excelDateToISO(rawVal) : (val ? new Date(val).toISOString() : new Date().toISOString()); }
+      else if (field === 'valor') {
+        rawValor = rawVal;
+        const v = val.toLowerCase();
+        isFechado = v === 'sim' || (!isNaN(parseFloat(v.replace(',','.'))) && parseFloat(v.replace(',','.')) > 0);
       }
-    });
+      else if (field === 'redeSocial') { lead.redeSocial = rmap[val.toLowerCase()] || val; }
+      else if (val) { lead[field] = val; }
+    }
+
+    // Fallback: coluna Valores separada
+    if (isFechado && !normalizeValor(rawValor) && valoresColIdx !== -1 && row[valoresColIdx] != null && row[valoresColIdx] !== '') {
+      rawValor = row[valoresColIdx];
+    }
+    if (isFechado) lead.valor = normalizeValor(rawValor);
+
+    // Se o lead já entra em etapa de fechamento, setar updatedAt como agora
+    // para o banner de faturamento do mês reconhecer corretamente
+    if (['fechado','fechou'].includes(lead.stage) && lead.valor) {
+      lead.updatedAt = new Date().toISOString();
+    }
+
     if (!lead.name && !lead.phone) continue;
+    lead.id = Date.now().toString() + Math.random().toString(36).slice(2,7);
     promises.push(window._fb.saveLead(lead).then(() => imported++).catch(() => errors++));
   }
 
   await Promise.all(promises);
-  event.target.value = '';
+  closeImportModal();
+  document.getElementById('btn-import-confirmar').disabled = false;
 
-  alert('Importação concluída!\n✅ ' + imported + ' leads importados' + (errors > 0 ? '\n❌ ' + errors + ' erros' : ''));
+  showToast('✅ ' + imported + ' leads importados' + (errors > 0 ? ' · ' + errors + ' erros' : ''), imported > 0 ? 'success' : 'warning');
   await getLeadsAsync();
   renderKanban();
   renderFunilChart();
+  renderFunilEvolucao();
 }
+
+window.closeImportModal = closeImportModal;
+window.confirmarImportacao = confirmarImportacao;
+
 
 window.abrirContatos = function abrirContatos() {
   try {
@@ -3508,7 +4068,8 @@ function stageColor(idx) { return STAGE_COLORS_ARR[idx % STAGE_COLORS_ARR.length
 function getActForStages() {
   if (typeof isAdmin !== 'undefined' && isAdmin) {
     const sel = document.getElementById('crm-client-select');
-    return sel && sel.value !== 'all' ? sel.value : null;
+    const fromSel = sel && sel.value !== 'all' ? sel.value : null;
+    return fromSel || (typeof crmClientFilter !== 'undefined' && crmClientFilter) || (typeof activeClient !== 'undefined' && activeClient ? activeClient.account : null);
   }
   return (typeof crmClientFilter !== 'undefined' && crmClientFilter) || (typeof activeClient !== 'undefined' && activeClient ? activeClient.account : null);
 }
@@ -3551,9 +4112,11 @@ function openStagesModal() {
   stages.forEach((s) => {
     const item = document.createElement('div');
     item.className = 'stage-item';
+    item.dataset.stageId = s.id; // preservar ID original
     const inp = document.createElement('input');
     inp.type = 'text';
-    inp.value = s.label;
+    // Se label parece ID interno, mostrar vazio para forçar preenchimento
+    inp.value = (s.label && !s.label.startsWith('col_') && !s.label.startsWith('stage_')) ? s.label : '';
     inp.placeholder = 'Nome da coluna';
     const del = document.createElement('button');
     del.className = 'btn-del-stage';
@@ -3592,12 +4155,19 @@ function addCustomStageItem() {
 function saveStagesFromModal() {
   const act = getActForStages();
   if (!act) return;
-  const items = document.querySelectorAll('#stages-list .stage-item input');
+  const items = document.querySelectorAll('#stages-list .stage-item');
   const stages = [];
-  items.forEach((inp, i) => {
-    const label = inp.value.trim();
-    if (!label) return;
-    stages.push({ id: 'col_' + i + '_' + Date.now(), label, cls: stageColor(i) });
+  let newIdx = 0;
+  items.forEach((item, i) => {
+    const inp = item.querySelector('input');
+    const label = inp ? inp.value.trim() : '';
+    // Ignorar colunas sem label ou com label parecendo ID interno
+    if (!label || label.startsWith('col_') || label.startsWith('stage_')) return;
+    // Preservar ID original se existir, senão gerar novo para colunas novas
+    const existingId = item.dataset.stageid || item.dataset.stageId;
+    const id = existingId || ('col_new_' + newIdx + '_' + Date.now());
+    newIdx++;
+    stages.push({ id, label, cls: stageColor(i) });
   });
   if (stages.length < 1) { alert('Adicione pelo menos uma coluna.'); return; }
   saveCustomStages(act, stages);
@@ -3609,6 +4179,7 @@ function saveStagesFromModal() {
 const CRM_KEY = 'catapulta_crm_v1';
 let crmClientFilter = null;
 let dragCard = null;
+let dragCol = null;
 
 // Firebase-backed lead storage with localStorage cache
 let _leadsCache = null;
@@ -3684,9 +4255,16 @@ function renderContatos() {
   }
   if (empty) empty.style.display = 'none';
 
+  // Construir mapa de stages incluindo custom stages de todos os clientes
   const STAGE_LABELS = {};
   const allStages = [...(typeof STAGES_DEFAULT !== 'undefined' ? STAGES_DEFAULT : []), ...(typeof STAGES_CLINICA !== 'undefined' ? STAGES_CLINICA : [])];
   allStages.forEach(s => STAGE_LABELS[s.id] = s.label);
+  // Adicionar custom stages de todos os clientes presentes nos leads
+  const actsPresentes = [...new Set(filtered.map(l => l.act).filter(Boolean))];
+  actsPresentes.forEach(act => {
+    const stages = getStages(act);
+    stages.forEach(s => { if (!STAGE_LABELS[s.id]) STAGE_LABELS[s.id] = s.label; });
+  });
 
   const STAGE_COLORS = {
     'novo':        {bg:'rgba(96,165,250,0.15)',color:'#60a5fa'},
@@ -3792,8 +4370,313 @@ function switchView(view) {
     document.getElementById('pw-confirm').value = '';
     document.getElementById('pw-error').style.display = 'none';
     document.getElementById('pw-success').style.display = 'none';
+    if (isAdmin) renderAdminLogins();
   }
 }
+
+async function renderAdminLogins() {
+  const section = document.getElementById('admin-logins-section');
+  const list = document.getElementById('admin-logins-list');
+  if (!section || !list) return;
+  section.style.display = 'block';
+  list.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 0;">Carregando...</div>';
+
+  // Clientes fixos
+  const fixed = Object.entries(CREDENTIALS).filter(([u]) => u !== 'admin').map(([login, cred]) => ({
+    login, name: CLIENT_NAMES[cred.act] || login, pass: getEffectivePassword(login), tipo: 'fixo'
+  }));
+
+  // Clientes extras do Firebase (sem duplicar os fixos)
+  let extras = [];
+  try {
+    const raw = await window._fb.getExtraClients();
+    extras = raw
+      .filter(c => !CREDENTIALS[c.login] || Object.keys(CREDENTIALS).indexOf(c.login) === -1 || !fixed.find(f => f.login === c.login))
+      .map(c => ({ login: c.login, name: c.name, pass: getEffectivePassword(c.login) || c.pass, tipo: 'extra' }));
+  } catch(e) {}
+
+  const todos = [...fixed, ...extras];
+  if (!todos.length) { list.innerHTML = '<div style="font-size:12px;color:var(--muted);">Nenhum cliente.</div>'; return; }
+
+  list.innerHTML = todos.map(c => `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:120px;">
+        <div style="font-size:13px;font-weight:600;color:var(--text);">${c.name}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:11px;color:var(--muted);">Login:</span>
+        <input id="login-user-${c.login}" class="field-input mono" style="width:120px;padding:4px 8px;font-size:12px;" value="${c.login}" ${c.tipo === 'fixo' ? 'disabled title="Login fixo"' : ''}>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:11px;color:var(--muted);">Senha:</span>
+        <input id="login-pass-${c.login}" class="field-input mono" style="width:130px;padding:4px 8px;font-size:12px;" value="${c.pass}" type="text">
+      </div>
+      <button onclick="saveClientCredential('${c.login}','${c.tipo}')" style="background:var(--accent-glow);border:1px solid var(--accent);color:var(--accent2);border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;white-space:nowrap;">Salvar</button>
+      <span id="login-feedback-${c.login}" style="font-size:11px;display:none;"></span>
+    </div>`).join('');
+}
+
+async function saveClientCredential(login, tipo) {
+  const newPass = document.getElementById('login-pass-' + login)?.value.trim();
+  const fb = document.getElementById('login-feedback-' + login);
+  if (!newPass) { if(fb){fb.style.display='inline';fb.style.color='#f87171';fb.textContent='Senha vazia.';} return; }
+  try {
+    await window._fb.updatePassword(login, newPass);
+    if (tipo === 'extra') {
+      const extras = await window._fb.getExtraClients();
+      const ex = extras.find(e => e.login === login);
+      if (ex) await window._fb.saveExtraClient(login, ex.name, ex.act, newPass, ex.layout);
+    }
+    if (CREDENTIALS[login]) CREDENTIALS[login].pass = newPass;
+    _customPasswords[login] = newPass;
+    if (fb) { fb.style.display='inline'; fb.style.color='#34d399'; fb.textContent='Salvo!'; setTimeout(()=>{fb.style.display='none';},2000); }
+  } catch(e) {
+    if (fb) { fb.style.display='inline'; fb.style.color='#f87171'; fb.textContent='Erro: '+e.message; }
+  }
+}
+
+
+
+// ===== FIELD CONFIG SYSTEM =====
+const FIELDS_CONFIG_KEY = 'field_config_';
+
+const CONFIGURABLE_FIELDS = [
+  { id: 'plantao',      label: 'Plantão',             type: 'select', defaultVisible: false },
+  { id: 'valor',        label: 'Valor do fechamento',  type: 'text',   defaultVisible: true  },
+  { id: 'origem',       label: 'Origem',               type: 'text',   defaultVisible: true  },
+  { id: 'rede-social',  label: 'Rede Social',          type: 'select', defaultVisible: true  },
+  { id: 'obs',          label: 'Observações',          type: 'textarea',defaultVisible: true  },
+  { id: 'proxima-acao', label: 'Próxima ação',         type: 'text',   defaultVisible: true  },
+  { id: 'proxima-data', label: 'Data da próxima ação', type: 'date',   defaultVisible: true  },
+];
+
+const DEFAULT_PLANTAO_OPTS = ['Implantes', 'Lentes', 'Clareamento'];
+const DEFAULT_REDE_OPTS = ['Instagram', 'Facebook', 'WhatsApp', 'TikTok', 'Google', 'Outro'];
+
+function getFieldConfig(act) {
+  try {
+    const raw = localStorage.getItem(FIELDS_CONFIG_KEY + act);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return {
+    fields: CONFIGURABLE_FIELDS.map(f => ({ id: f.id, label: f.label, visible: f.defaultVisible })),
+    plantaoOpts: [...DEFAULT_PLANTAO_OPTS],
+    redeOpts: [...DEFAULT_REDE_OPTS],
+  };
+}
+
+function saveFieldConfig(act, config) {
+  localStorage.setItem(FIELDS_CONFIG_KEY + act, JSON.stringify(config));
+}
+
+function openFieldsModal() {
+  const act = getActForStages();
+  if (!act) { alert('Selecione um cliente específico primeiro.'); return; }
+  const config = getFieldConfig(act);
+  const clientName = CLIENT_NAMES[act] || act;
+  document.getElementById('fields-modal-client').textContent = 'Cliente: ' + clientName;
+
+  // Campos
+  const fieldsList = document.getElementById('fields-config-list');
+  fieldsList.innerHTML = config.fields.map((f, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--surface2);border-radius:6px;">
+      <input type="checkbox" id="fld-vis-${f.id}" ${f.visible ? 'checked' : ''} style="accent-color:var(--accent);width:14px;height:14px;flex-shrink:0;">
+      <input type="text" value="${f.label}" id="fld-lbl-${f.id}" class="field-input" style="flex:1;padding:4px 8px;font-size:13px;" placeholder="Nome do campo">
+      <span style="font-size:10px;color:var(--muted);width:50px;text-align:right;">${CONFIGURABLE_FIELDS.find(cf=>cf.id===f.id)?.type||''}</span>
+    </div>`).join('');
+
+  // Opções plantão
+  renderSelectOpts('plantao', config.plantaoOpts);
+  renderSelectOpts('rede', config.redeOpts);
+
+  document.getElementById('fields-modal').style.display = 'flex';
+}
+
+function renderSelectOpts(type, opts) {
+  const el = document.getElementById('fields-' + type + '-opts');
+  el.innerHTML = opts.map((opt, i) => `
+    <div style="display:flex;align-items:center;gap:6px;">
+      <input type="text" value="${opt}" id="selopt-${type}-${i}" class="field-input" style="flex:1;padding:4px 8px;font-size:13px;">
+      <button onclick="removeSelectOption('${type}',${i})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:0 4px;">×</button>
+    </div>`).join('');
+}
+
+function addSelectOption(type) {
+  const act = getActForStages();
+  if (!act) return;
+  const config = getFieldConfig(act);
+  if (type === 'plantao') config.plantaoOpts.push('Nova opção');
+  else config.redeOpts.push('Nova opção');
+  saveFieldConfig(act, config);
+  openFieldsModal();
+}
+
+function removeSelectOption(type, idx) {
+  const act = getActForStages();
+  if (!act) return;
+  const config = getFieldConfig(act);
+  if (type === 'plantao') config.plantaoOpts.splice(idx, 1);
+  else config.redeOpts.splice(idx, 1);
+  saveFieldConfig(act, config);
+  openFieldsModal();
+}
+
+function saveFieldsConfig() {
+  const act = getActForStages();
+  if (!act) return;
+  const config = getFieldConfig(act);
+
+  // Ler campos
+  config.fields = config.fields.map(f => ({
+    id: f.id,
+    label: document.getElementById('fld-lbl-' + f.id)?.value.trim() || f.label,
+    visible: document.getElementById('fld-vis-' + f.id)?.checked ?? f.visible,
+  }));
+
+  // Ler opções plantão
+  const plantaoOpts = [];
+  let i = 0;
+  while (document.getElementById('selopt-plantao-' + i)) {
+    const v = document.getElementById('selopt-plantao-' + i).value.trim();
+    if (v) plantaoOpts.push(v);
+    i++;
+  }
+  config.plantaoOpts = plantaoOpts;
+
+  // Ler opções rede
+  const redeOpts = [];
+  i = 0;
+  while (document.getElementById('selopt-rede-' + i)) {
+    const v = document.getElementById('selopt-rede-' + i).value.trim();
+    if (v) redeOpts.push(v);
+    i++;
+  }
+  config.redeOpts = redeOpts;
+
+  saveFieldConfig(act, config);
+  document.getElementById('fields-modal').style.display = 'none';
+  showToast('Configuração salva!', 'success');
+}
+
+function applyFieldConfig(act) {
+  const config = getFieldConfig(act);
+  const fieldMap = {
+    'plantao':      'field-plantao',
+    'valor':        'field-valor',
+    'obs':          'field-obs',
+    'proxima-acao': 'field-proxima-acao',
+    'proxima-data': 'field-proxima-data',
+    'rede-social':  'field-rede-social',
+    'origem':       'field-origem',
+  };
+
+  config.fields.forEach(f => {
+    const wrapper = document.getElementById(fieldMap[f.id]);
+    if (wrapper) {
+      const lbl = wrapper.querySelector('.modal-label, label');
+      if (lbl) lbl.textContent = f.label;
+      wrapper.style.display = f.visible ? 'block' : 'none';
+    }
+  });
+
+  // Atualizar opções do select plantão
+  const plantaoSel = document.getElementById('lead-plantao');
+  if (plantaoSel) {
+    plantaoSel.innerHTML = '<option value="">Selecione</option>' +
+      config.plantaoOpts.map(o => `<option value="${o}">${o}</option>`).join('');
+  }
+
+  // Atualizar opções do select rede social
+  const redeSel = document.getElementById('lead-rede-social');
+  if (redeSel) {
+    redeSel.innerHTML = '<option value="">Não informado</option>' +
+      config.redeOpts.map(o => `<option value="${o}">${o}</option>`).join('');
+  }
+}
+
+window.openFieldsModal = openFieldsModal;
+window.addSelectOption = addSelectOption;
+window.removeSelectOption = removeSelectOption;
+window.saveFieldsConfig = saveFieldsConfig;
+
+
+// ===== TOAST SYSTEM =====
+
+// ===== FILTRO DE PERÍODO =====
+let _periodoFiltro = 'todos'; // 'todos' ou 'YYYY-MM'
+
+function populatePeriodoSelect(leads) {
+  const sel = document.getElementById('crm-periodo');
+  if (!sel) return;
+  // Coletar meses únicos dos leads
+  const meses = new Set();
+  leads.forEach(l => {
+    const d = l.createdAt ? new Date(l.createdAt) : null;
+    if (d && !isNaN(d)) {
+      meses.add(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'));
+    }
+  });
+  const sorted = [...meses].sort().reverse();
+  const current = _periodoFiltro;
+  sel.innerHTML = '<option value="todos">Todos os períodos</option>' +
+    sorted.map(m => {
+      const [y, mo] = m.split('-');
+      const nome = new Date(y, mo-1, 1).toLocaleDateString('pt-BR', {month:'long', year:'numeric'});
+      return `<option value="${m}" ${m === current ? 'selected' : ''}>${nome.charAt(0).toUpperCase() + nome.slice(1)}</option>`;
+    }).join('');
+}
+
+function onPeriodoChange() {
+  const sel = document.getElementById('crm-periodo');
+  _periodoFiltro = sel ? sel.value : 'todos';
+  renderKanban(); renderFunilChart(); renderFunilEvolucao();
+}
+
+function filterLeadsByPeriodo(leads) {
+  if (!_periodoFiltro || _periodoFiltro === 'todos') return leads;
+  const [y, m] = _periodoFiltro.split('-').map(Number);
+  return leads.filter(l => {
+    const d = l.createdAt ? new Date(l.createdAt) : null;
+    return d && d.getFullYear() === y && d.getMonth()+1 === m;
+  });
+}
+
+window.onPeriodoChange = onPeriodoChange;
+
+function showToast(msg, type = 'info', duration = 3500) {
+  const container = document.getElementById('toast-container');
+  if (!container) { alert(msg); return; }
+  const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+  const toast = document.createElement('div');
+  toast.className = 'toast ' + type;
+  toast.innerHTML = `<span class="toast-icon">${icons[type] || 'ℹ️'}</span><span class="toast-msg">${msg}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add('out');
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
+window.showToast = showToast;
+
+// ===== CONFIRM MODAL =====
+let _confirmResolve = null;
+function showConfirm(msg, title = 'Confirmar', okLabel = 'Confirmar', danger = true) {
+  return new Promise(resolve => {
+    _confirmResolve = resolve;
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-msg').textContent = msg;
+    const btn = document.getElementById('confirm-btn-ok');
+    btn.textContent = okLabel;
+    btn.className = 'confirm-btn-ok' + (danger ? '' : ' safe');
+    document.getElementById('confirm-modal').classList.add('open');
+  });
+}
+function confirmRespond(result) {
+  document.getElementById('confirm-modal').classList.remove('open');
+  if (_confirmResolve) { _confirmResolve(result); _confirmResolve = null; }
+}
+window.showConfirm = showConfirm;
+window.confirmRespond = confirmRespond;
 
 function setupCrmForClient() {
   if (isAdmin) {
@@ -3809,9 +4692,14 @@ function setupCrmForClient() {
 
 function renderKanban() {
   const sel = document.getElementById('crm-client-select');
-  const filterAct = isAdmin ? (sel ? (sel.value === 'all' ? null : sel.value) : null) : crmClientFilter;
+  const fromSel = sel && sel.value !== 'all' ? sel.value : null;
+  const filterAct = isAdmin ? (fromSel || crmClientFilter) : crmClientFilter;
   let leads = getLeads();
   if (filterAct) leads = leads.filter(l => l.act === filterAct);
+  // Filtrar por período selecionado
+  leads = typeof filterLeadsByPeriodo === 'function' ? filterLeadsByPeriodo(leads) : leads;
+  // Popular select de período com meses disponíveis
+  populatePeriodoSelect(getLeads().filter(l => !filterAct || l.act === filterAct));
 
   const STAGES = getStages(filterAct || (activeClient ? activeClient.account : ''));
 
@@ -3829,7 +4717,7 @@ function renderKanban() {
   const board = document.getElementById('kanban-board');
   board.innerHTML = '';
 
-  // Calcular valor fechado total
+  // Calcular faturamento: soma todos os leads em fechou/fechado com valor
   let totalFechado = 0;
   let qtdFechado = 0;
   leads.forEach(l => {
@@ -3845,6 +4733,8 @@ function renderKanban() {
     document.getElementById('valor-fechado-total').textContent = 'R$ ' + totalFechado.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
     document.getElementById('valor-fechado-qtd').textContent = qtdFechado > 0 ? '(' + qtdFechado + ' fechamento' + (qtdFechado > 1 ? 's' : '') + ')' : '';
   }
+
+
 
   STAGES.forEach(stage => {
     const stageLeads = leads.filter(l => l.stage === stage.id);
@@ -3925,17 +4815,34 @@ function renderKanban() {
       }
     });
 
+    // Lupinha de busca na coluna
+    const searchWrap = document.createElement('div');
+    searchWrap.className = 'col-search-wrap';
+    searchWrap.innerHTML = `
+      <svg class="col-search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input class="col-search-input" placeholder="Buscar..." oninput="filtrarColuna('${stage.id}', this.value)">`;
+    col.appendChild(searchWrap);
+
     // Cards container
     const cardsDiv = document.createElement('div');
     cardsDiv.className = 'kanban-cards';
     cardsDiv.id = 'col-' + stage.id;
-    if (stageLeads.length === 0) {
-      const empty = document.createElement('div');
-      empty.style.cssText = 'font-size:12px;color:var(--muted);text-align:center;padding:12px 0;';
-      empty.textContent = 'Nenhum lead';
-      cardsDiv.appendChild(empty);
-    }
-    stageLeads.forEach(lead => {
+
+    function renderColCards(filterText) {
+      cardsDiv.innerHTML = '';
+      const filteredLeads = filterText
+        ? stageLeads.filter(l =>
+            (l.name||'').toLowerCase().includes(filterText) ||
+            (l.phone||'').includes(filterText) ||
+            (l.email||'').toLowerCase().includes(filterText))
+        : stageLeads;
+      if (filteredLeads.length === 0) {
+        const empty = document.createElement('div');
+        empty.style.cssText = 'font-size:12px;color:var(--muted);text-align:center;padding:12px 0;';
+        empty.textContent = filterText ? 'Nenhum resultado' : 'Nenhum lead';
+        cardsDiv.appendChild(empty);
+      }
+      filteredLeads.forEach(lead => {
       const card = document.createElement('div');
       card.className = 'kanban-card';
       card.draggable = true;
@@ -3944,10 +4851,12 @@ function renderKanban() {
       card.addEventListener('dragend', onDragEnd);
       let cardHTML = '';
       if (lead.origem) cardHTML += `<div class="card-origem">📍 ${lead.origem}</div>`;
+      if (lead.redeSocial) cardHTML += `<div class="card-rede">📱 ${lead.redeSocial}</div>`;
       cardHTML += `<div class="card-name">${lead.name}</div>`;
       cardHTML += `<div class="card-phone">${lead.phone || '—'}</div>`;
       cardHTML += `<div class="card-email">${lead.email || '—'}</div>`;
       if (lead.obs) cardHTML += `<div class="card-obs">💬 ${lead.obs}</div>`;
+      if (lead.valor) cardHTML += `<div class="card-valor">💰 R$ ${lead.valor}</div>`;
       if (lead.proximaAcao) cardHTML += `<div class="card-proxima">⏰ ${lead.proximaAcao}${lead.proximaData ? ' · ' + new Date(lead.proximaData + 'T12:00:00').toLocaleDateString('pt-BR') : ''}</div>`;
       if (lead.createdAt) cardHTML += `<div style="font-size:10px;color:var(--muted);margin-top:4px;">Entrada: ${new Date(lead.createdAt).toLocaleDateString('pt-BR')}</div>`;
       const waPhone = lead.phone ? lead.phone.replace(/\D/g,'') : '';
@@ -3962,6 +4871,8 @@ function renderKanban() {
       card.innerHTML = cardHTML;
       cardsDiv.appendChild(card);
     });
+    } // fim renderColCards
+    renderColCards('');
     col.appendChild(cardsDiv);
 
     col.addEventListener('dragover', e => { e.preventDefault(); col.classList.add('drag-over'); });
@@ -3971,6 +4882,37 @@ function renderKanban() {
     board.appendChild(col);
   });
 }
+
+function filtrarColuna(stageId, text) {
+  const q = text.toLowerCase().trim();
+  const cardsDiv = document.getElementById('col-' + stageId);
+  if (!cardsDiv) return;
+  cardsDiv.querySelectorAll('.kanban-card').forEach(card => {
+    const id = card.dataset.id;
+    const lead = getLeads().find(l => l.id === id);
+    if (!lead) { card.style.display = ''; return; }
+    const match = !q ||
+      (lead.name||'').toLowerCase().includes(q) ||
+      (lead.phone||'').includes(q) ||
+      (lead.email||'').toLowerCase().includes(q);
+    card.style.display = match ? '' : 'none';
+  });
+  // Mostrar/ocultar empty state
+  const visible = [...cardsDiv.querySelectorAll('.kanban-card')].filter(c => c.style.display !== 'none');
+  let emptyEl = cardsDiv.querySelector('.col-empty-search');
+  if (visible.length === 0 && q) {
+    if (!emptyEl) {
+      emptyEl = document.createElement('div');
+      emptyEl.className = 'col-empty-search';
+      emptyEl.style.cssText = 'font-size:12px;color:var(--muted);text-align:center;padding:12px 0;';
+      emptyEl.textContent = 'Nenhum resultado';
+      cardsDiv.appendChild(emptyEl);
+    }
+  } else if (emptyEl) {
+    emptyEl.remove();
+  }
+}
+window.filtrarColuna = filtrarColuna;
 
 function onDragStart(e) {
   dragCard = e.currentTarget.dataset.id;
@@ -3982,16 +4924,17 @@ function dropCard(stageId) {
   if (!dragCard) return;
   const leads = getLeads();
   const idx = leads.findIndex(l => l.id === dragCard);
-  if (idx !== -1 && leads[idx].stage !== stageId) {
-    const STAGES = getStages(leads[idx].act);
-    const stageLabel = STAGES.find(s => s.id === stageId)?.label || stageId;
-    leads[idx].stage = stageId;
-    leads[idx].updatedAt = new Date().toISOString();
-    if (!leads[idx].history) leads[idx].history = [];
-    leads[idx].history.push({ stage: stageLabel, at: new Date().toLocaleString('pt-BR') });
-    _leadsCache = leads;
-    saveLeadToDb(leads[idx]);
+  if (idx === -1 || leads[idx].stage === stageId) {
+    dragCard = null;
+    return;
   }
+  const STAGES = getStages(leads[idx].act);
+  const stageLabel = STAGES.find(s => s.id === stageId)?.label || stageId;
+  leads[idx].stage = stageId;
+  leads[idx].updatedAt = new Date().toISOString();
+  if (!leads[idx].history) leads[idx].history = [];
+  leads[idx].history.push({ stage: stageLabel, at: new Date().toLocaleString('pt-BR') });
+  saveLeadToDb(leads[idx]);
   renderKanban(); renderFunilChart(); renderFunilEvolucao();
 }
 
@@ -4004,19 +4947,25 @@ function openLeadModal() {
   document.getElementById('lead-email').value = '';
   document.getElementById('lead-plantao').value = '';
   document.getElementById('lead-valor').value = '';
+  document.getElementById('lead-rede-social').value = '';
   document.getElementById('lead-stage').value = 'novo';
   document.getElementById('modal-title').textContent = 'Novo lead';
+  // Reset todos os campos configuráveis para visível antes de aplicar config
+  ['field-valor','field-origem','field-rede-social','field-obs','field-proxima-acao','field-proxima-data'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'block';
+  });
   document.getElementById('field-plantao').style.display = clinica ? 'block' : 'none';
-  document.getElementById('field-valor').style.display = 'block';
   document.getElementById('field-motivo-perda').style.display = 'none';
   document.getElementById('lead-stage').onchange = function() {
     const isPerdido = ['perdido','ncompareceu'].includes(this.value);
     document.getElementById('field-motivo-perda').style.display = isPerdido ? 'block' : 'none';
   };
-  // update stage options
+  // update stage options usando stages reais do cliente (inclui customizados)
   const stageSelect = document.getElementById('lead-stage');
-  const stages = clinica ? STAGES_CLINICA : STAGES_DEFAULT;
+  const stages = act ? getStages(act) : (clinica ? STAGES_CLINICA : STAGES_DEFAULT);
   stageSelect.innerHTML = stages.map(s => `<option value="${s.id}">${s.label}</option>`).join('');
+  if (act) applyFieldConfig(act);
   document.getElementById('lead-modal').classList.add('open');
 }
 
@@ -4030,8 +4979,13 @@ function editLead(id) {
   document.getElementById('lead-email').value = lead.email || '';
   document.getElementById('lead-plantao').value = lead.plantao || '';
   document.getElementById('lead-valor').value = lead.valor || '';
+  document.getElementById('lead-rede-social').value = lead.redeSocial || '';
+  // Reset campos configuráveis para visível antes de aplicar config
+  ['field-valor','field-origem','field-rede-social','field-obs','field-proxima-acao','field-proxima-data'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'block';
+  });
   document.getElementById('field-plantao').style.display = clinica ? 'block' : 'none';
-  document.getElementById('field-valor').style.display = 'block';
   const isPerdidoEdit = ['perdido','ncompareceu'].includes(lead.stage);
   document.getElementById('field-motivo-perda').style.display = isPerdidoEdit ? 'block' : 'none';
   document.getElementById('lead-stage').onchange = function() {
@@ -4039,10 +4993,13 @@ function editLead(id) {
     document.getElementById('field-motivo-perda').style.display = isPerdido ? 'block' : 'none';
   };
   const stageSelect = document.getElementById('lead-stage');
-  const stages = clinica ? STAGES_CLINICA : STAGES_DEFAULT;
+  const stages = (lead && lead.act) ? getStages(lead.act) : (clinica ? STAGES_CLINICA : STAGES_DEFAULT);
   stageSelect.innerHTML = stages.map(s => `<option value="${s.id}">${s.label}</option>`).join('');
   stageSelect.value = lead.stage;
   document.getElementById('modal-title').textContent = 'Editar lead';
+  if (lead.act) applyFieldConfig(lead.act);
+  // Restaurar valor do select rede social após applyFieldConfig sobrescrever opções
+  document.getElementById('lead-rede-social').value = lead.redeSocial || '';
   document.getElementById('lead-modal').classList.add('open');
 }
 
@@ -4075,9 +5032,20 @@ async function saveLead() {
     email: document.getElementById('lead-email').value.trim(),
     plantao: document.getElementById('lead-plantao').value,
     valor: document.getElementById('lead-valor').value.trim(),
+    redeSocial: document.getElementById('lead-rede-social').value,
+    origem: document.getElementById('lead-origem') ? document.getElementById('lead-origem').value.trim() : (existing ? existing.origem || '' : ''),
+    obs: document.getElementById('lead-obs') ? document.getElementById('lead-obs').value.trim() : (existing ? existing.obs || '' : ''),
+    motivo: document.getElementById('lead-motivo') ? document.getElementById('lead-motivo').value.trim() : (existing ? existing.motivo || '' : ''),
+    proximaAcao: document.getElementById('lead-proxima-acao') ? document.getElementById('lead-proxima-acao').value.trim() : (existing ? existing.proximaAcao || '' : ''),
+    proximaData: document.getElementById('lead-proxima-data') ? document.getElementById('lead-proxima-data').value : (existing ? existing.proximaData || '' : ''),
     stage: newStage,
     act, history,
-    createdAt: existing ? existing.createdAt : new Date().toISOString(),
+    createdAt: (() => {
+      const chegadaEl = document.getElementById('lead-chegada');
+      if (chegadaEl && chegadaEl.value) return new Date(chegadaEl.value + 'T12:00:00').toISOString();
+      return existing ? existing.createdAt : new Date().toISOString();
+    })(),
+    updatedAt: new Date().toISOString(),
     _docId: existing ? (existing._docId || null) : null
   };
   if (_leadsCache) {
@@ -4090,7 +5058,7 @@ async function saveLead() {
 }
 
 async function deleteLead(id) {
-  if (!confirm('Remover este lead?')) return;
+  if (!await showConfirm('Esta ação não pode ser desfeita.', 'Remover lead?', 'Remover')) return;
   await deleteLeadFromDb(id);
   renderKanban(); renderFunilChart(); renderFunilEvolucao();
 }
@@ -4325,7 +5293,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function doLogout() {
-  if (!confirm('Deseja sair?')) return;
+  if (!await showConfirm('Você será desconectado do sistema.', 'Sair', 'Sair', false)) return;
   clearSession();
   if (window._fb) await window._fb.logoutUser();
   location.reload();
@@ -4334,6 +5302,10 @@ async function doLogout() {
 function updateSidebarForUser() {
   const configBtn = document.getElementById('btn-config');
   if (configBtn) configBtn.style.display = isAdmin ? 'flex' : 'none';
+  const camposBtn = document.getElementById('btn-cfg-campos');
+  if (camposBtn) camposBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+  const limparBtn2 = document.getElementById('btn-limpar-crm');
+  if (limparBtn2) limparBtn2.style.display = isAdmin ? 'inline-flex' : 'none';
   const logoutBtn = document.getElementById('btn-logout');
   if (logoutBtn) logoutBtn.style.display = 'flex';
   const footer = document.getElementById('sidebar-footer');
@@ -4380,14 +5352,25 @@ async function loadExtraClients() {
     extras.forEach(c => {
       CREDENTIALS[c.login] = { pass: c.pass, act: c.act };
       CLIENT_NAMES[c.act] = c.name;
+      if (c.layout === 'clinica' && !CLINICA_ACTS.includes(c.act)) {
+        CLINICA_ACTS.push(c.act);
+      }
     });
-    // Re-rodar restoreSession se havia sessão salva de um cliente extra
+    // Repopular dropdown com clientes extras agora disponíveis
+    if (isAdmin) {
+      const sel = document.getElementById('crm-client-select');
+      if (sel) {
+        sel.innerHTML = '<option value="all">Todos os clientes</option>' +
+          Object.entries(CLIENT_NAMES).map(([act, name]) => `<option value="${act}">${name}</option>`).join('');
+      }
+    }
+    // Re-rodar restoreSession para garantir que cliente extra seja reconhecido
     const session = getSession();
-    if (session && !document.getElementById('login-overlay').style.display.includes('none')) {
+    if (session) {
       restoreSession();
     } else {
       renderSidebar();
-      updateSidebarForUser(); // Atualiza mobile-client-select com novos clientes
+      updateSidebarForUser();
     }
   } catch(e) { console.warn('loadExtraClients erro:', e); }
 }
