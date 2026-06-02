@@ -169,6 +169,25 @@ input[type="date"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px va
 .welcome-title { font-size: 20px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
 .welcome-desc { font-size: 14px; color: var(--muted); max-width: 320px; line-height: 1.7; }
 
+
+.dashboard-section-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+.dashboard-section-head .section-label { margin-bottom:0; }
+.metric-picker { position:relative; }
+.metric-picker-btn { height:36px; padding:0 12px; border-radius:8px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font:600 12px 'Inter', sans-serif; display:inline-flex; align-items:center; gap:8px; cursor:pointer; }
+.metric-picker-btn:hover { border-color:var(--gold); color:var(--gold); }
+.metric-picker-menu { position:absolute; right:0; top:42px; z-index:30; width:250px; max-height:360px; overflow:auto; padding:10px; border:1px solid var(--border); border-radius:8px; background:var(--surface); box-shadow:0 18px 46px rgba(0,0,0,.35); display:none; }
+.metric-picker.open .metric-picker-menu { display:block; }
+.metric-picker-title { font-size:10px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin:3px 4px 8px; }
+.metric-option { display:flex; align-items:center; gap:8px; padding:8px 6px; border-radius:6px; color:var(--text); font-size:12px; cursor:pointer; }
+.metric-option:hover { background:rgba(255,255,255,.04); }
+.metric-option input { accent-color:var(--gold); }
+.ad-name-main { font-weight:700; color:var(--text); margin-bottom:4px; }
+.ad-name-sub { color:var(--muted); font-size:11px; line-height:1.35; }
+@media (max-width: 768px) {
+  .dashboard-section-head { align-items:flex-start; }
+  .metric-picker { margin-left:auto; }
+  .metric-picker-menu { right:0; width:min(280px, calc(100vw - 48px)); }
+}
 /* Metrics */
 .section-label { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; }
 .metrics-grid {
@@ -177,7 +196,8 @@ input[type="date"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px va
 }
 .metric-card {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--r2); padding: 20px;
+  border-radius: var(--r2); padding: 20px; min-height: 160px; box-sizing: border-box;
+  display: flex; flex-direction: column; justify-content: center;
   transition: all 0.2s; position: relative; overflow: hidden;
   opacity: 0; animation: fadeUp 0.4s ease forwards;
 }
@@ -586,11 +606,11 @@ tr:hover td { background: var(--surface2); }
   }
   .confirm-btn-cancel:hover { border-color: var(--text); color: var(--text); }
   .confirm-btn-ok {
-    background: #f87171; border: none; color: #fff;
+    background: rgba(239, 68, 68, 0.16); border: 1px solid rgba(248, 113, 113, 0.48); color: #ff8a8a;
     border-radius: 8px; padding: 8px 20px; font-size: 13px;
-    cursor: pointer; font-weight: 600; font-family: inherit;
+    cursor: pointer; font-weight: 700; font-family: inherit;
   }
-  .confirm-btn-ok:hover { background: #ef4444; }
+  .confirm-btn-ok:hover { background: rgba(239, 68, 68, 0.28); border-color: #f87171; color: #fff; }
   .confirm-btn-ok.safe { background: var(--accent2); }
   .confirm-btn-ok.safe:hover { opacity: .85; }
   .col-search-wrap { padding: 8px 10px 4px; }
@@ -671,9 +691,28 @@ tr:hover td { background: var(--surface2); }
     .content { padding: 14px; }
     .crm-view { padding: 14px; }
 
-    /* Metrics */
+    
+.dashboard-section-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+.dashboard-section-head .section-label { margin-bottom:0; }
+.metric-picker { position:relative; }
+.metric-picker-btn { height:36px; padding:0 12px; border-radius:8px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font:600 12px 'Inter', sans-serif; display:inline-flex; align-items:center; gap:8px; cursor:pointer; }
+.metric-picker-btn:hover { border-color:var(--gold); color:var(--gold); }
+.metric-picker-menu { position:absolute; right:0; top:42px; z-index:30; width:250px; max-height:360px; overflow:auto; padding:10px; border:1px solid var(--border); border-radius:8px; background:var(--surface); box-shadow:0 18px 46px rgba(0,0,0,.35); display:none; }
+.metric-picker.open .metric-picker-menu { display:block; }
+.metric-picker-title { font-size:10px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin:3px 4px 8px; }
+.metric-option { display:flex; align-items:center; gap:8px; padding:8px 6px; border-radius:6px; color:var(--text); font-size:12px; cursor:pointer; }
+.metric-option:hover { background:rgba(255,255,255,.04); }
+.metric-option input { accent-color:var(--gold); }
+.ad-name-main { font-weight:700; color:var(--text); margin-bottom:4px; }
+.ad-name-sub { color:var(--muted); font-size:11px; line-height:1.35; }
+@media (max-width: 768px) {
+  .dashboard-section-head { align-items:flex-start; }
+  .metric-picker { margin-left:auto; }
+  .metric-picker-menu { right:0; width:min(280px, calc(100vw - 48px)); }
+}
+/* Metrics */
     .metrics-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }
-    .metric-card { padding: 14px; }
+    .metric-card { padding: 14px; min-height: 132px; }
     .metric-value { font-size: 19px; }
     .metric-icon { width: 26px; height: 26px; margin-bottom: 10px; }
     .metric-sub { font-size: 10px; }
@@ -692,6 +731,9 @@ tr:hover td { background: var(--surface2); }
     .campaigns-table tbody td.name-cell { display: block; text-align: left; font-size: 14px; font-weight: 700; padding-bottom: 10px; }
     .campaigns-table tbody td.name-cell::before { display: block; margin-bottom: 5px; }
     .campaigns-table tbody td:not(.name-cell) > * { margin-left: auto; }
+    .campaigns-table tbody td.name-cell { display:block; text-align:left; }
+    .campaigns-table tbody td.name-cell::before { display:block; margin-bottom:10px; }
+    .campaigns-table .ad-info { align-items:flex-start; }
     .campaigns-table tbody td.empty-state { display: block; text-align: center; }
     .campaigns-table tbody td.empty-state::before { content: none; }
     .hide-leads-cols .campaigns-table .col-cpl, .hide-leads-cols .campaigns-table .col-leads, .hide-leads-cols2 .campaigns-table .col-cpl, .hide-leads-cols2 .campaigns-table .col-leads, .hide-conv-cols .campaigns-table .col-conv, .hide-conv-cols .campaigns-table .col-cpconv { display: none; }
@@ -2196,7 +2238,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function doLogout() {
-  if (!await showConfirm('Você será desconectado do sistema.', 'Sair', 'Sair', false)) return;
+  if (!await showConfirm('Você será desconectado do sistema.', 'Sair', 'Sair', true)) return;
   clearSession();
   if (window._fb) await window._fb.logoutUser();
   location.reload();
@@ -2638,7 +2680,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function doLogout() {
-  if (!await showConfirm('Você será desconectado do sistema.', 'Sair', 'Sair', false)) return;
+  if (!await showConfirm('Você será desconectado do sistema.', 'Sair', 'Sair', true)) return;
   clearSession();
   if (window._fb) await window._fb.logoutUser();
   location.reload();
@@ -3068,9 +3110,34 @@ function onCrmClientChange() {
       </div>
 
       <div id="data-area" style="display:none">
-        <div class="section-label">Resumo do período</div>
+        <div class="dashboard-section-head">
+          <div class="section-label">Resumo do período</div>
+          <div class="metric-picker" id="metric-picker">
+            <button class="metric-picker-btn" type="button" onclick="toggleMetricPicker(event)">Métricas ▾</button>
+            <div class="metric-picker-menu" onclick="event.stopPropagation()">
+              <div class="metric-picker-title">Métricas exibidas</div>
+              <label class="metric-option"><input type="checkbox" value="spend" onchange="onDashboardMetricToggle(this)"> Valor gasto</label>
+              <label class="metric-option"><input type="checkbox" value="reach" onchange="onDashboardMetricToggle(this)"> Alcance</label>
+              <label class="metric-option"><input type="checkbox" value="cpm" onchange="onDashboardMetricToggle(this)"> CPM</label>
+              <label class="metric-option"><input type="checkbox" value="ctr" onchange="onDashboardMetricToggle(this)"> CTR</label>
+              <label class="metric-option"><input type="checkbox" value="freq" onchange="onDashboardMetricToggle(this)"> Frequência</label>
+              <label class="metric-option"><input type="checkbox" value="cpl" onchange="onDashboardMetricToggle(this)"> CPL</label>
+              <label class="metric-option"><input type="checkbox" value="conv" onchange="onDashboardMetricToggle(this)"> Conversas iniciadas</label>
+              <label class="metric-option"><input type="checkbox" value="cpconv" onchange="onDashboardMetricToggle(this)"> Custo/conversa</label>
+              <label class="metric-option"><input type="checkbox" value="leads" onchange="onDashboardMetricToggle(this)"> Leads</label>
+              <label class="metric-option"><input type="checkbox" value="impressions" onchange="onDashboardMetricToggle(this)"> Impressões</label>
+              <label class="metric-option"><input type="checkbox" value="clicks" onchange="onDashboardMetricToggle(this)"> Cliques</label>
+              <label class="metric-option"><input type="checkbox" value="linkClicks" onchange="onDashboardMetricToggle(this)"> Cliques no link</label>
+              <label class="metric-option"><input type="checkbox" value="cpc" onchange="onDashboardMetricToggle(this)"> CPC</label>
+              <label class="metric-option"><input type="checkbox" value="cpcLink" onchange="onDashboardMetricToggle(this)"> CPC link</label>
+              <label class="metric-option"><input type="checkbox" value="landingViews" onchange="onDashboardMetricToggle(this)"> Visualizações da página</label>
+              <label class="metric-option"><input type="checkbox" value="costLanding" onchange="onDashboardMetricToggle(this)"> Custo/página</label>
+              <label class="metric-option"><input type="checkbox" value="engagement" onchange="onDashboardMetricToggle(this)"> Engajamentos</label>
+            </div>
+          </div>
+        </div>
         <div class="metrics-grid">
-          <div class="metric-card featured">
+          <div class="metric-card featured" id="card-spend" data-dashboard-metric="spend">
             <div class="metric-icon" style="background:var(--accent-glow)">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
             </div>
@@ -3078,7 +3145,7 @@ function onCrmClientChange() {
             <div class="metric-value" id="m-spend">—</div>
             <div class="metric-sub">no período</div>
           </div>
-          <div class="metric-card">
+          <div class="metric-card" id="card-reach" data-dashboard-metric="reach">
             <div class="metric-icon" style="background:var(--blue-dim)">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             </div>
@@ -3086,7 +3153,7 @@ function onCrmClientChange() {
             <div class="metric-value" id="m-reach">—</div>
             <div class="metric-sub">pessoas únicas</div>
           </div>
-          <div class="metric-card">
+          <div class="metric-card" id="card-cpm" data-dashboard-metric="cpm">
             <div class="metric-icon" style="background:var(--amber-dim)">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
             </div>
@@ -3094,7 +3161,7 @@ function onCrmClientChange() {
             <div class="metric-value" id="m-cpm">—</div>
             <div class="metric-sub">custo por mil impressões</div>
           </div>
-          <div class="metric-card">
+          <div class="metric-card" id="card-ctr" data-dashboard-metric="ctr">
             <div class="metric-icon" style="background:var(--green-dim)">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             </div>
@@ -3102,7 +3169,7 @@ function onCrmClientChange() {
             <div class="metric-value" id="m-ctr">—</div>
             <div class="metric-sub">taxa de clique</div>
           </div>
-          <div class="metric-card">
+          <div class="metric-card" id="card-freq" data-dashboard-metric="freq">
             <div class="metric-icon" style="background:rgba(167,139,250,0.1)">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             </div>
@@ -3110,7 +3177,7 @@ function onCrmClientChange() {
             <div class="metric-value" id="m-freq">—</div>
             <div class="metric-sub">média por pessoa</div>
           </div>
-          <div class="metric-card" id="card-cpl">
+          <div class="metric-card" id="card-cpl" data-dashboard-metric="cpl">
             <div class="metric-icon" style="background:var(--red-dim)">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             </div>
@@ -3118,7 +3185,7 @@ function onCrmClientChange() {
             <div class="metric-value" id="m-cpl">—</div>
             <div class="metric-sub" id="card-cpl-sub">custo por lead</div>
           </div>
-          <div class="metric-card" id="card-conv">
+          <div class="metric-card" id="card-conv" data-dashboard-metric="conv">
             <div class="metric-icon" style="background:var(--blue-dim)">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             </div>
@@ -3126,7 +3193,7 @@ function onCrmClientChange() {
             <div class="metric-value" id="m-conv">—</div>
             <div class="metric-sub">quantidade no período</div>
           </div>
-          <div class="metric-card" id="card-cpconv">
+          <div class="metric-card" id="card-cpconv" data-dashboard-metric="cpconv">
             <div class="metric-icon" style="background:var(--blue-dim)">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             </div>
@@ -3134,13 +3201,45 @@ function onCrmClientChange() {
             <div class="metric-value" id="m-cpconv">—</div>
             <div class="metric-sub">por conversa iniciada</div>
           </div>
-          <div class="metric-card" id="card-leads">
+          <div class="metric-card" id="card-leads" data-dashboard-metric="leads">
             <div class="metric-icon" style="background:var(--red-dim)">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.6 3.38 2 2 0 0 1 3.58 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.6a16 16 0 0 0 6 6l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
             </div>
             <div class="metric-label">Leads</div>
             <div class="metric-value" id="m-leads">—</div>
             <div class="metric-sub" id="m-leads-sub">custo por lead</div>
+          </div>
+          <div class="metric-card" id="card-impressions" data-dashboard-metric="impressions">
+            <div class="metric-icon" style="background:var(--amber-dim)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 20h10"/></svg></div>
+            <div class="metric-label">Impressões</div><div class="metric-value" id="m-impressions">—</div><div class="metric-sub">exibições no período</div>
+          </div>
+          <div class="metric-card" id="card-clicks" data-dashboard-metric="clicks">
+            <div class="metric-icon" style="background:var(--green-dim)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M15 15l5 5"/><path d="M4 4l7.5 16 2.5-7 7-2.5L4 4z"/></svg></div>
+            <div class="metric-label">Cliques</div><div class="metric-value" id="m-clicks">—</div><div class="metric-sub">todos os cliques</div>
+          </div>
+          <div class="metric-card" id="card-link-clicks" data-dashboard-metric="linkClicks">
+            <div class="metric-icon" style="background:var(--green-dim)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11 4"/><path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07L13 20"/></svg></div>
+            <div class="metric-label">Cliques no link</div><div class="metric-value" id="m-link-clicks">—</div><div class="metric-sub">links clicados</div>
+          </div>
+          <div class="metric-card" id="card-cpc" data-dashboard-metric="cpc">
+            <div class="metric-icon" style="background:var(--accent-glow)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+            <div class="metric-label">CPC</div><div class="metric-value" id="m-cpc">—</div><div class="metric-sub">custo por clique</div>
+          </div>
+          <div class="metric-card" id="card-cpc-link" data-dashboard-metric="cpcLink">
+            <div class="metric-icon" style="background:var(--accent-glow)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11 4"/><path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07L13 20"/></svg></div>
+            <div class="metric-label">CPC link</div><div class="metric-value" id="m-cpc-link">—</div><div class="metric-sub">custo por clique no link</div>
+          </div>
+          <div class="metric-card" id="card-landing" data-dashboard-metric="landingViews">
+            <div class="metric-icon" style="background:var(--blue-dim)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M4 9h16"/><path d="M9 14h6"/></svg></div>
+            <div class="metric-label">Visualizações da página</div><div class="metric-value" id="m-landing">—</div><div class="metric-sub">landing page views</div>
+          </div>
+          <div class="metric-card" id="card-cost-landing" data-dashboard-metric="costLanding">
+            <div class="metric-icon" style="background:var(--blue-dim)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2"><path d="M4 4h16v16H4z"/><line x1="12" y1="11" x2="12" y2="17"/></svg></div>
+            <div class="metric-label">Custo/página</div><div class="metric-value" id="m-cost-landing">—</div><div class="metric-sub">por visualização da página</div>
+          </div>
+          <div class="metric-card" id="card-engagement" data-dashboard-metric="engagement">
+            <div class="metric-icon" style="background:rgba(167,139,250,0.1)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg></div>
+            <div class="metric-label">Engajamentos</div><div class="metric-value" id="m-engagement">—</div><div class="metric-sub">post engagement</div>
           </div>
         </div>
 
@@ -3186,6 +3285,33 @@ function onCrmClientChange() {
             </thead>
             <tbody id="campaigns-body">
               <tr><td colspan="10" class="empty-state"><strong>Nenhum dado carregado</strong>Clique em Atualizar para carregar</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="dashboard-section-head" style="margin-top:28px;">
+          <div class="section-label">Desempenho por anúncio</div>
+          <select class="modal-select" id="ads-sort-select" onchange="renderAdsTable(lastAdsData || [])" style="width:180px; height:36px; padding:0 10px; font-size:12px;">
+            <option value="leads">Ordenar por leads</option>
+            <option value="spend">Ordenar por gasto</option>
+            <option value="cpl">Ordenar por CPL</option>
+            <option value="conv">Ordenar por conversas</option>
+          </select>
+        </div>
+        <div class="table-card campaigns-table-card">
+          <table class="campaigns-table ads-table">
+            <thead>
+              <tr>
+                <th style="width:34%">Anúncio</th>
+                <th style="width:10%">Leads</th>
+                <th style="width:12%">Gasto</th>
+                <th style="width:12%">CPL</th>
+                <th style="width:12%">Conv. inic.</th>
+                <th style="width:12%">CTR</th>
+                <th style="width:8%">CPM</th>
+              </tr>
+            </thead>
+            <tbody id="ads-body">
+              <tr><td colspan="7" class="empty-state"><strong>Nenhum dado carregado</strong>Atualize o período para carregar anúncios</td></tr>
             </tbody>
           </table>
         </div>
@@ -3620,6 +3746,7 @@ async function saveClient() {
   btn.textContent = 'Salvar cliente';
   btn.disabled = false;
   renderAll();
+applyDashboardMetricVisibility();
 }
 
 async function removeExtraClient(login, name) {
@@ -3747,12 +3874,13 @@ async function loadData() {
 
   
   const account = activeClient.account;
-  const insightsUrl = `${WORKER_URL}?account=${account}&from=${from}&to=${to}&fields=spend,reach,impressions,cpm,ctr,frequency,actions,campaign_name,campaign_id`;
+  const insightsUrl = `${WORKER_URL}?account=${account}&from=${from}&to=${to}&fields=spend,reach,impressions,cpm,ctr,frequency,clicks,inline_link_clicks,actions,campaign_name,campaign_id`;
+    const adsUrl = `${WORKER_URL}?account=${account}&from=${from}&to=${to}&fields=spend,reach,impressions,cpm,ctr,frequency,clicks,inline_link_clicks,actions,ad_name,ad_id,campaign_name,campaign_id&level=ad`;
   const campaignsUrl = `${WORKER_URL}?account=${account}&from=${from}&to=${to}&fields=id,effective_status`;
 
   try {
-    const [insRes, campRes] = await Promise.all([fetch(insightsUrl), fetch(campaignsUrl)]);
-    const [insJson, campJson] = await Promise.all([insRes.json(), campRes.json()]);
+    const [insRes, campRes, adsRes] = await Promise.all([fetch(insightsUrl), fetch(campaignsUrl), fetch(adsUrl).catch(() => null)]);
+    const [insJson, campJson, adsJson] = await Promise.all([insRes.json(), campRes.json(), adsRes ? adsRes.json() : Promise.resolve({ data: [] })]);
     showLoading(false);
 
     if (insJson.error) { showError('Erro da API Meta: ' + insJson.error.message); return; }
@@ -3762,27 +3890,34 @@ async function loadData() {
     const statusMap = {};
     (campJson.data || []).forEach(c => { statusMap[c.id] = c.effective_status; });
 
-    let totalSpend = 0, totalReach = 0, totalImpr = 0, totalLeads = 0, totalConv = 0;
+    let totalSpend = 0, totalLeadSpend = 0, totalReach = 0, totalImpr = 0, totalLeads = 0, totalConv = 0, totalClicks = 0, totalLinkClicks = 0, totalLandingViews = 0, totalEngagement = 0;
     let wtCtr = 0, wtCpm = 0, wtFreq = 0;
 
     data.forEach(d => {
       const spend = parseFloat(d.spend || 0);
       const reach = parseInt(d.reach || 0);
       const impr = parseInt(d.impressions || 0);
-      totalSpend += spend; totalReach += reach; totalImpr += impr;
+      totalSpend += spend; totalReach += reach; totalImpr += impr; totalClicks += parseInt(d.clicks || 0); totalLinkClicks += parseInt(d.inline_link_clicks || 0);
       wtCtr += parseFloat(d.ctr || 0) * impr;
       wtCpm += parseFloat(d.cpm || 0) * impr;
       wtFreq += parseFloat(d.frequency || 0) * reach;
       const acts = d.actions || [];
-      totalLeads += acts.filter(a => a.action_type === 'lead').reduce((s, a) => s + parseInt(a.value || 0), 0);
+      const leadsForRow = acts.filter(a => a.action_type === 'lead').reduce((s, a) => s + parseInt(a.value || 0), 0);
+      if (leadsForRow) totalLeadSpend += spend;
+      totalLeads += leadsForRow;
       totalConv += acts.filter(a => a.action_type === 'onsite_conversion.messaging_conversation_started_7d').reduce((s, a) => s + parseInt(a.value || 0), 0);
+      totalLandingViews += acts.filter(a => ['landing_page_view','omni_landing_page_view'].includes(a.action_type)).reduce((s, a) => s + parseInt(a.value || 0), 0);
+      totalEngagement += acts.filter(a => ['post_engagement','page_engagement'].includes(a.action_type)).reduce((s, a) => s + parseInt(a.value || 0), 0);
     });
 
     const avgCtr = totalImpr ? wtCtr / totalImpr : 0;
     const avgCpm = totalImpr ? wtCpm / totalImpr : 0;
     const avgFreq = totalReach ? wtFreq / totalReach : 0;
-    const cpl = totalLeads ? totalSpend / totalLeads : 0;
+    const cpl = totalLeads ? totalLeadSpend / totalLeads : 0;
     const cpConv = totalConv ? totalSpend / totalConv : 0;
+    const cpc = totalClicks ? totalSpend / totalClicks : 0;
+    const cpcLink = totalLinkClicks ? totalSpend / totalLinkClicks : 0;
+    const costLanding = totalLandingViews ? totalSpend / totalLandingViews : 0;
 
     document.getElementById('data-area').style.display = 'block';
     dailyData = await loadDailyData(account, from, to);
@@ -3797,6 +3932,14 @@ async function loadData() {
     animVal('m-leads-sub', totalLeads ? 'custo: ' + fmtBRL(cpl) : 'custo por lead');
     animVal('m-conv', totalConv ? fmtNum(totalConv) : '—');
     animVal('m-cpconv', totalConv ? fmtBRL(cpConv) : '—');
+    animVal('m-impressions', totalImpr ? fmtNum(totalImpr) : '—');
+    animVal('m-clicks', totalClicks ? fmtNum(totalClicks) : '—');
+    animVal('m-link-clicks', totalLinkClicks ? fmtNum(totalLinkClicks) : '—');
+    animVal('m-cpc', totalClicks ? fmtBRL(cpc) : '—');
+    animVal('m-cpc-link', totalLinkClicks ? fmtBRL(cpcLink) : '—');
+    animVal('m-landing', totalLandingViews ? fmtNum(totalLandingViews) : '—');
+    animVal('m-cost-landing', totalLandingViews ? fmtBRL(costLanding) : '—');
+    animVal('m-engagement', totalEngagement ? fmtNum(totalEngagement) : '—');
 
     // Lógica de ocultação por cliente
     const act = activeClient ? activeClient.account : '';
@@ -3808,8 +3951,8 @@ async function loadData() {
     if (tableHeader) {
       const table = tableHeader.closest('table');
       if (table) {
-        // Petland: oculta leads/CPL
-        if (isPetland) table.classList.add('hide-leads-cols'); else table.classList.remove('hide-leads-cols');
+        // Leads/CPL visiveis na Petland
+        table.classList.remove('hide-leads-cols');
         // Travi: oculta conv/custo-conv
         if (isTravi) table.classList.add('hide-conv-cols'); else table.classList.remove('hide-conv-cols');
         // Contabiliza: oculta leads/CPL
@@ -3824,19 +3967,11 @@ async function loadData() {
     const cardConv   = document.getElementById('card-conv');
     const cardCpconv = document.getElementById('card-cpconv');
 
-    // Petland: oculta leads, ajusta CPL para custo/conversa
-    if (isPetland) {
-      if (cardLeads)  cardLeads.style.display = 'none';
-      if (cardCplLabel) cardCplLabel.textContent = 'Custo/conversa';
-      if (cardCplSub)   cardCplSub.textContent = 'por conversa iniciada';
-      animVal('m-cpl', totalConv ? fmtBRL(cpConv) : '—');
-    } else {
-      if (cardLeads)  cardLeads.style.display = '';
-      if (cardCplLabel) cardCplLabel.textContent = 'CPL';
-      if (cardCplSub)   cardCplSub.textContent = 'custo por lead';
-      animVal('m-cpl', totalLeads ? fmtBRL(cpl) : '—');
-    }
-
+    // CPL e custo/conversa ficam separados para todos os clientes
+    if (cardLeads)  cardLeads.style.display = '';
+    if (cardCplLabel) cardCplLabel.textContent = 'CPL';
+    if (cardCplSub)   cardCplSub.textContent = 'custo por lead';
+    animVal('m-cpl', totalLeads ? fmtBRL(cpl) : '—');
     // Travi: oculta conversas iniciadas e custo/conversa
     if (isTravi) {
       if (cardConv)   cardConv.style.display = 'none';
@@ -3850,9 +3985,11 @@ async function loadData() {
     if (isContabiliza) {
       if (cardLeads)  cardLeads.style.display = 'none';
       if (cardCpl)    cardCpl.style.display = 'none';
-    } else if (!isPetland) {
+    } else {
       if (cardCpl)    cardCpl.style.display = '';
     }
+
+    applyDashboardMetricVisibility();
 
     document.getElementById('campaigns-body').innerHTML = data.map(d => {
       const spend = parseFloat(d.spend || 0);
@@ -3875,6 +4012,12 @@ async function loadData() {
         <td data-label="Custo/conv." class="col-cpconv">${convRow ? fmtBRL(cpConvRow) : '—'}</td>
       </tr>`;
     }).join('');
+
+    lastAdsData = Array.isArray(adsJson && adsJson.data) ? adsJson.data : [];
+    const adThumbs = await loadAdThumbnails(account, lastAdsData);
+    adThumbnailCache = { ...adThumbnailCache, ...adThumbs };
+    lastAdsData = lastAdsData.map(row => ({ ...row, thumbnail_url: row.thumbnail_url || adThumbnailCache[row.ad_id] || '' }));
+    renderAdsTable(lastAdsData);
 
   } catch(e) {
     showLoading(false);
@@ -3931,6 +4074,48 @@ let mainChart = null;
 let chartType = 'line';
 let activeMetric = 'spend';
 let dailyData = [];
+let lastAdsData = [];
+let adThumbnailCache = {};
+const DASHBOARD_METRICS_KEY = 'huven_dashboard_visible_metrics_v1';
+const DEFAULT_DASHBOARD_METRICS = ['spend','reach','cpm','ctr','freq','cpl','conv','cpconv','leads'];
+
+function getVisibleDashboardMetrics() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(DASHBOARD_METRICS_KEY) || 'null');
+    if (Array.isArray(saved) && saved.length) return saved;
+  } catch(e) {}
+  return DEFAULT_DASHBOARD_METRICS.slice();
+}
+function setVisibleDashboardMetrics(metrics) { localStorage.setItem(DASHBOARD_METRICS_KEY, JSON.stringify(metrics)); }
+function syncMetricPickerChecks() {
+  const visible = new Set(getVisibleDashboardMetrics());
+  document.querySelectorAll('#metric-picker input[type="checkbox"]').forEach(input => { input.checked = visible.has(input.value); });
+}
+function updateMetricPickerLabelsForClient() {
+      const cplInput = document.querySelector('#metric-picker input[value="cpl"]');
+      if (cplInput && cplInput.parentElement) cplInput.parentElement.lastChild.textContent = ' CPL';
+    }
+function applyDashboardMetricVisibility() {
+  const visible = new Set(getVisibleDashboardMetrics());
+  document.querySelectorAll('[data-dashboard-metric]').forEach(card => {
+    const key = card.getAttribute('data-dashboard-metric');
+    card.style.display = visible.has(key) ? '' : 'none';
+  });
+  syncMetricPickerChecks();
+}
+function toggleMetricPicker(event) {
+  if (event) event.stopPropagation();
+  const picker = document.getElementById('metric-picker');
+  if (picker) picker.classList.toggle('open');
+}
+function onDashboardMetricToggle(input) {
+  const visible = new Set(getVisibleDashboardMetrics());
+  if (input.checked) visible.add(input.value); else visible.delete(input.value);
+  if (!visible.size) { input.checked = true; visible.add(input.value); }
+  setVisibleDashboardMetrics([...visible]);
+  applyDashboardMetricVisibility();
+}
+document.addEventListener('click', () => { const picker = document.getElementById('metric-picker'); if (picker) picker.classList.remove('open'); });
 
 const metricConfig = {
   spend:  { label: 'Valor gasto (R$)',      color: '#a78bfa', extract: d => parseFloat(d.spend || 0),     fmt: v => 'R$ ' + v.toFixed(2).replace('.',',') },
@@ -4022,6 +4207,157 @@ function switchChartType(t) {
   buildChart();
 }
 
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+}
+function getAdThumbnail(row) {
+  const creative = row && row.creative;
+  if (row && row.thumbnail_url) return row.thumbnail_url;
+  if (row && row.ad_creative_thumbnail_url) return row.ad_creative_thumbnail_url;
+  if (row && row.image_url) return row.image_url;
+  if (creative && creative.thumbnail_url) return creative.thumbnail_url;
+  if (creative && creative.image_url) return creative.image_url;
+  return '';
+}
+function renderAdThumb(ad) {
+  const thumb = ad && ad.thumbnail ? escapeHtml(ad.thumbnail) : '';
+  if (!thumb) return '<div class="ad-thumb-placeholder" aria-hidden="true">AD</div>';
+  return `<img class="ad-thumb" src="${thumb}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'), { className: 'ad-thumb-placeholder', textContent: 'AD' }))">`;
+}
+async function loadAdThumbnails(account, rows) {
+  const ids = [...new Set((rows || []).map(row => row && row.ad_id).filter(Boolean))];
+  if (!ids.length) return {};
+  const url = `${WORKER_URL}?account=${account}&ad_ids=${encodeURIComponent(ids.join(','))}&fields=creative{thumbnail_url,image_url},thumbnail_url,image_url`;
+  try {
+    const res = await fetch(url);
+    const json = await res.json();
+    const list = Array.isArray(json && json.data) ? json.data : [];
+    return list.reduce((map, item) => {
+      const id = item.id || item.ad_id;
+      const thumb = getAdThumbnail(item);
+      if (id && thumb) map[id] = thumb;
+      return map;
+    }, {});
+  } catch {
+    return {};
+  }
+}
+function getActionValue(actions, types) {
+  const values = (actions || [])
+    .filter(a => types.includes(a.action_type))
+    .map(a => parseInt(a.value || 0))
+    .filter(v => !Number.isNaN(v));
+  return values.length ? Math.max(...values) : 0;
+}
+
+function mergeAdInsightRows(rows) {
+  const map = new Map();
+  (rows || []).forEach(row => {
+    const key = [row.ad_id || row.ad_name || 'sem-id', row.campaign_id || row.campaign_name || 'sem-campanha'].join('|');
+    const current = map.get(key) || {
+      ad_id: row.ad_id,
+      ad_name: row.ad_name,
+      thumbnail_url: row.thumbnail_url || (row.ad_id ? adThumbnailCache[row.ad_id] : ''),
+      creative: row.creative || null,
+      campaign_id: row.campaign_id,
+      campaign_name: row.campaign_name,
+      spend: 0,
+      impressions: 0,
+      reach: 0,
+      clicks: 0,
+      inline_link_clicks: 0,
+      actions: []
+    };
+    const rowThumb = getAdThumbnail(row) || (row.ad_id ? adThumbnailCache[row.ad_id] : '');
+    if (rowThumb && !current.thumbnail_url) current.thumbnail_url = rowThumb;
+    current.spend += parseFloat(row.spend || 0);
+    current.impressions += parseInt(row.impressions || 0);
+    current.reach += parseInt(row.reach || 0);
+    current.clicks += parseInt(row.clicks || 0);
+    current.inline_link_clicks += parseInt(row.inline_link_clicks || 0);
+    (row.actions || []).forEach(action => {
+      const existing = current.actions.find(a => a.action_type === action.action_type);
+      const value = parseInt(action.value || 0);
+      if (existing) existing.value = String(Math.max(parseInt(existing.value || 0), value));
+      else current.actions.push({ action_type: action.action_type, value: String(value) });
+    });
+    map.set(key, current);
+  });
+  return [...map.values()].map(row => ({
+    ...row,
+    ctr: row.impressions ? (row.clicks / row.impressions) * 100 : 0,
+    cpm: row.impressions ? (row.spend / row.impressions) * 1000 : 0,
+    frequency: row.reach ? row.impressions / row.reach : 0
+  }));
+}
+
+function updateAdsTableLabelsForClient() {
+  const sort = document.getElementById('ads-sort-select');
+  if (sort) {
+    const cplOption = Array.from(sort.options).find(o => o.value === 'cpl');
+    if (cplOption) cplOption.textContent = 'Ordenar por CPL';
+  }
+  document.querySelectorAll('.ads-table th').forEach(th => {
+    if (th.textContent.trim() === 'Custo/conv.') th.textContent = 'CPL';
+  });
+}
+function renderAdsTable(rows) {
+  const body = document.getElementById('ads-body');
+  if (!body) return;
+  updateAdsTableLabelsForClient();
+  const sortBy = (document.getElementById('ads-sort-select') || {}).value || 'leads';
+  const normalized = mergeAdInsightRows(rows || []).map(row => {
+    const spend = parseFloat(row.spend || 0);
+    const leads = getActionValue(row.actions, ['lead']);
+    const conv = getActionValue(row.actions, [
+      'onsite_conversion.messaging_conversation_started_7d',
+      'onsite_conversion.messaging_first_reply',
+      'messaging_conversation_started_7d'
+    ]);
+    const cpl = leads ? spend / leads : 0;
+    return {
+      name: row.ad_name || row.ad_id || 'Anúncio sem nome',
+      campaign: row.campaign_name || '',
+      thumbnail: getAdThumbnail(row) || (row.ad_id ? adThumbnailCache[row.ad_id] : ''),
+      spend,
+      leads,
+      conv,
+      cpl,
+      ctr: parseFloat(row.ctr || 0),
+      cpm: parseFloat(row.cpm || 0)
+    };
+  });
+
+  normalized.sort((a, b) => {
+    if (sortBy === 'cpl') return (a.cpl || 999999999) - (b.cpl || 999999999);
+    return (b[sortBy] || 0) - (a[sortBy] || 0);
+  });
+
+  if (!normalized.length) {
+    body.innerHTML = '<tr><td colspan="7" class="empty-state"><strong>Nenhum anúncio encontrado</strong>Não há dados por anúncio para esse período.</td></tr>';
+    return;
+  }
+
+  body.innerHTML = normalized.map(ad => `
+    <tr>
+      <td class="name-cell" data-label="Anúncio" title="${escapeHtml(ad.name)}">
+        <div class="ad-info">
+          ${renderAdThumb(ad)}
+          <div class="ad-copy">
+            <div class="ad-name-main">${escapeHtml(ad.name)}</div>
+            ${ad.campaign ? `<div class="ad-name-sub">${escapeHtml(ad.campaign)}</div>` : ''}
+          </div>
+        </div>
+      </td>
+      <td data-label="Leads">${ad.leads || '—'}</td>
+      <td data-label="Gasto">${fmtBRL(ad.spend)}</td>
+      <td data-label="CPL">${ad.leads ? fmtBRL(ad.cpl) : '—'}</td>
+      <td data-label="Conv. inic.">${ad.conv || '—'}</td>
+      <td data-label="CTR">${fmt(ad.ctr, 2)}%</td>
+      <td data-label="CPM">${fmtBRL(ad.cpm)}</td>
+    </tr>`).join('');
+}
 async function loadDailyData(account, from, to) {
   const url = `${WORKER_URL}?account=${account}&from=${from}&to=${to}&fields=spend,reach,actions&time_increment=1`;
   try {
@@ -6235,7 +6571,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function doLogout() {
-  if (!await showConfirm('Você será desconectado do sistema.', 'Sair', 'Sair', false)) return;
+  if (!await showConfirm('Você será desconectado do sistema.', 'Sair', 'Sair', true)) return;
   clearSession();
   if (window._fb) await window._fb.logoutUser();
   location.reload();
@@ -6554,6 +6890,26 @@ function onCrmClientChange() {
 </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
