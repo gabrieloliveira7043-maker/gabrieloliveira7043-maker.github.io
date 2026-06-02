@@ -1236,6 +1236,26 @@ const STAGE_COLORS = ['col-novo','col-contato','col-proposta','col-fechado','col
 function stageColor(idx) { return STAGE_COLORS[idx % STAGE_COLORS.length]; }
 
 const CRM_KEY = 'catapulta_crm_v1';
+function normalizeImportedLeadFields(lead) {
+  if (!lead || typeof lead !== 'object') return lead;
+  const normalized = { ...lead };
+  normalized.obs = normalized.obs || normalized.observacoes || normalized.observacao || normalized['observações'] || '';
+  const rawSheet = normalized.sheet && normalized.sheet.raw ? normalized.sheet.raw : {};
+  const socialRaw = String(rawSheet.platform || rawSheet.plataforma || rawSheet.rede_social || normalized.platform || normalized.plataforma || normalized.rede_social || normalized.redeSocial || normalized.origem || '').trim();
+  const social = socialRaw.toLowerCase();
+  if (social.includes('insta') || social === 'ig') normalized.redeSocial = 'Instagram';
+  else if (social.includes('face') || social === 'fb' || social.includes('facebook') || social === 'meta') normalized.redeSocial = 'Facebook';
+  else if (social.includes('whats')) normalized.redeSocial = 'WhatsApp';
+  else if (social.includes('tiktok')) normalized.redeSocial = 'TikTok';
+  else if (social.includes('google')) normalized.redeSocial = 'Google';
+  else if (!normalized.redeSocial && socialRaw) normalized.redeSocial = socialRaw;
+  return normalized;
+}
+
+function normalizeImportedLeadsFields(leads) {
+  return Array.isArray(leads) ? leads.map(normalizeImportedLeadFields) : [];
+}
+
 let crmClientFilter = null;
 let dragCard = null;
 let dragCol = null;
@@ -1247,18 +1267,18 @@ async function getLeadsAsync() {
   if (window._fbReady) {
     try {
       const leads = await window._fb.getLeads();
-      _leadsCache = leads;
-      return leads;
+      _leadsCache = normalizeImportedLeadsFields(leads);
+      return _leadsCache;
     } catch(e) {
       console.warn('Firebase error, using cache', e);
-      return _leadsCache || [];
+      return normalizeImportedLeadsFields(_leadsCache || []);
     }
   }
-  return _leadsCache || [];
+  return normalizeImportedLeadsFields(_leadsCache || []);
 }
 
 function getLeads() {
-  return _leadsCache || [];
+  return normalizeImportedLeadsFields(_leadsCache || []);
 }
 
 async function saveLeadToDb(lead) {
@@ -1291,7 +1311,7 @@ function abrirContatos() {
   const contV = document.getElementById('contatos-view');
   if (contV) { contV.style.display = 'block'; contV.style.visibility = 'visible'; contV.style.opacity = '1'; }
   // Nav active
-  ['report','crm','conta','contatos'].forEach(v => {
+  ['report','crm','conta','contatos','integracoes'].forEach(v => {
     const el = document.getElementById('nav-' + v);
     if (el) el.classList.toggle('active', v === 'contatos');
   });
@@ -1308,7 +1328,7 @@ function abrirAtendimento() {
 }
 
 function switchView(view) {
-  ['report','crm','conta','contatos'].forEach(v => {
+  ['report','crm','conta','contatos','integracoes'].forEach(v => {
     const el = document.getElementById('nav-' + v);
     if (el) el.classList.toggle('active', v === view);
   });
@@ -1774,7 +1794,7 @@ function openLeadModal() {
 }
 
 function editLead(id) {
-  const lead = getLeads().find(l => l.id === id);
+  let lead = getLeads().find(l => l.id === id);
   if (!lead) return;
   const clinica = isClinicaClient(lead.act);
   document.getElementById('lead-id').value = lead.id;
@@ -1785,6 +1805,7 @@ function editLead(id) {
   document.getElementById('lead-plantao').value = lead.plantao || '';
   document.getElementById('lead-valor').value = lead.valor || '';
   document.getElementById('lead-origem').value = lead.origem || '';
+  lead = normalizeImportedLeadFields(lead);
   document.getElementById('lead-rede-social').value = lead.redeSocial || '';
   document.getElementById('lead-obs').value = lead.obs || '';
   document.getElementById('lead-motivo').value = lead.motivo || '';
@@ -1924,7 +1945,7 @@ function moveLeadTo(id, stageId) {
 
 
 function setMobileNav(view) {
-  ['report','crm','cfg'].forEach(v => {
+  ['report','crm','conta','integracoes','cfg'].forEach(v => {
     const el = document.getElementById('mnav-' + v);
     if (el) el.classList.toggle('active', v === view);
   });
@@ -2283,6 +2304,156 @@ async function changePassword() {
 }
 
 
+function getCurrentCrmActForSheets() {
+  const sel = document.getElementById('crm-client-select');
+  if (sel && sel.value && sel.value !== 'all') return sel.value;
+  if (crmClientFilter) return crmClientFilter;
+  if (activeClient && activeClient.account) return activeClient.account;
+  const keys = Object.keys(CLIENT_NAMES || {});
+  return keys[0] || '';
+}
+
+function openIntegrationsFromNav() {
+  switchView('crm');
+  ['report','crm','conta','contatos','integracoes'].forEach(v => {
+    const el = document.getElementById('nav-' + v);
+    if (el) el.classList.toggle('active', v === 'integracoes');
+  });
+  if (typeof setMobileNav === 'function') setMobileNav('integracoes');
+  setTimeout(openSheetsIntegrationModal, 80);
+}
+function openSheetsIntegrationModal() {
+  const modal = document.getElementById('sheets-integration-modal');
+  if (!modal) return;
+  const act = getCurrentCrmActForSheets();
+  const clientName = CLIENT_NAMES[act] || (activeClient ? activeClient.name : '') || act;
+  document.getElementById('sheets-act').value = clientName ? clientName + ' | ' + act : act;
+  const saved = getSheetsIntegrationConfig(act);
+  document.getElementById('sheets-worker-url').value = saved.url || '';
+  document.getElementById('sheets-worker-secret').value = saved.secret || 'huven_sheets_2026';
+  document.getElementById('sheets-script-output').value = '';
+  modal.style.display = 'flex';
+  modal.classList.add('open');
+}
+
+function closeSheetsIntegrationModal() {
+  const modal = document.getElementById('sheets-integration-modal');
+  if (!modal) return;
+  modal.classList.remove('open');
+  modal.style.display = 'none';
+}
+
+function getSheetsIntegrationConfig(act) {
+  try {
+    const all = JSON.parse(localStorage.getItem('huven_sheets_integrations') || '{}');
+    return all[act] || {};
+  } catch(e) { return {}; }
+}
+
+function saveSheetsIntegrationConfig(act, data) {
+  try {
+    const all = JSON.parse(localStorage.getItem('huven_sheets_integrations') || '{}');
+    all[act] = data;
+    localStorage.setItem('huven_sheets_integrations', JSON.stringify(all));
+  } catch(e) {}
+}
+
+function generateSheetsIntegrationScript() {
+  const act = getCurrentCrmActForSheets();
+  const url = document.getElementById('sheets-worker-url').value.trim();
+  const secret = document.getElementById('sheets-worker-secret').value.trim();
+  if (!act) { showToast('Selecione um cliente antes de gerar a integração.', 'warning'); return; }
+  if (!url || !secret) { showToast('Preencha a URL do Worker e o segredo.', 'warning'); return; }
+  saveSheetsIntegrationConfig(act, { url, secret });
+  const script = buildSheetsAppsScript(url, secret, act);
+  document.getElementById('sheets-script-output').value = script;
+  showToast('Código da planilha gerado.', 'success');
+}
+
+function copySheetsIntegrationScript() {
+  const output = document.getElementById('sheets-script-output');
+  if (!output.value.trim()) generateSheetsIntegrationScript();
+  output.select();
+  output.setSelectionRange(0, output.value.length);
+  try {
+    navigator.clipboard.writeText(output.value);
+    showToast('Código copiado.', 'success');
+  } catch(e) {
+    document.execCommand('copy');
+    showToast('Código copiado.', 'success');
+  }
+}
+
+function buildSheetsAppsScript(workerUrl, secret, act) {
+  return [
+    "const HUVENT_CRM_WORKER_URL = " + JSON.stringify(workerUrl) + ";",
+    "const HUVENT_CRM_SECRET = " + JSON.stringify(secret) + ";",
+    "const HUVENT_CRM_ACT = " + JSON.stringify(act) + ";",
+    "const HUVENT_STATUS_COLUMN = 'CRM_SYNC';",
+    "const HUVENT_FORM_ANSWER_START_COLUMN = 13; // Coluna M",
+    "const HUVENT_FORM_ANSWER_END_COLUMN = 16; // Coluna P",
+    "const HUVENT_SHEET_NAME = 'Captação imóveis';",
+    "",
+    "function syncNovosLeadsParaCrm() {",
+    "  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(HUVENT_SHEET_NAME);",
+    "  if (!sheet) throw new Error('Aba não encontrada: ' + HUVENT_SHEET_NAME);",
+    "  const values = sheet.getDataRange().getValues();",
+    "  if (values.length < 2) return;",
+    "",
+    "  const headers = values[0].map(h => String(h || '').trim());",
+    "  let statusIndex = headers.indexOf(HUVENT_STATUS_COLUMN);",
+    "  if (statusIndex === -1) {",
+    "    statusIndex = headers.length;",
+    "    sheet.getRange(1, statusIndex + 1).setValue(HUVENT_STATUS_COLUMN);",
+    "    headers.push(HUVENT_STATUS_COLUMN);",
+    "  }",
+    "",
+    "  const rowsToSend = [];",
+    "  const rowNumbers = [];",
+    "  for (let r = 1; r < values.length; r++) {",
+    "    const status = String(values[r][statusIndex] || '').trim();",
+    "    if (status === 'ENVIADO') continue;",
+    "    const row = { act: HUVENT_CRM_ACT };",
+    "    headers.forEach((header, i) => {",
+    "      if (header && header !== HUVENT_STATUS_COLUMN) row[header] = values[r][i];",
+    "    });",
+    "    row.__huven_form_answers = getRespostasDoFormulario(headers, values[r]);",
+    "    rowsToSend.push(row);",
+    "    rowNumbers.push(r + 1);",
+    "  }",
+    "  if (!rowsToSend.length) return;",
+    "",
+    "  const response = UrlFetchApp.fetch(HUVENT_CRM_WORKER_URL, {",
+    "    method: 'post',",
+    "    contentType: 'application/json',",
+    "    headers: { 'x-huven-secret': HUVENT_CRM_SECRET },",
+    "    payload: JSON.stringify({ rows: rowsToSend }),",
+    "    muteHttpExceptions: true",
+    "  });",
+    "",
+    "  const code = response.getResponseCode();",
+    "  const text = response.getContentText();",
+    "  if (code < 200 || code >= 300) throw new Error('Erro ao enviar leads ao CRM: ' + code + ' - ' + text);",
+    "  rowNumbers.forEach(rowNumber => sheet.getRange(rowNumber, statusIndex + 1).setValue('ENVIADO'));",
+    "}",
+    "",
+    "function getRespostasDoFormulario(headers, rowValues) {",
+    "  const answers = [];",
+    "  for (let column = HUVENT_FORM_ANSWER_START_COLUMN; column <= HUVENT_FORM_ANSWER_END_COLUMN; column++) {",
+    "    const index = column - 1;",
+    "    const question = String(headers[index] || '').trim();",
+    "    const answer = String(rowValues[index] || '').trim();",
+    "    if (question && answer) answers.push({ question, answer });",
+    "  }",
+    "  return answers;",
+    "}",
+    "",
+    "function criarGatilhoDeSincronizacao() {",
+    "  ScriptApp.newTrigger('syncNovosLeadsParaCrm').timeBased().everyMinutes(5).create();",
+    "}"
+  ].join("\n");
+}
+
 function onCrmClientChange() {
   const sel = document.getElementById('crm-client-select');
   const act = sel.value;
@@ -2327,7 +2498,7 @@ function onCrmClientChange() {
   window._fb = {
     async getLeads() {
       const snap = await getDocs(collection(db, 'leads'));
-      return snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
+      return snap.docs.map(d => normalizeImportedLeadFields({ ...d.data(), _docId: d.id }));
     },
     async saveLead(lead) {
       if (lead._docId) {
@@ -2552,6 +2723,156 @@ async function changePassword() {
 }
 
 
+function getCurrentCrmActForSheets() {
+  const sel = document.getElementById('crm-client-select');
+  if (sel && sel.value && sel.value !== 'all') return sel.value;
+  if (crmClientFilter) return crmClientFilter;
+  if (activeClient && activeClient.account) return activeClient.account;
+  const keys = Object.keys(CLIENT_NAMES || {});
+  return keys[0] || '';
+}
+
+function openIntegrationsFromNav() {
+  switchView('crm');
+  ['report','crm','conta','contatos','integracoes'].forEach(v => {
+    const el = document.getElementById('nav-' + v);
+    if (el) el.classList.toggle('active', v === 'integracoes');
+  });
+  if (typeof setMobileNav === 'function') setMobileNav('integracoes');
+  setTimeout(openSheetsIntegrationModal, 80);
+}
+function openSheetsIntegrationModal() {
+  const modal = document.getElementById('sheets-integration-modal');
+  if (!modal) return;
+  const act = getCurrentCrmActForSheets();
+  const clientName = CLIENT_NAMES[act] || (activeClient ? activeClient.name : '') || act;
+  document.getElementById('sheets-act').value = clientName ? clientName + ' | ' + act : act;
+  const saved = getSheetsIntegrationConfig(act);
+  document.getElementById('sheets-worker-url').value = saved.url || '';
+  document.getElementById('sheets-worker-secret').value = saved.secret || 'huven_sheets_2026';
+  document.getElementById('sheets-script-output').value = '';
+  modal.style.display = 'flex';
+  modal.classList.add('open');
+}
+
+function closeSheetsIntegrationModal() {
+  const modal = document.getElementById('sheets-integration-modal');
+  if (!modal) return;
+  modal.classList.remove('open');
+  modal.style.display = 'none';
+}
+
+function getSheetsIntegrationConfig(act) {
+  try {
+    const all = JSON.parse(localStorage.getItem('huven_sheets_integrations') || '{}');
+    return all[act] || {};
+  } catch(e) { return {}; }
+}
+
+function saveSheetsIntegrationConfig(act, data) {
+  try {
+    const all = JSON.parse(localStorage.getItem('huven_sheets_integrations') || '{}');
+    all[act] = data;
+    localStorage.setItem('huven_sheets_integrations', JSON.stringify(all));
+  } catch(e) {}
+}
+
+function generateSheetsIntegrationScript() {
+  const act = getCurrentCrmActForSheets();
+  const url = document.getElementById('sheets-worker-url').value.trim();
+  const secret = document.getElementById('sheets-worker-secret').value.trim();
+  if (!act) { showToast('Selecione um cliente antes de gerar a integração.', 'warning'); return; }
+  if (!url || !secret) { showToast('Preencha a URL do Worker e o segredo.', 'warning'); return; }
+  saveSheetsIntegrationConfig(act, { url, secret });
+  const script = buildSheetsAppsScript(url, secret, act);
+  document.getElementById('sheets-script-output').value = script;
+  showToast('Código da planilha gerado.', 'success');
+}
+
+function copySheetsIntegrationScript() {
+  const output = document.getElementById('sheets-script-output');
+  if (!output.value.trim()) generateSheetsIntegrationScript();
+  output.select();
+  output.setSelectionRange(0, output.value.length);
+  try {
+    navigator.clipboard.writeText(output.value);
+    showToast('Código copiado.', 'success');
+  } catch(e) {
+    document.execCommand('copy');
+    showToast('Código copiado.', 'success');
+  }
+}
+
+function buildSheetsAppsScript(workerUrl, secret, act) {
+  return [
+    "const HUVENT_CRM_WORKER_URL = " + JSON.stringify(workerUrl) + ";",
+    "const HUVENT_CRM_SECRET = " + JSON.stringify(secret) + ";",
+    "const HUVENT_CRM_ACT = " + JSON.stringify(act) + ";",
+    "const HUVENT_STATUS_COLUMN = 'CRM_SYNC';",
+    "const HUVENT_FORM_ANSWER_START_COLUMN = 13; // Coluna M",
+    "const HUVENT_FORM_ANSWER_END_COLUMN = 16; // Coluna P",
+    "const HUVENT_SHEET_NAME = 'Captação imóveis';",
+    "",
+    "function syncNovosLeadsParaCrm() {",
+    "  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(HUVENT_SHEET_NAME);",
+    "  if (!sheet) throw new Error('Aba não encontrada: ' + HUVENT_SHEET_NAME);",
+    "  const values = sheet.getDataRange().getValues();",
+    "  if (values.length < 2) return;",
+    "",
+    "  const headers = values[0].map(h => String(h || '').trim());",
+    "  let statusIndex = headers.indexOf(HUVENT_STATUS_COLUMN);",
+    "  if (statusIndex === -1) {",
+    "    statusIndex = headers.length;",
+    "    sheet.getRange(1, statusIndex + 1).setValue(HUVENT_STATUS_COLUMN);",
+    "    headers.push(HUVENT_STATUS_COLUMN);",
+    "  }",
+    "",
+    "  const rowsToSend = [];",
+    "  const rowNumbers = [];",
+    "  for (let r = 1; r < values.length; r++) {",
+    "    const status = String(values[r][statusIndex] || '').trim();",
+    "    if (status === 'ENVIADO') continue;",
+    "    const row = { act: HUVENT_CRM_ACT };",
+    "    headers.forEach((header, i) => {",
+    "      if (header && header !== HUVENT_STATUS_COLUMN) row[header] = values[r][i];",
+    "    });",
+    "    row.__huven_form_answers = getRespostasDoFormulario(headers, values[r]);",
+    "    rowsToSend.push(row);",
+    "    rowNumbers.push(r + 1);",
+    "  }",
+    "  if (!rowsToSend.length) return;",
+    "",
+    "  const response = UrlFetchApp.fetch(HUVENT_CRM_WORKER_URL, {",
+    "    method: 'post',",
+    "    contentType: 'application/json',",
+    "    headers: { 'x-huven-secret': HUVENT_CRM_SECRET },",
+    "    payload: JSON.stringify({ rows: rowsToSend }),",
+    "    muteHttpExceptions: true",
+    "  });",
+    "",
+    "  const code = response.getResponseCode();",
+    "  const text = response.getContentText();",
+    "  if (code < 200 || code >= 300) throw new Error('Erro ao enviar leads ao CRM: ' + code + ' - ' + text);",
+    "  rowNumbers.forEach(rowNumber => sheet.getRange(rowNumber, statusIndex + 1).setValue('ENVIADO'));",
+    "}",
+    "",
+    "function getRespostasDoFormulario(headers, rowValues) {",
+    "  const answers = [];",
+    "  for (let column = HUVENT_FORM_ANSWER_START_COLUMN; column <= HUVENT_FORM_ANSWER_END_COLUMN; column++) {",
+    "    const index = column - 1;",
+    "    const question = String(headers[index] || '').trim();",
+    "    const answer = String(rowValues[index] || '').trim();",
+    "    if (question && answer) answers.push({ question, answer });",
+    "  }",
+    "  return answers;",
+    "}",
+    "",
+    "function criarGatilhoDeSincronizacao() {",
+    "  ScriptApp.newTrigger('syncNovosLeadsParaCrm').timeBased().everyMinutes(5).create();",
+    "}"
+  ].join("\n");
+}
+
 function onCrmClientChange() {
   const sel = document.getElementById('crm-client-select');
   const act = sel.value;
@@ -2611,6 +2932,10 @@ function onCrmClientChange() {
   <div class="mobile-nav-item" id="mnav-crm" onclick="switchView('crm'); setMobileNav('crm')">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
     CRM
+  </div>
+  <div class="mobile-nav-item" id="mnav-integracoes" onclick="openIntegrationsFromNav(); setMobileNav('integracoes')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+    Integrações
   </div>
   <div class="mobile-nav-item" id="mnav-conta" onclick="switchView('conta'); setMobileNav('conta')">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -2676,6 +3001,10 @@ function onCrmClientChange() {
         <div class="nav-item" id="nav-conta" onclick="switchView('conta')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           Conta
+        </div>
+        <div class="nav-item" id="nav-integracoes" onclick="openIntegrationsFromNav()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          Integrações
         </div>
         <div class="nav-item" id="nav-contatos" onclick="if(window.abrirContatos) abrirContatos(); else switchView('contatos')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/><line x1="20" y1="8" x2="20" y2="14"/></svg>
@@ -2925,6 +3254,36 @@ function onCrmClientChange() {
 
     </div>
 
+    <!-- Sheets Integration Modal -->
+    <div class="modal-overlay stages-modal" id="sheets-integration-modal" style="display:none;">
+      <div class="modal-box" style="max-width:760px; width:92vw;">
+        <div class="modal-title">Integrações</div>
+        <div style="font-size:12px; color:var(--muted); line-height:1.5; margin-bottom:14px;">
+          Configure integrações do cliente. Nesta versão, gere o código da integração com Google Sheets.
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Cliente / ACT</label>
+          <input type="text" class="modal-input" id="sheets-act" readonly>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">URL do Worker Cloudflare</label>
+          <input type="text" class="modal-input" id="sheets-worker-url" placeholder="https://huven-sheets-cliente.seunome.workers.dev">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Segredo do Worker</label>
+          <input type="text" class="modal-input" id="sheets-worker-secret" placeholder="huven_sheets_2026">
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Código para Apps Script</label>
+          <textarea class="modal-input" id="sheets-script-output" rows="14" readonly style="font-family:'JetBrains Mono', monospace; font-size:11px; line-height:1.5; resize:vertical;"></textarea>
+        </div>
+        <div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
+          <button class="btn-cancel" onclick="closeSheetsIntegrationModal()">Fechar</button>
+          <button class="btn-save" onclick="generateSheetsIntegrationScript()">Gerar código</button>
+          <button class="btn-save" onclick="copySheetsIntegrationScript()">Copiar código</button>
+        </div>
+      </div>
+    </div>
     <!-- Lead Modal -->
     <div class="modal-overlay" id="lead-modal">
       <div class="modal-box">
@@ -4288,7 +4647,7 @@ window.abrirContatos = function abrirContatos() {
     });
     const v = document.getElementById('contatos-view');
     if(v) { v.style.cssText += ';display:block!important;visibility:visible!important;opacity:1!important;'; }
-    ['report','crm','conta','contatos'].forEach(n => {
+    ['report','crm','conta','contatos','integracoes'].forEach(n => {
       const el = document.getElementById('nav-'+n);
       if(el) el.classList.toggle('active', n==='contatos');
     });
@@ -4583,6 +4942,26 @@ function saveStagesFromModal() {
 }
 
 const CRM_KEY = 'catapulta_crm_v1';
+function normalizeImportedLeadFields(lead) {
+  if (!lead || typeof lead !== 'object') return lead;
+  const normalized = { ...lead };
+  normalized.obs = normalized.obs || normalized.observacoes || normalized.observacao || normalized['observações'] || '';
+  const rawSheet = normalized.sheet && normalized.sheet.raw ? normalized.sheet.raw : {};
+  const socialRaw = String(rawSheet.platform || rawSheet.plataforma || rawSheet.rede_social || normalized.platform || normalized.plataforma || normalized.rede_social || normalized.redeSocial || normalized.origem || '').trim();
+  const social = socialRaw.toLowerCase();
+  if (social.includes('insta') || social === 'ig') normalized.redeSocial = 'Instagram';
+  else if (social.includes('face') || social === 'fb' || social.includes('facebook') || social === 'meta') normalized.redeSocial = 'Facebook';
+  else if (social.includes('whats')) normalized.redeSocial = 'WhatsApp';
+  else if (social.includes('tiktok')) normalized.redeSocial = 'TikTok';
+  else if (social.includes('google')) normalized.redeSocial = 'Google';
+  else if (!normalized.redeSocial && socialRaw) normalized.redeSocial = socialRaw;
+  return normalized;
+}
+
+function normalizeImportedLeadsFields(leads) {
+  return Array.isArray(leads) ? leads.map(normalizeImportedLeadFields) : [];
+}
+
 let crmClientFilter = null;
 let dragCard = null;
 let dragCol = null;
@@ -4594,18 +4973,18 @@ async function getLeadsAsync() {
   if (window._fbReady) {
     try {
       const leads = await window._fb.getLeads();
-      _leadsCache = leads;
-      return leads;
+      _leadsCache = normalizeImportedLeadsFields(leads);
+      return _leadsCache;
     } catch(e) {
       console.warn('Firebase error, using cache', e);
-      return _leadsCache || [];
+      return normalizeImportedLeadsFields(_leadsCache || []);
     }
   }
-  return _leadsCache || [];
+  return normalizeImportedLeadsFields(_leadsCache || []);
 }
 
 function getLeads() {
-  return _leadsCache || [];
+  return normalizeImportedLeadsFields(_leadsCache || []);
 }
 
 async function saveLeadToDb(lead) {
@@ -4751,7 +5130,7 @@ function renderAtendimento() {
 }
 
 function switchView(view) {
-  ['report','crm','conta','contatos'].forEach(v => {
+  ['report','crm','conta','contatos','integracoes'].forEach(v => {
     const el = document.getElementById('nav-' + v);
     if (el) el.classList.toggle('active', v === view);
   });
@@ -5530,7 +5909,7 @@ function openLeadModal() {
 }
 
 function editLead(id) {
-  const lead = getLeads().find(l => l.id === id);
+  let lead = getLeads().find(l => l.id === id);
   if (!lead) return;
   const clinica = isClinicaClient(lead.act);
   document.getElementById('lead-id').value = lead.id;
@@ -5540,7 +5919,10 @@ function editLead(id) {
   document.getElementById('lead-created-at').value = leadDateInputValue(lead);
   document.getElementById('lead-plantao').value = lead.plantao || '';
   document.getElementById('lead-valor').value = lead.valor || '';
+  lead = normalizeImportedLeadFields(lead);
+  document.getElementById('lead-origem').value = lead.origem || '';
   document.getElementById('lead-rede-social').value = lead.redeSocial || '';
+  document.getElementById('lead-obs').value = lead.obs || '';
   // Reset campos configuráveis para visível antes de aplicar config
   ['field-valor','field-origem','field-rede-social','field-obs','field-proxima-acao','field-proxima-data'].forEach(id => {
     const el = document.getElementById(id);
@@ -5559,8 +5941,11 @@ function editLead(id) {
   stageSelect.value = getArteAzulejoStageForBoard(lead, lead.act);
   document.getElementById('modal-title').textContent = 'Editar lead';
   if (lead.act) applyFieldConfig(lead.act);
-  // Restaurar valor do select rede social após applyFieldConfig sobrescrever opções
+  // Restaurar valores após applyFieldConfig sobrescrever opções
+  lead = normalizeImportedLeadFields(lead);
+  document.getElementById('lead-origem').value = lead.origem || '';
   document.getElementById('lead-rede-social').value = lead.redeSocial || '';
+  document.getElementById('lead-obs').value = lead.obs || '';
   document.getElementById('lead-modal').classList.add('open');
 }
 
@@ -5688,7 +6073,7 @@ function moveLeadTo(id, stageId) {
 
 
 function setMobileNav(view) {
-  ['report','crm','cfg'].forEach(v => {
+  ['report','crm','conta','integracoes','cfg'].forEach(v => {
     const el = document.getElementById('mnav-' + v);
     if (el) el.classList.toggle('active', v === view);
   });
@@ -5994,6 +6379,156 @@ async function changePassword() {
 }
 
 
+function getCurrentCrmActForSheets() {
+  const sel = document.getElementById('crm-client-select');
+  if (sel && sel.value && sel.value !== 'all') return sel.value;
+  if (crmClientFilter) return crmClientFilter;
+  if (activeClient && activeClient.account) return activeClient.account;
+  const keys = Object.keys(CLIENT_NAMES || {});
+  return keys[0] || '';
+}
+
+function openIntegrationsFromNav() {
+  switchView('crm');
+  ['report','crm','conta','contatos','integracoes'].forEach(v => {
+    const el = document.getElementById('nav-' + v);
+    if (el) el.classList.toggle('active', v === 'integracoes');
+  });
+  if (typeof setMobileNav === 'function') setMobileNav('integracoes');
+  setTimeout(openSheetsIntegrationModal, 80);
+}
+function openSheetsIntegrationModal() {
+  const modal = document.getElementById('sheets-integration-modal');
+  if (!modal) return;
+  const act = getCurrentCrmActForSheets();
+  const clientName = CLIENT_NAMES[act] || (activeClient ? activeClient.name : '') || act;
+  document.getElementById('sheets-act').value = clientName ? clientName + ' | ' + act : act;
+  const saved = getSheetsIntegrationConfig(act);
+  document.getElementById('sheets-worker-url').value = saved.url || '';
+  document.getElementById('sheets-worker-secret').value = saved.secret || 'huven_sheets_2026';
+  document.getElementById('sheets-script-output').value = '';
+  modal.style.display = 'flex';
+  modal.classList.add('open');
+}
+
+function closeSheetsIntegrationModal() {
+  const modal = document.getElementById('sheets-integration-modal');
+  if (!modal) return;
+  modal.classList.remove('open');
+  modal.style.display = 'none';
+}
+
+function getSheetsIntegrationConfig(act) {
+  try {
+    const all = JSON.parse(localStorage.getItem('huven_sheets_integrations') || '{}');
+    return all[act] || {};
+  } catch(e) { return {}; }
+}
+
+function saveSheetsIntegrationConfig(act, data) {
+  try {
+    const all = JSON.parse(localStorage.getItem('huven_sheets_integrations') || '{}');
+    all[act] = data;
+    localStorage.setItem('huven_sheets_integrations', JSON.stringify(all));
+  } catch(e) {}
+}
+
+function generateSheetsIntegrationScript() {
+  const act = getCurrentCrmActForSheets();
+  const url = document.getElementById('sheets-worker-url').value.trim();
+  const secret = document.getElementById('sheets-worker-secret').value.trim();
+  if (!act) { showToast('Selecione um cliente antes de gerar a integração.', 'warning'); return; }
+  if (!url || !secret) { showToast('Preencha a URL do Worker e o segredo.', 'warning'); return; }
+  saveSheetsIntegrationConfig(act, { url, secret });
+  const script = buildSheetsAppsScript(url, secret, act);
+  document.getElementById('sheets-script-output').value = script;
+  showToast('Código da planilha gerado.', 'success');
+}
+
+function copySheetsIntegrationScript() {
+  const output = document.getElementById('sheets-script-output');
+  if (!output.value.trim()) generateSheetsIntegrationScript();
+  output.select();
+  output.setSelectionRange(0, output.value.length);
+  try {
+    navigator.clipboard.writeText(output.value);
+    showToast('Código copiado.', 'success');
+  } catch(e) {
+    document.execCommand('copy');
+    showToast('Código copiado.', 'success');
+  }
+}
+
+function buildSheetsAppsScript(workerUrl, secret, act) {
+  return [
+    "const HUVENT_CRM_WORKER_URL = " + JSON.stringify(workerUrl) + ";",
+    "const HUVENT_CRM_SECRET = " + JSON.stringify(secret) + ";",
+    "const HUVENT_CRM_ACT = " + JSON.stringify(act) + ";",
+    "const HUVENT_STATUS_COLUMN = 'CRM_SYNC';",
+    "const HUVENT_FORM_ANSWER_START_COLUMN = 13; // Coluna M",
+    "const HUVENT_FORM_ANSWER_END_COLUMN = 16; // Coluna P",
+    "const HUVENT_SHEET_NAME = 'Captação imóveis';",
+    "",
+    "function syncNovosLeadsParaCrm() {",
+    "  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(HUVENT_SHEET_NAME);",
+    "  if (!sheet) throw new Error('Aba não encontrada: ' + HUVENT_SHEET_NAME);",
+    "  const values = sheet.getDataRange().getValues();",
+    "  if (values.length < 2) return;",
+    "",
+    "  const headers = values[0].map(h => String(h || '').trim());",
+    "  let statusIndex = headers.indexOf(HUVENT_STATUS_COLUMN);",
+    "  if (statusIndex === -1) {",
+    "    statusIndex = headers.length;",
+    "    sheet.getRange(1, statusIndex + 1).setValue(HUVENT_STATUS_COLUMN);",
+    "    headers.push(HUVENT_STATUS_COLUMN);",
+    "  }",
+    "",
+    "  const rowsToSend = [];",
+    "  const rowNumbers = [];",
+    "  for (let r = 1; r < values.length; r++) {",
+    "    const status = String(values[r][statusIndex] || '').trim();",
+    "    if (status === 'ENVIADO') continue;",
+    "    const row = { act: HUVENT_CRM_ACT };",
+    "    headers.forEach((header, i) => {",
+    "      if (header && header !== HUVENT_STATUS_COLUMN) row[header] = values[r][i];",
+    "    });",
+    "    row.__huven_form_answers = getRespostasDoFormulario(headers, values[r]);",
+    "    rowsToSend.push(row);",
+    "    rowNumbers.push(r + 1);",
+    "  }",
+    "  if (!rowsToSend.length) return;",
+    "",
+    "  const response = UrlFetchApp.fetch(HUVENT_CRM_WORKER_URL, {",
+    "    method: 'post',",
+    "    contentType: 'application/json',",
+    "    headers: { 'x-huven-secret': HUVENT_CRM_SECRET },",
+    "    payload: JSON.stringify({ rows: rowsToSend }),",
+    "    muteHttpExceptions: true",
+    "  });",
+    "",
+    "  const code = response.getResponseCode();",
+    "  const text = response.getContentText();",
+    "  if (code < 200 || code >= 300) throw new Error('Erro ao enviar leads ao CRM: ' + code + ' - ' + text);",
+    "  rowNumbers.forEach(rowNumber => sheet.getRange(rowNumber, statusIndex + 1).setValue('ENVIADO'));",
+    "}",
+    "",
+    "function getRespostasDoFormulario(headers, rowValues) {",
+    "  const answers = [];",
+    "  for (let column = HUVENT_FORM_ANSWER_START_COLUMN; column <= HUVENT_FORM_ANSWER_END_COLUMN; column++) {",
+    "    const index = column - 1;",
+    "    const question = String(headers[index] || '').trim();",
+    "    const answer = String(rowValues[index] || '').trim();",
+    "    if (question && answer) answers.push({ question, answer });",
+    "  }",
+    "  return answers;",
+    "}",
+    "",
+    "function criarGatilhoDeSincronizacao() {",
+    "  ScriptApp.newTrigger('syncNovosLeadsParaCrm').timeBased().everyMinutes(5).create();",
+    "}"
+  ].join("\n");
+}
+
 function onCrmClientChange() {
   const sel = document.getElementById('crm-client-select');
   const act = sel.value;
@@ -6019,3 +6554,10 @@ function onCrmClientChange() {
 </script>
 </body>
 </html>
+
+
+
+
+
+
+
