@@ -605,6 +605,39 @@ tr:hover td { background: var(--surface2); }
   .toast.warning { border-left: 3px solid #fbbf24; }
   @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
+  .notification-bell-btn { position: relative; }
+  .notification-badge {
+    margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px;
+    border-radius: 999px; background: var(--red); color: #fff;
+    display: none; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 800; line-height: 1;
+  }
+  .notification-badge.show { display: inline-flex; }
+  .notifications-list { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow: auto; }
+  .notification-item {
+    border: 1px solid var(--border); border-radius: 8px; background: var(--surface2);
+    padding: 10px 12px; display: flex; gap: 10px; align-items: flex-start;
+  }
+  .notification-item.unread { border-color: rgba(212,175,80,.65); background: rgba(212,175,80,.08); }
+  .notification-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-top: 6px; flex-shrink: 0; }
+  .notification-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 3px; }
+  .notification-msg { font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .notification-time { font-size: 11px; color: var(--muted); margin-top: 6px; opacity: .8; }
+  .crm-new-lead-banner {
+    display: none; align-items: center; justify-content: space-between; gap: 12px;
+    margin: 0 0 14px; padding: 11px 14px; border-radius: 8px;
+    border: 1px solid rgba(212,175,80,.55); background: rgba(212,175,80,.1);
+    color: var(--text); font-size: 13px; font-weight: 650;
+  }
+  .crm-new-lead-banner.show { display: flex; }
+  .crm-new-lead-ack {
+    background: var(--accent); border: 1px solid rgba(212,175,80,.85);
+    color: #111; border-radius: 8px; padding: 8px 18px;
+    font-size: 13px; font-weight: 800; cursor: pointer;
+    min-width: 96px; box-shadow: 0 6px 18px rgba(212,175,80,.18);
+  }
+  .crm-new-lead-ack:hover { filter: brightness(1.08); transform: translateY(-1px); }
+
   /* Modal de confirmação no padrão do sistema */
   #confirm-modal {
     position: fixed; inset: 0; background: rgba(0,0,0,0.6);
@@ -1006,7 +1039,7 @@ const CREDENTIALS = {
   "thayelli":   { pass: null, act: "act_1281304275983449" },
   "adriana":    { pass: null,  act: "act_456685107743703"  },
   "travi":      { pass: null,    act: "act_379348482601330"  },
-  "boleto":     { pass: "catapulta123",    act: "act_1712273919281701" },
+  "boleto":     { pass: null,    act: "act_1712273919281701" },
 };
 
 const CLIENT_NAMES = {
@@ -1299,6 +1332,37 @@ const STAGE_COLORS = ['col-novo','col-contato','col-proposta','col-fechado','col
 function stageColor(idx) { return STAGE_COLORS[idx % STAGE_COLORS.length]; }
 
 const CRM_KEY = 'catapulta_crm_v1';
+function adrianaCampaignLabelFromLead(lead, rawSheet) {
+  const act = String(lead.act || rawSheet.act || rawSheet.account || rawSheet.conta || '').trim();
+  if (act !== 'act_456685107743703') return '';
+  const sourceText = [
+    lead.origem,
+    lead.campaignName,
+    lead.campanha,
+    lead.anuncio,
+    rawSheet.origem,
+    rawSheet.campaign_name,
+    rawSheet.campanha,
+    rawSheet.ad_name,
+    rawSheet.anuncio,
+    rawSheet.form_name,
+    rawSheet.formulario,
+    rawSheet.__huven_origin,
+    rawSheet.__huven_form_name
+  ].filter(Boolean).join(' ').toLowerCase();
+  if (sourceText.includes('cobertura') || sourceText.includes('asa norte') || sourceText.includes('asa_norte') || sourceText.includes('cobertura ia')) {
+    return 'Campanha Cobertura IA';
+  }
+  return 'Campanha imóveis Adriana';
+}
+
+function applyAdrianaCampaignOrigem(lead, rawSheet) {
+  const campaignLabel = adrianaCampaignLabelFromLead(lead, rawSheet || {});
+  if (!campaignLabel) return lead;
+  const social = lead.redeSocial || 'Instagram';
+  lead.origem = `${social} - ${campaignLabel}`;
+  return lead;
+}
 function normalizeImportedLeadFields(lead) {
   if (!lead || typeof lead !== 'object') return lead;
   const normalized = { ...lead };
@@ -1312,6 +1376,7 @@ function normalizeImportedLeadFields(lead) {
   else if (social.includes('tiktok')) normalized.redeSocial = 'TikTok';
   else if (social.includes('google')) normalized.redeSocial = 'Google';
   else if (!normalized.redeSocial && socialRaw) normalized.redeSocial = socialRaw;
+  if (typeof applyAdrianaCampaignOrigem === 'function') applyAdrianaCampaignOrigem(normalized, rawSheet);
   return normalized;
 }
 
@@ -1523,7 +1588,7 @@ function setupCrmForClient() {
     const sel = document.getElementById('crm-client-select');
     sel.style.display = 'block';
     sel.innerHTML = '<option value="all">Todos os clientes</option>' +
-      Object.entries(CLIENT_NAMES).map(([act, name]) => `<option value="${act}">${name}</option>`).join('');
+      getSidebarClientEntries().map(([act, name]) => `<option value="${escapeHtml(act)}">${escapeHtml(name)}</option>`).join('');
     crmClientFilter = null;
   } else {
     crmClientFilter = activeClient ? activeClient.account : null;
@@ -1768,27 +1833,29 @@ function renderKanban() {
       card.addEventListener('dragstart', onDragStart);
       card.addEventListener('dragend', onDragEnd);
       let cardHTML = '';
-      if (lead.origem) cardHTML += `<div class="card-origem">📍 ${lead.origem}</div>`;
-      if (lead.redeSocial) cardHTML += `<div class="card-rede">📱 ${lead.redeSocial}</div>`;
-      cardHTML += `<div class="card-name">${lead.name}</div>`;
-      cardHTML += `<div class="card-phone">${lead.phone || '—'}</div>`;
-      cardHTML += `<div class="card-email">${lead.email || '—'}</div>`;
-      if (lead.obs) cardHTML += `<div class="card-obs">💬 ${lead.obs}</div>`;
-      if (lead.valor) cardHTML += `<div class="card-valor">💰 R$ ${lead.valor}</div>`;
-      if (lead.proximaAcao) cardHTML += `<div class="card-proxima">⏰ ${lead.proximaAcao}${lead.proximaData ? ' · ' + new Date(lead.proximaData + 'T12:00:00').toLocaleDateString('pt-BR') : ''}</div>`;
-      if (lead.createdAt) cardHTML += `<div style="font-size:10px;color:var(--muted);margin-top:4px;">Entrada: ${new Date(lead.createdAt).toLocaleDateString('pt-BR')}</div>`;
-      const waPhone = lead.phone ? lead.phone.replace(/\D/g,'') : '';
+      const safeLeadId = escapeJsString(lead.id);
+      if (lead.origem) cardHTML += `<div class="card-origem">📍 ${escapeHtml(limitText(lead.origem, 160))}</div>`;
+      if (lead.redeSocial) cardHTML += `<div class="card-rede">📱 ${escapeHtml(limitText(lead.redeSocial, 80))}</div>`;
+      cardHTML += `<div class="card-name">${escapeHtml(limitText(lead.name || 'Lead sem nome', 120))}</div>`;
+      cardHTML += `<div class="card-phone">${escapeHtml(lead.phone || '—')}</div>`;
+      cardHTML += `<div class="card-email">${escapeHtml(lead.email || '—')}</div>`;
+      if (lead.obs) cardHTML += `<div class="card-obs">💬 ${escapeHtml(limitText(lead.obs, 260))}</div>`;
+      if (lead.valor) cardHTML += `<div class="card-valor">💰 R$ ${escapeHtml(limitText(lead.valor, 40))}</div>`;
+      if (lead.proximaAcao) cardHTML += `<div class="card-proxima">⏰ ${escapeHtml(limitText(lead.proximaAcao, 120))}${lead.proximaData ? ' · ' + new Date(lead.proximaData + 'T12:00:00').toLocaleDateString('pt-BR') : ''}</div>`;
+      if (lead.createdAt) cardHTML += `<div style="font-size:10px;color:var(--muted);margin-top:4px;">Entrada: ${escapeHtml(new Date(lead.createdAt).toLocaleDateString('pt-BR'))}</div>`;
+      const waPhone = onlyDigits(lead.phone);
       const waLink = waPhone ? `https://wa.me/55${waPhone}` : '';
       cardHTML += `<div class="card-actions">
-        <button class="card-btn" onclick="editLead('${lead.id}')">Editar</button>
-        <button class="card-btn" onclick="openMoveModal('${lead.id}')">Mover</button>
-        <button class="card-btn" onclick="showHistory('${lead.id}')">Hist.</button>
+        <button class="card-btn" onclick="editLead('${safeLeadId}')">Editar</button>
+        <button class="card-btn" onclick="openMoveModal('${safeLeadId}')">Mover</button>
+        <button class="card-btn" onclick="showHistory('${safeLeadId}')">Hist.</button>
         ${waLink ? (lead.whatsappFirstMessageAt
           ? `<button class="card-btn card-btn-whatsapp" onclick="window.open('${waLink}','_blank')" title="Abrir WhatsApp"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.112.554 4.094 1.523 5.812L.057 23.997l6.305-1.654A11.954 11.954 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.012-1.376l-.36-.214-3.733.979 1-3.647-.235-.374A9.818 9.818 0 0 1 2.182 12C2.182 6.58 6.58 2.182 12 2.182S21.818 6.58 21.818 12 17.42 21.818 12 21.818z"/></svg></button>`
           : `<button class="card-btn card-btn-first-msg" onclick="openFirstWhatsAppMessage('${lead.id}')" title="Enviar primeira mensagem no WhatsApp"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.112.554 4.094 1.523 5.812L.057 23.997l6.305-1.654A11.954 11.954 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.012-1.376l-.36-.214-3.733.979 1-3.647-.235-.374A9.818 9.818 0 0 1 2.182 12C2.182 6.58 6.58 2.182 12 2.182S21.818 6.58 21.818 12 17.42 21.818 12 21.818z"/></svg><span>1ª msg</span></button>`)
         : ''}
-        <button class="card-btn del" onclick="deleteLead('${lead.id}')">✕</button>
+        <button class="card-btn del" onclick="deleteLead('${safeLeadId}')">✕</button>
       </div>`;
+      cardHTML = cardHTML.replace(`openFirstWhatsAppMessage('${lead.id}')`, `openFirstWhatsAppMessage('${safeLeadId}')`);
       card.innerHTML = cardHTML;
       cardsDiv.appendChild(card);
     });
@@ -2081,8 +2148,8 @@ function updateMobileHeader() {
       mobileSel.style.display = 'block';
       if (!mobileSel.children.length || mobileSel.children.length === 1) {
         mobileSel.innerHTML = '<option value="">Selecione um cliente</option>' +
-          Object.entries(CLIENT_NAMES).map(([act, name]) =>
-            `<option value="${act}">${name}</option>`
+          getSidebarClientEntries().map(([act, name]) =>
+            `<option value="${escapeHtml(act)}">${escapeHtml(name)}</option>`
           ).join('');
       }
       if (activeClient && activeClient.account) {
@@ -2128,6 +2195,29 @@ const STAGE_COLORS = {
   'fechado':     '#34d399',
   'perdido':     '#f87171',
 };
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]));
+}
+
+function escapeJsString(value) {
+  return String(value ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, ' ');
+}
+
+function onlyDigits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function limitText(value, max = 600) {
+  const text = String(value ?? '').trim();
+  return text.length > max ? text.slice(0, max) + '...' : text;
+}
 
 function buildCrmChart(leads, stages) {
   const ctx = document.getElementById('crm-chart');
@@ -2222,9 +2312,9 @@ function switchCrmChart(type) {
 }
 
 
-window.addEventListener('fbready', () => {
-  loadCustomPasswords();
-  loadExtraClients();
+window.addEventListener('fbready', async () => {
+  await loadCustomPasswords();
+  await loadExtraClients();
   getLeadsAsync().then(() => {
     if (document.getElementById('crm-view') && document.getElementById('crm-view').style.display === 'block') {
       renderKanban();
@@ -2236,33 +2326,63 @@ window.addEventListener('fbready', () => {
 const SESSION_KEY = 'catapulta_session_v1';
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 dias em ms
 
-function saveSession(user) {
-  const session = { user, expiresAt: Date.now() + SESSION_DURATION };
+async function getSessionSignature(user, pass, expiresAt) {
+  const payload = `${user}|${expiresAt}|${pass || ''}|huven-crm-v2`;
+  if (window.crypto && crypto.subtle && window.TextEncoder) {
+    const bytes = new TextEncoder().encode(payload);
+    const hash = await crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  return btoa(unescape(encodeURIComponent(payload))).slice(0, 64);
+}
+
+async function saveSession(user, pass) {
+  const expiresAt = Date.now() + SESSION_DURATION;
+  const session = {
+    v: 2,
+    user,
+    expiresAt,
+    sig: await getSessionSignature(user, pass, expiresAt)
+  };
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
-function getSession() {
+async function getSession() {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
-    console.log('[Session] raw:', raw);
     const session = JSON.parse(raw);
-    if (!session) { console.log('[Session] null session'); return null; }
-    if (Date.now() > session.expiresAt) {
-      console.log('[Session] expired');
+    if (!session || session.v !== 2 || !session.user || !session.expiresAt || !session.sig) {
       localStorage.removeItem(SESSION_KEY);
       return null;
     }
-    console.log('[Session] valid:', session.user);
+    if (Date.now() > session.expiresAt) {
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    const effectivePass = getEffectivePassword(session.user);
+    const expected = await getSessionSignature(session.user, effectivePass, session.expiresAt);
+    if (!effectivePass || expected !== session.sig) {
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
     return session;
-  } catch(e) { console.log('[Session] error:', e); return null; }
+  } catch(e) {
+    localStorage.removeItem(SESSION_KEY);
+    return null;
+  }
 }
 
 function clearSession() {
   localStorage.removeItem(SESSION_KEY);
 }
 
-function restoreSession() {
-  const session = getSession();
+async function restoreSession() {
+  if (!window._fbReady) {
+    await new Promise(resolve => window.addEventListener('fbready', resolve, { once: true }));
+  }
+  await loadCustomPasswords();
+  await loadExtraClients();
+  const session = await getSession();
   if (!session) {
     document.getElementById('login-overlay').style.display = 'flex';
     return false;
@@ -2287,6 +2407,7 @@ function restoreSession() {
   isAdmin = (user === 'admin');
   setupCrmForClient();
   renderSidebar();
+  ensureAdminClientSidebar();
   updateMobileHeader();
   updateSidebarForUser();
   const mobileNav = document.getElementById('mobile-nav');
@@ -2301,6 +2422,15 @@ function restoreSession() {
 document.addEventListener('DOMContentLoaded', function() {
   if (!IS_CLIENT_LINK) {
     setTimeout(restoreSession, 80);
+    let sidebarRepairTries = 0;
+    const sidebarRepairTimer = setInterval(() => {
+      sidebarRepairTries += 1;
+      ensureAdminClientSidebar();
+      const list = document.getElementById('client-list');
+      if ((list && list.children.length > 0) || sidebarRepairTries >= 20) {
+        clearInterval(sidebarRepairTimer);
+      }
+    }, 250);
   }
 });
 
@@ -2344,7 +2474,7 @@ async function loadExtraClients() {
       const sel = document.getElementById('crm-client-select');
       if (sel) {
         sel.innerHTML = '<option value="all">Todos os clientes</option>' +
-          Object.entries(CLIENT_NAMES).map(([act, name]) => `<option value="${act}">${name}</option>`).join('');
+          getSidebarClientEntries().map(([act, name]) => `<option value="${escapeHtml(act)}">${escapeHtml(name)}</option>`).join('');
       }
     }
     renderSidebar();
@@ -2364,7 +2494,7 @@ function getEffectivePassword(user) {
 }
 
 async function changePassword() {
-  const session = getSession();
+  const session = await getSession();
   if (!session) return;
   const user = session.user;
 
@@ -2439,7 +2569,7 @@ function openSheetsIntegrationModal() {
   document.getElementById('sheets-act').value = clientName ? clientName + ' | ' + act : act;
   const saved = getSheetsIntegrationConfig(act);
   document.getElementById('sheets-worker-url').value = saved.url || '';
-  document.getElementById('sheets-worker-secret').value = saved.secret || 'huven_sheets_2026';
+  document.getElementById('sheets-worker-secret').value = saved.secret || '';
   document.getElementById('sheets-script-output').value = '';
   modal.style.display = 'flex';
   modal.classList.add('open');
@@ -2588,7 +2718,7 @@ function onCrmClientChange() {
 </script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
   const firebaseConfig = {
@@ -2608,6 +2738,16 @@ function onCrmClientChange() {
     async getLeads() {
       const snap = await getDocs(collection(db, 'leads'));
       return snap.docs.map(d => normalizeImportedLeadFields({ ...d.data(), _docId: d.id }));
+    },
+    listenLeads(callback) {
+      return onSnapshot(collection(db, 'leads'), snap => {
+        const leads = snap.docs.map(d => normalizeImportedLeadFields({ ...d.data(), _docId: d.id }));
+        const changed = snap.docChanges().map(change => ({
+          type: change.type,
+          lead: normalizeImportedLeadFields({ ...change.doc.data(), _docId: change.doc.id })
+        }));
+        callback(leads, changed);
+      }, error => console.warn('Firestore realtime error:', error));
     },
     async saveLead(lead) {
       if (lead._docId) {
@@ -2678,33 +2818,63 @@ window.addEventListener('fbready', () => {
 const SESSION_KEY = 'catapulta_session_v1';
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 dias em ms
 
-function saveSession(user) {
-  const session = { user, expiresAt: Date.now() + SESSION_DURATION };
+async function getSessionSignature(user, pass, expiresAt) {
+  const payload = `${user}|${expiresAt}|${pass || ''}|huven-crm-v2`;
+  if (window.crypto && crypto.subtle && window.TextEncoder) {
+    const bytes = new TextEncoder().encode(payload);
+    const hash = await crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  return btoa(unescape(encodeURIComponent(payload))).slice(0, 64);
+}
+
+async function saveSession(user, pass) {
+  const expiresAt = Date.now() + SESSION_DURATION;
+  const session = {
+    v: 2,
+    user,
+    expiresAt,
+    sig: await getSessionSignature(user, pass, expiresAt)
+  };
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
-function getSession() {
+async function getSession() {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
-    console.log('[Session] raw:', raw);
     const session = JSON.parse(raw);
-    if (!session) { console.log('[Session] null session'); return null; }
-    if (Date.now() > session.expiresAt) {
-      console.log('[Session] expired');
+    if (!session || session.v !== 2 || !session.user || !session.expiresAt || !session.sig) {
       localStorage.removeItem(SESSION_KEY);
       return null;
     }
-    console.log('[Session] valid:', session.user);
+    if (Date.now() > session.expiresAt) {
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    const effectivePass = getEffectivePassword(session.user);
+    const expected = await getSessionSignature(session.user, effectivePass, session.expiresAt);
+    if (!effectivePass || expected !== session.sig) {
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
     return session;
-  } catch(e) { console.log('[Session] error:', e); return null; }
+  } catch(e) {
+    localStorage.removeItem(SESSION_KEY);
+    return null;
+  }
 }
 
 function clearSession() {
   localStorage.removeItem(SESSION_KEY);
 }
 
-function restoreSession() {
-  const session = getSession();
+async function restoreSession() {
+  if (!window._fbReady) {
+    await new Promise(resolve => window.addEventListener('fbready', resolve, { once: true }));
+  }
+  await loadCustomPasswords();
+  await loadExtraClients();
+  const session = await getSession();
   if (!session) {
     document.getElementById('login-overlay').style.display = 'flex';
     return false;
@@ -2729,6 +2899,7 @@ function restoreSession() {
   isAdmin = (user === 'admin');
   setupCrmForClient();
   renderSidebar();
+  ensureAdminClientSidebar();
   updateMobileHeader();
   updateSidebarForUser();
   const mobileNav = document.getElementById('mobile-nav');
@@ -2783,7 +2954,7 @@ function getEffectivePassword(user) {
 }
 
 async function changePassword() {
-  const session = getSession();
+  const session = await getSession();
   if (!session) return;
   const user = session.user;
 
@@ -2858,7 +3029,7 @@ function openSheetsIntegrationModal() {
   document.getElementById('sheets-act').value = clientName ? clientName + ' | ' + act : act;
   const saved = getSheetsIntegrationConfig(act);
   document.getElementById('sheets-worker-url').value = saved.url || '';
-  document.getElementById('sheets-worker-secret').value = saved.secret || 'huven_sheets_2026';
+  document.getElementById('sheets-worker-secret').value = saved.secret || '';
   document.getElementById('sheets-script-output').value = '';
   modal.style.display = 'flex';
   modal.classList.add('open');
@@ -3131,6 +3302,11 @@ function onCrmClientChange() {
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         Configurar clientes
       </button>
+      <button class="btn-cfg notification-bell-btn" id="btn-notifications" onclick="openNotificationsCenter()" style="margin-top:6px;" title="Ver notificações de novos leads">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        Notificações
+        <span class="notification-badge" id="notifications-badge">0</span>
+      </button>
       <button class="btn-cfg huven-theme-toggle" id="huven-theme-toggle" onclick="toggleHuvenTheme()" title="Alternar tema claro ou escuro" style="margin-top:6px;">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
         Tema <span id="huven-theme-label">Claro</span>
@@ -3156,6 +3332,10 @@ function onCrmClientChange() {
         <button class="btn-update" onclick="loadData()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
           Atualizar
+        </button>
+        <button class="btn-update" onclick="extractTrafficData()" title="Extrair dados de tráfego para Excel">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Extrair
         </button>
       </div>
     </div>
@@ -3403,11 +3583,14 @@ function onCrmClientChange() {
           <button class="btn-manage-stages" onclick="openStagesModal()" style="margin-right:8px;">⚙ Colunas</button>
           <button class="btn-manage-stages" id="btn-cfg-campos" onclick="openFieldsModal()" style="margin-right:8px; display:none;">⚙ Campos</button>
           <button class="btn-manage-stages" id="btn-limpar-crm" onclick="limparCrmCliente()" style="margin-right:8px; display:none; color:var(--red); border-color:rgba(248,113,113,0.3);" title="Limpar todos os leads deste cliente">🗑 Limpar CRM</button>
-          <button class="btn-manage-stages" onclick="exportLeads()" style="margin-right:8px;" title="Exportar leads para CSV">
+          <button class="btn-manage-stages" onclick="exportLeads()" style="margin-right:8px;" title="Exportar leads para Excel">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Exportar
+            Exportar Excel
           </button>
-          <button class="btn-manage-stages" onclick="document.getElementById('import-csv-input').click()" style="margin-right:8px;" title="Importar leads de CSV">
+                    <button class="btn-manage-stages" onclick="openFirstMessageModal()" style="margin-right:8px;" title="Personalizar primeira mensagem">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            1ª mensagem
+          </button><button class="btn-manage-stages" onclick="document.getElementById('import-csv-input').click()" style="margin-right:8px;" title="Importar leads de CSV">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Importar
           </button>
@@ -3417,6 +3600,10 @@ function onCrmClientChange() {
             Novo lead
           </button>
         </div>
+      </div>
+      <div class="crm-new-lead-banner" id="crm-new-lead-banner">
+        <span id="crm-new-lead-banner-text">Novo lead chegou no CRM.</span>
+        <button class="crm-new-lead-ack" onclick="clearUnreadLeadNotifications()">Ok, vi</button>
       </div>
       <div id="valor-fechado-banner" style="background:rgba(52,211,153,0.08); border:1px solid rgba(52,211,153,0.25); border-radius:8px; padding:10px 16px; margin-bottom:14px; align-items:center; gap:10px;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
@@ -3464,7 +3651,7 @@ function onCrmClientChange() {
         </div>
         <div class="modal-field">
           <label class="modal-label">Segredo do Worker</label>
-          <input type="text" class="modal-input" id="sheets-worker-secret" placeholder="huven_sheets_2026">
+          <input type="text" class="modal-input" id="sheets-worker-secret" placeholder="cole um segredo forte">
         </div>
         <div class="modal-field">
           <label class="modal-label">Código para Apps Script</label>
@@ -3563,6 +3750,38 @@ function onCrmClientChange() {
   
     <!-- Import Mapping Modal -->
     <div id="toast-container"></div>
+    <div class="modal-overlay stages-modal" id="notifications-modal" style="display:none;">
+      <div class="stages-box" style="max-width:520px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;">
+          <div>
+            <div class="modal-title" style="margin-bottom:3px;">Notificações</div>
+            <div style="font-size:12px;color:var(--muted);">Últimos leads que chegaram no CRM</div>
+          </div>
+          <button class="btn-del-stage" onclick="closeNotificationsCenter()" title="Fechar">×</button>
+        </div>
+        <div class="notifications-list" id="notifications-list"></div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+          <button class="modal-btn-cancel" onclick="clearNotificationsCenter()">Limpar</button>
+          <button class="modal-btn-save" onclick="closeNotificationsCenter()">Fechar</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-overlay stages-modal" id="first-message-modal" style="display:none;">
+      <div class="modal-box" style="max-width:560px; width:92vw;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;">
+          <div class="modal-title" style="margin-bottom:0;">Personalizar primeira mensagem</div>
+          <button class="btn-close-panel" onclick="closeFirstMessageModal()">×</button>
+        </div>
+        <div class="modal-field">
+          <label class="modal-label">Mensagem inicial</label>
+          <textarea class="modal-input" id="first-message-template" rows="6" style="resize:vertical;" placeholder="Olá {primeiro_nome}, tudo bem? Recebemos seu cadastro e vou te ajudar com as informações por aqui. Vi que você veio pelo {rede_social}."></textarea>
+        </div>
+        <div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
+          <button class="modal-btn-cancel" onclick="closeFirstMessageModal()">Cancelar</button>
+          <button class="modal-btn-save" onclick="saveFirstMessageTemplate()">Salvar mensagem</button>
+        </div>
+      </div>
+    </div>
     <div id="confirm-modal">
       <div class="confirm-box">
         <div class="confirm-title" id="confirm-title">Confirmação</div>
@@ -3838,33 +4057,75 @@ function selectClient(name) {
   renderSidebar();
 }
 
+function getBaseClientNames() {
+  return {
+    "act_1324786597927962": "Raquel Odonto",
+    "act_1311713804053571": "Clínica Vital",
+    "act_728532149829958": "Petland Campinas",
+    "act_1515794876111984": "Contabiliza Tech",
+    "act_2690757151096950": "English Sniper",
+    "act_1281304275983449": "Thayelli Registro de Marcas",
+    "act_456685107743703": "Adriana Jimenez",
+    "act_379348482601330": "Travi",
+    "act_1712273919281701": "Catapulta Boleto",
+    "act_457365536961711": "Arte Em Azulejo"
+  };
+}
+
+function getClientDisplayName(act) {
+  return (CLIENT_NAMES && CLIENT_NAMES[act]) || getBaseClientNames()[act] || act;
+}
+
+function getSidebarClientEntries() {
+  return Object.entries({ ...getBaseClientNames(), ...(CLIENT_NAMES || {}) })
+    .filter(([act, name]) => act && name);
+}
+
 function renderSidebar() {
   const list = document.getElementById('client-list');
+  if (!list) return;
 
   if (IS_CLIENT_LINK) {
-    list.innerHTML = activeClient ? `<div class="client-item active"><div class="client-avatar">${initials(activeClient.name)}</div><span>${activeClient.name}</span></div>` : '';
+    list.innerHTML = activeClient ? `<div class="client-item active"><div class="client-avatar">${escapeHtml(initials(activeClient.name))}</div><span>${escapeHtml(activeClient.name)}</span></div>` : '';
     return;
   }
 
-  if (isAdmin) {
-    list.innerHTML = Object.entries(CLIENT_NAMES).map(([act, name]) => `
-      <div class="client-item ${activeClient && activeClient.account === act ? 'active' : ''}" onclick="selectClientByAct('${act}')">
-        <div class="client-avatar">${initials(name)}</div>
-        <span>${name}</span>
+  const adminVisible = isAdmin || document.getElementById('page-title')?.textContent.trim().toLowerCase() === 'admin';
+  if (adminVisible) {
+    const entries = getSidebarClientEntries();
+    list.innerHTML = entries.map(([act, name]) => `
+      <div class="client-item ${activeClient && activeClient.account === act ? 'active' : ''}" onclick="selectClientByAct('${escapeJsString(act)}')">
+        <div class="client-avatar">${escapeHtml(initials(name))}</div>
+        <span>${escapeHtml(name)}</span>
       </div>`).join('');
     return;
   }
 
   // Cliente não-admin: mostrar apenas o próprio cliente logado
   if (activeClient) {
-    list.innerHTML = `<div class="client-item active"><div class="client-avatar">${initials(activeClient.name)}</div><span>${activeClient.name}</span></div>`;
+    list.innerHTML = `<div class="client-item active"><div class="client-avatar">${escapeHtml(initials(activeClient.name))}</div><span>${escapeHtml(activeClient.name)}</span></div>`;
   } else {
     list.innerHTML = '';
   }
 }
 
+function ensureAdminClientSidebar() {
+  const list = document.getElementById('client-list');
+  if (!list) return;
+  const title = document.getElementById('page-title')?.textContent.trim().toLowerCase();
+  const sessionRaw = localStorage.getItem(typeof SESSION_KEY !== 'undefined' ? SESSION_KEY : 'catapulta_session_v1') || '';
+  const adminVisible = isAdmin || title === 'admin' || sessionRaw.includes('"user":"admin"');
+  if (!adminVisible || list.children.length > 0) return;
+  const entries = getSidebarClientEntries();
+  list.innerHTML = entries.map(([act, name]) => `
+    <div class="client-item ${activeClient && activeClient.account === act ? 'active' : ''}" onclick="selectClientByAct('${escapeJsString(act)}')">
+      <div class="client-avatar">${escapeHtml(initials(name))}</div>
+      <span>${escapeHtml(name)}</span>
+    </div>`).join('');
+}
+
 function selectClientByAct(act) {
-  const name = CLIENT_NAMES[act] || act;
+  const name = getClientDisplayName(act);
   activeClient = { name, account: act };
   document.getElementById('page-title').textContent = name;
   document.getElementById('page-meta').textContent = act;
@@ -3885,9 +4146,9 @@ function selectClientByAct(act) {
 
   // Atualizar view ativa
   const crmView = document.getElementById('crm-view');
-  if (crmView && crmView.style.display !== 'none') { renderKanban(); renderFunilChart(); renderFunilEvolucao(); }
+  if (crmView && crmView.style.display !== 'none') { getLeadsAsync().then(() => { renderKanban(); renderFunilChart(); renderFunilEvolucao(); }); }
   const contView = document.getElementById('contatos-view');
-  if (contView && contView.style.display !== 'none') renderContatos();
+  if (contView && contView.style.display !== 'none') getLeadsAsync().then(() => renderContatos());
 }
 
 
@@ -3904,8 +4165,8 @@ async function renderSavedList() {
     el.innerHTML = '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 8px;">Clientes adicionados</div>' +
       extras.map(c => `
       <div class="saved-item">
-        <div><div class="saved-name">${c.name}</div><div class="saved-id">${c.act} · login: ${c.login}</div></div>
-        <button class="btn-remove" onclick="removeExtraClient('${c.login}','${c.name}')">Remover</button>
+        <div><div class="saved-name">${escapeHtml(c.name)}</div><div class="saved-id">${escapeHtml(c.act)} · login: ${escapeHtml(c.login)}</div></div>
+        <button class="btn-remove" onclick="removeExtraClient('${escapeJsString(c.login)}','${escapeJsString(c.name)}')">Remover</button>
       </div>`).join('');
   } catch(e) { el.innerHTML = '<div style="font-size:12px;color:#f87171;margin:16px 0 8px;">Erro ao carregar.</div>'; }
 }
@@ -4094,6 +4355,54 @@ async function loadData() {
 }
 
 
+async function extractTrafficData() {
+  if (!activeClient) { showError('Selecione um cliente na barra lateral.'); return; }
+  const from = document.getElementById('date-from').value;
+  const to = document.getElementById('date-to').value;
+  if (!from || !to) { showError('Selecione o período.'); return; }
+  await ensureXlsxLoaded();
+  const account = activeClient.account;
+  const fields = 'spend,reach,impressions,cpm,ctr,frequency,clicks,inline_link_clicks,actions,campaign_name,campaign_id';
+  const adsFields = 'spend,reach,impressions,cpm,ctr,frequency,clicks,inline_link_clicks,actions,ad_name,ad_id,campaign_name,campaign_id';
+  showLoading(true);
+  try {
+    const [campaignRes, adsRes] = await Promise.all([
+      fetch(`${WORKER_URL}?account=${account}&from=${from}&to=${to}&fields=${fields}`),
+      fetch(`${WORKER_URL}?account=${account}&from=${from}&to=${to}&fields=${adsFields}&level=ad`)
+    ]);
+    const [campaignJson, adsJson] = await Promise.all([campaignRes.json(), adsRes.json()]);
+    showLoading(false);
+    if (campaignJson.error) { showError('Erro da API Meta: ' + campaignJson.error.message); return; }
+    const actionTypesConv = ['onsite_conversion.messaging_conversation_started_7d','onsite_conversion.messaging_first_reply','messaging_conversation_started_7d'];
+    const campaignRows = (campaignJson.data || []).map(row => {
+      const spend = parseFloat(row.spend || 0);
+      const leads = getActionValue(row.actions || [], ['lead']);
+      const conv = getActionValue(row.actions || [], actionTypesConv);
+      return { 'Campanha': row.campaign_name || '', 'ID campanha': row.campaign_id || '', 'Gasto': spend, 'Alcance': parseInt(row.reach || 0), 'Impressões': parseInt(row.impressions || 0), 'Cliques': parseInt(row.clicks || 0), 'Cliques no link': parseInt(row.inline_link_clicks || 0), 'Leads': leads, 'CPL': leads ? spend / leads : '', 'Conversas iniciadas': conv, 'Custo por conversa': conv ? spend / conv : '', 'CTR': parseFloat(row.ctr || 0), 'CPM': parseFloat(row.cpm || 0), 'Frequência': parseFloat(row.frequency || 0) };
+    });
+    const adRows = mergeAdInsightRows(adsJson.data || []).map(row => {
+      const spend = parseFloat(row.spend || 0);
+      const leads = getActionValue(row.actions || [], ['lead']);
+      const conv = getActionValue(row.actions || [], actionTypesConv);
+      return { 'Anúncio': row.ad_name || '', 'ID anúncio': row.ad_id || '', 'Campanha': row.campaign_name || '', 'Gasto': spend, 'Alcance': parseInt(row.reach || 0), 'Impressões': parseInt(row.impressions || 0), 'Cliques': parseInt(row.clicks || 0), 'Cliques no link': parseInt(row.inline_link_clicks || 0), 'Leads': leads, 'CPL': leads ? spend / leads : '', 'Conversas iniciadas': conv, 'Custo por conversa': conv ? spend / conv : '', 'CTR': parseFloat(row.ctr || 0), 'CPM': parseFloat(row.cpm || 0), 'Frequência': parseFloat(row.frequency || 0) };
+    });
+    const wb = window.XLSX.utils.book_new();
+    const wsResumo = window.XLSX.utils.aoa_to_sheet([['Resumo','Valor'], ['Cliente', activeClient.name], ['Conta', account], ['De', from], ['Até', to], ['Gerado em', new Date().toLocaleString('pt-BR')]]);
+    wsResumo['!cols'] = [{ wch: 24 }, { wch: 34 }];
+    window.XLSX.utils.book_append_sheet(wb, wsResumo, 'Resumo');
+    const wsCamp = window.XLSX.utils.json_to_sheet(campaignRows);
+    styleWorksheet(wsCamp, Object.keys(campaignRows[0] || {'Campanha':''}), campaignRows.length);
+    window.XLSX.utils.book_append_sheet(wb, wsCamp, 'Campanhas');
+    const wsAds = window.XLSX.utils.json_to_sheet(adRows);
+    styleWorksheet(wsAds, Object.keys(adRows[0] || {'Anúncio':''}), adRows.length);
+    window.XLSX.utils.book_append_sheet(wb, wsAds, 'Anúncios');
+    window.XLSX.writeFile(wb, `trafego_${safeFileName(activeClient.name)}_${from}_a_${to}.xlsx`);
+  } catch(e) {
+    showLoading(false);
+    showError('Erro ao extrair dados: ' + (e && e.message ? e.message : e));
+  }
+}
+window.extractTrafficData = extractTrafficData;
 const today = new Date();
 const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
 const pad = n => String(n).padStart(2, '0');
@@ -4276,8 +4585,28 @@ function switchChartType(t) {
 
 
 function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]));
 }
+
+function escapeJsString(value) {
+  return String(value ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, ' ');
+}
+
+function onlyDigits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function limitText(value, max = 600) {
+  const text = String(value ?? '').trim();
+  return text.length > max ? text.slice(0, max) + '...' : text;
+}
+
 function getAdThumbnail(row) {
   const creative = row && row.creative;
   if (row && row.thumbnail_url) return row.thumbnail_url;
@@ -4446,7 +4775,7 @@ const CREDENTIALS = {
   "thayelli":   { pass: null, act: "act_1281304275983449" },
   "adriana":    { pass: null,  act: "act_456685107743703"  },
   "travi":      { pass: null,    act: "act_379348482601330"  },
-  "boleto":     { pass: "catapulta123",    act: "act_1712273919281701" },
+  "boleto":     { pass: null,    act: "act_1712273919281701" },
 };
 
 const CLIENT_NAMES = {
@@ -4608,40 +4937,89 @@ function renderFunilEvolucao() {
   }).join('');
 }
 
-function exportLeads() {
-  const leads = getLeads();
-  if (!leads.length) { alert('Nenhum lead para exportar.'); return; }
-  const stages = getStages();
-  const stageMap = {};
-  stages.forEach(s => { stageMap[s.id] = s.label; });
-  const clientName = activeClient ? activeClient.name : 'todos';
-
-  const headers = ['Nome','Telefone','Email','Etapa','Plantão','Valor Fechamento','Origem','Observações','Próxima Ação','Data Próxima Ação','Motivo Perda','Criado em'];
-  const rows = leads.map(l => [
-    l.name || '',
-    l.phone || '',
-    l.email || '',
-    stageMap[l.stage] || l.stage || '',
-    l.plantao || '',
-    l.valor || '',
-    l.origem || '',
-    (l.obs || '').toString().trim(),
-    l.nextAction || '',
-    l.nextActionDate || '',
-    l.motivoPerda || '',
-    l.createdAt ? new Date(l.createdAt).toLocaleDateString('pt-BR') : '',
-  ].map(v => '"' + String(v).replace(/"/g, '""') + '"'));
-
-  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'leads_' + clientName.replace(/\s+/g,'_') + '_' + new Date().toISOString().slice(0,10) + '.csv';
-  a.click();
-  URL.revokeObjectURL(url);
+async function ensureXlsxLoaded() {
+  if (window.XLSX) return window.XLSX;
+  await new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+  return window.XLSX;
 }
 
+function safeFileName(name) {
+  return String(name || 'arquivo').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'arquivo';
+}
+
+function currentCrmFilteredLeads() {
+  const sel = document.getElementById('crm-client-select');
+  const fromSel = sel && sel.value !== 'all' ? sel.value : null;
+  const filterAct = isAdmin ? (fromSel || crmClientFilter) : crmClientFilter;
+  let leads = getLeads();
+  if (filterAct) leads = leads.filter(l => l.act === filterAct);
+  try { leads = filterLeadsByCrmMonth(leads); } catch(e) {}
+  return { leads, filterAct };
+}
+
+function styleWorksheet(ws, headers, rowsLength) {
+  if (!window.XLSX) return;
+  ws['!cols'] = headers.map((header, idx) => ({ wch: Math.min(Math.max(String(header).length + 6, idx === 7 ? 42 : 16), idx === 7 ? 64 : 30) }));
+  ws['!autofilter'] = { ref: `A1:${window.XLSX.utils.encode_col(headers.length - 1)}${Math.max(rowsLength + 1, 1)}` };
+  headers.forEach((_, idx) => {
+    const cell = ws[window.XLSX.utils.encode_cell({ r: 0, c: idx })];
+    if (cell) cell.s = { font: { bold: true }, alignment: { horizontal: 'center' } };
+  });
+}
+
+async function exportLeads() {
+  const { leads, filterAct } = currentCrmFilteredLeads();
+  if (!leads.length) { alert('Nenhum lead para exportar no filtro atual.'); return; }
+  await ensureXlsxLoaded();
+  const stages = getStages(filterAct || (activeClient ? activeClient.account : ''));
+  const stageMap = {};
+  stages.forEach(s => { stageMap[s.id] = s.label; });
+  const clientName = filterAct ? (CLIENT_NAMES[filterAct] || filterAct) : (activeClient ? activeClient.name : 'Todos os clientes');
+  const monthSelect = document.getElementById('crm-month-filter');
+  const periodLabel = monthSelect && monthSelect.value !== 'all' ? monthSelect.options[monthSelect.selectedIndex].textContent : 'Geral';
+  const headers = ['Cliente','Nome','Telefone','Email','Etapa','Rede social','Origem','Observações','Plantão','Valor fechamento','Próxima ação','Data próxima ação','Motivo perda','Criado em','Atualizado em'];
+  const data = leads.map(l => {
+    const lead = normalizeImportedLeadFields(l);
+    return {
+      'Cliente': CLIENT_NAMES[lead.act] || lead.act || clientName,
+      'Nome': lead.name || '',
+      'Telefone': lead.phone || '',
+      'Email': lead.email || '',
+      'Etapa': stageMap[getArteAzulejoStageForBoard(lead, lead.act)] || stageMap[lead.stage] || lead.stage || '',
+      'Rede social': lead.redeSocial || '',
+      'Origem': lead.origem || '',
+      'Observações': (lead.obs || '').toString().trim(),
+      'Plantão': lead.plantao || '',
+      'Valor fechamento': lead.valor || '',
+      'Próxima ação': lead.proximaAcao || lead.nextAction || '',
+      'Data próxima ação': lead.proximaData || lead.nextActionDate || '',
+      'Motivo perda': lead.motivo || lead.motivoPerda || '',
+      'Criado em': lead.createdAt ? new Date(lead.createdAt).toLocaleDateString('pt-BR') : '',
+      'Atualizado em': lead.updatedAt ? new Date(lead.updatedAt).toLocaleDateString('pt-BR') : ''
+    };
+  });
+  const wb = window.XLSX.utils.book_new();
+  const ws = window.XLSX.utils.json_to_sheet(data, { header: headers });
+  styleWorksheet(ws, headers, data.length);
+  window.XLSX.utils.book_append_sheet(wb, ws, 'Leads');
+  const resumoRows = [['Cliente', clientName], ['Filtro', periodLabel], ['Total de leads', leads.length], ['Gerado em', new Date().toLocaleString('pt-BR')]];
+  const byStage = {};
+  leads.forEach(l => {
+    const label = stageMap[getArteAzulejoStageForBoard(l, l.act)] || stageMap[l.stage] || l.stage || 'Sem etapa';
+    byStage[label] = (byStage[label] || 0) + 1;
+  });
+  Object.entries(byStage).forEach(([stage, count]) => resumoRows.push([stage, count]));
+  const wsResumo = window.XLSX.utils.aoa_to_sheet([['Resumo', 'Valor'], ...resumoRows]);
+  wsResumo['!cols'] = [{ wch: 28 }, { wch: 34 }];
+  window.XLSX.utils.book_append_sheet(wb, wsResumo, 'Resumo');
+  window.XLSX.writeFile(wb, `leads_${safeFileName(clientName)}_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
 // ===== IMPORT WITH MAPPING =====
 const IMPORT_FIELDS = [
   { id: 'name',      label: 'Nome' },
@@ -5094,6 +5472,8 @@ async function doLogin() {
   if (!window._fbReady) {
     await new Promise(resolve => window.addEventListener('fbready', resolve, { once: true }));
   }
+  await loadCustomPasswords();
+  await loadExtraClients();
 
   const effectivePass = getEffectivePassword(user);
   if (!effectivePass || effectivePass !== pass) {
@@ -5120,6 +5500,7 @@ async function doLogin() {
   isAdmin = (user === 'admin');
   setupCrmForClient();
   renderSidebar();
+  ensureAdminClientSidebar();
   updateMobileHeader();
   if (window.innerWidth <= 768) {
     const mobileNav = document.getElementById('mobile-nav');
@@ -5127,7 +5508,7 @@ async function doLogin() {
     const mobileFilters = document.getElementById('mobile-filters');
     if (mobileFilters) mobileFilters.style.display = 'flex';
   }
-  saveSession(user);
+  await saveSession(user, pass);
 }
 
 document.addEventListener('keydown', e => {
@@ -5345,9 +5726,148 @@ function saveStagesFromModal() {
 }
 
 const CRM_KEY = 'catapulta_crm_v1';
+function normalizeLeadAccountId(lead) {
+  const rawSheet = lead && lead.sheet && lead.sheet.raw ? lead.sheet.raw : {};
+  const raw = String((lead && (lead.act || lead.account || lead.conta)) || rawSheet.act || rawSheet.account || rawSheet.conta || '').trim();
+  if (!raw) return '';
+  return raw.startsWith('act_') ? raw : ('act_' + raw.replace(/^act[_\s-]*/i, ''));
+}
+
+function normalizeActValue(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  return raw.startsWith('act_') ? raw : ('act_' + raw.replace(/^act[_\s-]*/i, ''));
+}
+
+function leadMatchesClient(lead, act) {
+  if (!act) return true;
+  const target = normalizeActValue(act);
+  const leadAct = normalizeLeadAccountId(lead);
+  if (leadAct && leadAct === target) return true;
+
+  if (target === 'act_456685107743703') {
+    const rawSheet = lead && lead.sheet && lead.sheet.raw ? lead.sheet.raw : {};
+    const text = [
+      lead && lead.origem,
+      lead && lead.campaignName,
+      lead && lead.campanha,
+      lead && lead.anuncio,
+      rawSheet.origem,
+      rawSheet.campaign_name,
+      rawSheet.form_name,
+      rawSheet.ad_name,
+      rawSheet.__huven_origin,
+      rawSheet.__huven_form_name
+    ].filter(Boolean).join(' ').toLowerCase();
+    return text.includes('adriana') || text.includes('cobertura') || text.includes('asa norte') || text.includes('asa_norte') || text.includes('captação imóveis') || text.includes('captacao imoveis') || text.includes('campanha imoveis');
+  }
+
+  return false;
+}
+
+function normalizeStageTextForMatch(value) {
+  return normalizeClientNameForStages(value).replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function normalizeLeadStageForClient(lead, act) {
+  const current = String((lead && lead.stage) || '').trim();
+  if (!current) return current;
+  const stages = getStages(act || '');
+  const candidates = [
+    current,
+    lead && lead.stageLabel,
+    lead && lead.status,
+    lead && lead.etapa,
+    lead && lead.situacao,
+    lead && lead.coluna
+  ].filter(Boolean).map(normalizeStageTextForMatch);
+
+  for (const stage of stages) {
+    const stageId = normalizeStageTextForMatch(stage.id);
+    const stageLabel = normalizeStageTextForMatch(stage.label);
+    if (candidates.includes(stageId) || candidates.includes(stageLabel)) return stage.id;
+  }
+
+  const aliases = {
+    'novo lead': 'novo',
+    'novo': 'novo',
+    'em contato': 'contato',
+    'contato': 'contato',
+    'conversando': 'conversando',
+    'nao respondeu': 'nresp',
+    'nao respondido': 'nresp',
+    'sem resposta': 'nresp',
+    'agendou visita': 'agendou',
+    'agendou': 'agendou',
+    'compareceu': 'compareceu',
+    'nao compareceu': 'ncompareceu',
+    'fechou': 'fechou',
+    'fechado': 'fechou',
+    'nao fechou': 'nfechou',
+    'nao fechado': 'nfechou',
+    'perdido': 'nfechou',
+    'proposta enviada': 'proposta',
+    'proposta': 'proposta'
+  };
+  const canonicalLabels = {
+    novo: ['novo', 'novo lead'],
+    contato: ['contato', 'em contato'],
+    conversando: ['conversando'],
+    nresp: ['nresp', 'nao respondeu', 'nao respondido', 'sem resposta'],
+    agendou: ['agendou', 'agendou visita'],
+    compareceu: ['compareceu'],
+    ncompareceu: ['ncompareceu', 'nao compareceu'],
+    fechou: ['fechou', 'fechado'],
+    nfechou: ['nfechou', 'nao fechou', 'nao fechado', 'perdido'],
+    proposta: ['proposta', 'proposta enviada']
+  };
+  const canonical = candidates.map(c => aliases[c]).find(Boolean);
+  if (canonical) {
+    const expected = canonicalLabels[canonical] || [canonical];
+    const matchedStage = stages.find(stage => {
+      const stageId = normalizeStageTextForMatch(stage.id);
+      const stageLabel = normalizeStageTextForMatch(stage.label);
+      return stageId === canonical || expected.includes(stageId) || expected.includes(stageLabel);
+    });
+    return matchedStage ? matchedStage.id : canonical;
+  }
+  return current;
+}
+function adrianaCampaignLabelFromLead(lead, rawSheet) {
+  const act = String(lead.act || rawSheet.act || rawSheet.account || rawSheet.conta || '').trim();
+  if (act !== 'act_456685107743703') return '';
+  const sourceText = [
+    lead.origem,
+    lead.campaignName,
+    lead.campanha,
+    lead.anuncio,
+    rawSheet.origem,
+    rawSheet.campaign_name,
+    rawSheet.campanha,
+    rawSheet.ad_name,
+    rawSheet.anuncio,
+    rawSheet.form_name,
+    rawSheet.formulario,
+    rawSheet.__huven_origin,
+    rawSheet.__huven_form_name
+  ].filter(Boolean).join(' ').toLowerCase();
+  if (sourceText.includes('cobertura') || sourceText.includes('asa norte') || sourceText.includes('asa_norte') || sourceText.includes('cobertura ia')) {
+    return 'Campanha Cobertura IA';
+  }
+  return 'Campanha imóveis Adriana';
+}
+
+function applyAdrianaCampaignOrigem(lead, rawSheet) {
+  const campaignLabel = adrianaCampaignLabelFromLead(lead, rawSheet || {});
+  if (!campaignLabel) return lead;
+  const social = lead.redeSocial || 'Instagram';
+  lead.origem = `${social} - ${campaignLabel}`;
+  return lead;
+}
 function normalizeImportedLeadFields(lead) {
   if (!lead || typeof lead !== 'object') return lead;
   const normalized = { ...lead };
+  normalized.act = normalizeLeadAccountId(normalized) || normalized.act;
   normalized.obs = normalized.obs || normalized.observacoes || normalized.observacao || normalized['observações'] || '';
   const rawSheet = normalized.sheet && normalized.sheet.raw ? normalized.sheet.raw : {};
   const socialRaw = String(rawSheet.platform || rawSheet.plataforma || rawSheet.rede_social || normalized.platform || normalized.plataforma || normalized.rede_social || normalized.redeSocial || normalized.origem || '').trim();
@@ -5358,6 +5878,8 @@ function normalizeImportedLeadFields(lead) {
   else if (social.includes('tiktok')) normalized.redeSocial = 'TikTok';
   else if (social.includes('google')) normalized.redeSocial = 'Google';
   else if (!normalized.redeSocial && socialRaw) normalized.redeSocial = socialRaw;
+  normalized.stage = normalizeLeadStageForClient(normalized, normalized.act);
+  if (typeof applyAdrianaCampaignOrigem === 'function') applyAdrianaCampaignOrigem(normalized, rawSheet);
   return normalized;
 }
 
@@ -5416,12 +5938,12 @@ function renderContatos() {
 
   // Filtrar por cliente do usuário logado (não admin vê só os seus)
   if (!isAdmin && activeClient && activeClient.account) {
-    leads = leads.filter(l => l.act === activeClient.account);
+    leads = leads.filter(l => leadMatchesClient(l, activeClient.account));
   } else if (isAdmin) {
     // Admin: filtrar pelo cliente selecionado no dropdown
     const sel = document.getElementById('crm-client-select');
     if (sel && sel.value && sel.value !== 'all') {
-      leads = leads.filter(l => l.act === sel.value);
+      leads = leads.filter(l => leadMatchesClient(l, sel.value));
     }
   }
 
@@ -5499,11 +6021,11 @@ function renderAtendimento() {
 
   // Filtrar por cliente logado (igual ao CRM)
   if (!isAdmin && activeClient && activeClient.account) {
-    leads = leads.filter(l => l.act === activeClient.account);
+    leads = leads.filter(l => leadMatchesClient(l, activeClient.account));
   } else if (isAdmin) {
     const sel = document.getElementById('crm-client-select');
     if (sel && sel.value && sel.value !== 'all') {
-      leads = leads.filter(l => l.act === sel.value);
+      leads = leads.filter(l => leadMatchesClient(l, sel.value));
     }
   }
 
@@ -5544,7 +6066,7 @@ function switchView(view) {
   const contView = document.getElementById('contatos-view');
   if (contView) contView.style.display = view === 'contatos' ? 'block' : 'none';
   if (view === 'crm') {
-    if (!_leadsCache) { getLeadsAsync().then(() => { renderKanban(); renderFunilChart(); renderFunilEvolucao(); }); } else { renderKanban(); renderFunilChart(); renderFunilEvolucao(); }
+    getLeadsAsync().then(() => { renderKanban(); renderFunilChart(); renderFunilEvolucao(); });
   }
   if (view === 'contatos') {
     if (!_leadsCache) { getLeadsAsync().then(() => renderContatos()); } else { renderContatos(); }
@@ -5795,7 +6317,14 @@ function showToast(msg, type = 'info', duration = 3500) {
   const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
   const toast = document.createElement('div');
   toast.className = 'toast ' + type;
-  toast.innerHTML = `<span class="toast-icon">${icons[type] || 'ℹ️'}</span><span class="toast-msg">${msg}</span>`;
+  const icon = document.createElement('span');
+  icon.className = 'toast-icon';
+  icon.textContent = icons[type] || 'ℹ️';
+  const text = document.createElement('span');
+  text.className = 'toast-msg';
+  text.textContent = String(msg || '');
+  toast.appendChild(icon);
+  toast.appendChild(text);
   container.appendChild(toast);
   setTimeout(() => {
     toast.classList.add('out');
@@ -5888,7 +6417,7 @@ function createdAtFromDateInput(value, fallbackIso) {
 
 function getCrmBaseLeads(filterAct) {
   let leads = getLeads();
-  if (filterAct) leads = leads.filter(l => l.act === filterAct);
+  if (filterAct) leads = leads.filter(l => leadMatchesClient(l, filterAct));
   return leads;
 }
 
@@ -5947,7 +6476,7 @@ function setupCrmForClient() {
     const sel = document.getElementById('crm-client-select');
     sel.style.display = 'block';
     sel.innerHTML = '<option value="all">Todos os clientes</option>' +
-      Object.entries(CLIENT_NAMES).map(([act, name]) => `<option value="${act}">${name}</option>`).join('');
+      getSidebarClientEntries().map(([act, name]) => `<option value="${escapeHtml(act)}">${escapeHtml(name)}</option>`).join('');
     crmClientFilter = null;
   } else {
     crmClientFilter = activeClient ? activeClient.account : null;
@@ -6028,7 +6557,7 @@ function renderKanban() {
   const fromSel = sel && sel.value !== 'all' ? sel.value : null;
   const filterAct = isAdmin ? (fromSel || crmClientFilter) : crmClientFilter;
   let leads = getLeads();
-  if (filterAct) leads = leads.filter(l => l.act === filterAct);
+  if (filterAct) leads = leads.filter(l => leadMatchesClient(l, filterAct));
   try {
     populateCrmMonthFilter(leads);
     leads = filterLeadsByCrmMonth(leads);
@@ -6188,27 +6717,29 @@ function renderKanban() {
       card.addEventListener('dragstart', onDragStart);
       card.addEventListener('dragend', onDragEnd);
       let cardHTML = '';
-      if (lead.origem) cardHTML += `<div class="card-origem">📍 ${lead.origem}</div>`;
-      if (lead.redeSocial) cardHTML += `<div class="card-rede">📱 ${lead.redeSocial}</div>`;
-      cardHTML += `<div class="card-name">${lead.name}</div>`;
-      cardHTML += `<div class="card-phone">${lead.phone || '—'}</div>`;
-      cardHTML += `<div class="card-email">${lead.email || '—'}</div>`;
-      if (lead.obs) cardHTML += `<div class="card-obs">💬 ${lead.obs}</div>`;
-      if (lead.valor) cardHTML += `<div class="card-valor">💰 R$ ${lead.valor}</div>`;
-      if (lead.proximaAcao) cardHTML += `<div class="card-proxima">⏰ ${lead.proximaAcao}${lead.proximaData ? ' · ' + new Date(lead.proximaData + 'T12:00:00').toLocaleDateString('pt-BR') : ''}</div>`;
-      if (lead.createdAt) cardHTML += `<div style="font-size:10px;color:var(--muted);margin-top:4px;">Entrada: ${new Date(lead.createdAt).toLocaleDateString('pt-BR')}</div>`;
-      const waPhone = lead.phone ? lead.phone.replace(/\D/g,'') : '';
+      const safeLeadId = escapeJsString(lead.id);
+      if (lead.origem) cardHTML += `<div class="card-origem">📍 ${escapeHtml(limitText(lead.origem, 160))}</div>`;
+      if (lead.redeSocial) cardHTML += `<div class="card-rede">📱 ${escapeHtml(limitText(lead.redeSocial, 80))}</div>`;
+      cardHTML += `<div class="card-name">${escapeHtml(limitText(lead.name || 'Lead sem nome', 120))}</div>`;
+      cardHTML += `<div class="card-phone">${escapeHtml(lead.phone || '—')}</div>`;
+      cardHTML += `<div class="card-email">${escapeHtml(lead.email || '—')}</div>`;
+      if (lead.obs) cardHTML += `<div class="card-obs">💬 ${escapeHtml(limitText(lead.obs, 260))}</div>`;
+      if (lead.valor) cardHTML += `<div class="card-valor">💰 R$ ${escapeHtml(limitText(lead.valor, 40))}</div>`;
+      if (lead.proximaAcao) cardHTML += `<div class="card-proxima">⏰ ${escapeHtml(limitText(lead.proximaAcao, 120))}${lead.proximaData ? ' · ' + new Date(lead.proximaData + 'T12:00:00').toLocaleDateString('pt-BR') : ''}</div>`;
+      if (lead.createdAt) cardHTML += `<div style="font-size:10px;color:var(--muted);margin-top:4px;">Entrada: ${escapeHtml(new Date(lead.createdAt).toLocaleDateString('pt-BR'))}</div>`;
+      const waPhone = onlyDigits(lead.phone);
       const waLink = waPhone ? `https://wa.me/55${waPhone}` : '';
       cardHTML += `<div class="card-actions">
-        <button class="card-btn" onclick="editLead('${lead.id}')">Editar</button>
-        <button class="card-btn" onclick="openMoveModal('${lead.id}')">Mover</button>
-        <button class="card-btn" onclick="showHistory('${lead.id}')">Hist.</button>
+        <button class="card-btn" onclick="editLead('${safeLeadId}')">Editar</button>
+        <button class="card-btn" onclick="openMoveModal('${safeLeadId}')">Mover</button>
+        <button class="card-btn" onclick="showHistory('${safeLeadId}')">Hist.</button>
         ${waLink ? (lead.whatsappFirstMessageAt
           ? `<button class="card-btn card-btn-whatsapp" onclick="window.open('${waLink}','_blank')" title="Abrir WhatsApp"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.112.554 4.094 1.523 5.812L.057 23.997l6.305-1.654A11.954 11.954 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.012-1.376l-.36-.214-3.733.979 1-3.647-.235-.374A9.818 9.818 0 0 1 2.182 12C2.182 6.58 6.58 2.182 12 2.182S21.818 6.58 21.818 12 17.42 21.818 12 21.818z"/></svg></button>`
           : `<button class="card-btn card-btn-first-msg" onclick="openFirstWhatsAppMessage('${lead.id}')" title="Enviar primeira mensagem no WhatsApp"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.112.554 4.094 1.523 5.812L.057 23.997l6.305-1.654A11.954 11.954 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.012-1.376l-.36-.214-3.733.979 1-3.647-.235-.374A9.818 9.818 0 0 1 2.182 12C2.182 6.58 6.58 2.182 12 2.182S21.818 6.58 21.818 12 17.42 21.818 12 21.818z"/></svg><span>1ª msg</span></button>`)
         : ''}
-        <button class="card-btn del" onclick="deleteLead('${lead.id}')">✕</button>
+        <button class="card-btn del" onclick="deleteLead('${safeLeadId}')">✕</button>
       </div>`;
+      cardHTML = cardHTML.replace(`openFirstWhatsAppMessage('${lead.id}')`, `openFirstWhatsAppMessage('${safeLeadId}')`);
       card.innerHTML = cardHTML;
       cardsDiv.appendChild(card);
     });
@@ -6420,13 +6951,55 @@ function normalizeWhatsAppPhone(phone) {
   return digits;
 }
 
+const FIRST_MESSAGE_TEMPLATE_KEY = 'huven_first_message_templates_v1';
+const DEFAULT_FIRST_MESSAGE_TEMPLATE = 'Olá {primeiro_nome}, tudo bem? Recebemos seu cadastro e vou te ajudar com as informações por aqui. Vi que você veio pelo {rede_social}.';
+
+function firstMessageTemplateAct() {
+  return crmClientFilter || (activeClient ? activeClient.account : 'geral');
+}
+function getFirstMessageTemplates() {
+  try { return JSON.parse(localStorage.getItem(FIRST_MESSAGE_TEMPLATE_KEY) || '{}'); } catch(e) { return {}; }
+}
+function getFirstMessageTemplate(act) {
+  const templates = getFirstMessageTemplates();
+  return templates[act || 'geral'] || templates.geral || DEFAULT_FIRST_MESSAGE_TEMPLATE;
+}
+function openFirstMessageModal() {
+  const modal = document.getElementById('first-message-modal');
+  const input = document.getElementById('first-message-template');
+  if (!modal || !input) return;
+  input.value = getFirstMessageTemplate(firstMessageTemplateAct());
+  modal.style.display = 'flex';
+  modal.classList.add('open');
+}
+function closeFirstMessageModal() {
+  const modal = document.getElementById('first-message-modal');
+  if (!modal) return;
+  modal.classList.remove('open');
+  modal.style.display = 'none';
+}
+function saveFirstMessageTemplate() {
+  const input = document.getElementById('first-message-template');
+  if (!input) return;
+  const templates = getFirstMessageTemplates();
+  templates[firstMessageTemplateAct()] = input.value.trim() || DEFAULT_FIRST_MESSAGE_TEMPLATE;
+  localStorage.setItem(FIRST_MESSAGE_TEMPLATE_KEY, JSON.stringify(templates));
+  closeFirstMessageModal();
+  showToast('Primeira mensagem atualizada.', 'success');
+}
+window.openFirstMessageModal = openFirstMessageModal;
+window.closeFirstMessageModal = closeFirstMessageModal;
+window.saveFirstMessageTemplate = saveFirstMessageTemplate;
+
 function buildFirstWhatsAppMessage(lead) {
   const firstName = String(lead.name || '').trim().split(/\s+/)[0] || 'tudo bem';
-  const rede = String(lead.redeSocial || '').trim();
-  const source = rede ? ` Vi que você veio pelo ${rede}.` : '';
-  return `Olá ${firstName}, tudo bem? Recebemos seu cadastro e vou te ajudar com as informações por aqui.${source}`;
+  const template = getFirstMessageTemplate(lead.act || firstMessageTemplateAct());
+  return template
+    .replaceAll('{nome}', lead.name || '')
+    .replaceAll('{primeiro_nome}', firstName)
+    .replaceAll('{rede_social}', lead.redeSocial || 'Instagram')
+    .replaceAll('{origem}', lead.origem || '');
 }
-
 function openFirstWhatsAppMessage(id) {
   const leads = getLeads();
   const lead = leads.find(l => l.id === id);
@@ -6549,8 +7122,8 @@ function updateMobileHeader() {
       mobileSel.style.display = 'block';
       if (!mobileSel.children.length || mobileSel.children.length === 1) {
         mobileSel.innerHTML = '<option value="">Selecione um cliente</option>' +
-          Object.entries(CLIENT_NAMES).map(([act, name]) =>
-            `<option value="${act}">${name}</option>`
+          getSidebarClientEntries().map(([act, name]) =>
+          `<option value="${escapeHtml(act)}">${escapeHtml(name)}</option>`
           ).join('');
       }
       if (activeClient && activeClient.account) {
@@ -6601,9 +7174,307 @@ const STAGE_COLORS = {
 
 
 
-window.addEventListener('fbready', () => {
-  loadCustomPasswords();
-  loadExtraClients();
+
+const LEAD_NOTIFIER_INTERVAL_MS = 30000;
+const LEAD_NOTIFICATIONS_KEY = 'huven_lead_notifications_v1';
+let _leadNotifierStarted = false;
+let _leadNotifierPrimed = false;
+let _knownLeadKeys = new Set();
+let _leadRealtimeUnsubscribe = null;
+let _leadNotificationAudioCtx = null;
+let _leadNotificationUnread = 0;
+let _leadNotificationTitleBase = document.title || 'Ads Report';
+let _leadNotificationSoundUnlocked = false;
+let _leadNotificationSoundPending = false;
+
+function getLeadUniqueKey(lead) {
+  return String((lead && (lead._docId || lead.id || lead.email || lead.phone || lead.name)) || '').trim();
+}
+
+function getSelectedCrmActForNotifications() {
+  if (!isAdmin && activeClient && activeClient.account) return activeClient.account;
+  const sel = document.getElementById('crm-client-select');
+  if (sel && sel.value && sel.value !== 'all') return sel.value;
+  if (crmClientFilter) return crmClientFilter;
+  if (activeClient && activeClient.account) return activeClient.account;
+  return '';
+}
+
+function getStoredLeadNotifications() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(LEAD_NOTIFICATIONS_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch(e) { return []; }
+}
+
+function saveStoredLeadNotifications(items) {
+  localStorage.setItem(LEAD_NOTIFICATIONS_KEY, JSON.stringify((items || []).slice(0, 40)));
+}
+
+function isCrmViewOpen() {
+  const crmView = document.getElementById('crm-view');
+  return !!(crmView && crmView.style.display === 'block');
+}
+
+function updateLeadNotificationUi() {
+  const notifications = getStoredLeadNotifications();
+  _leadNotificationUnread = notifications.filter(n => !n.read).length;
+
+  const badge = document.getElementById('notifications-badge');
+  if (badge) {
+    badge.textContent = _leadNotificationUnread > 99 ? '99+' : String(_leadNotificationUnread);
+    badge.classList.toggle('show', _leadNotificationUnread > 0);
+  }
+
+  const banner = document.getElementById('crm-new-lead-banner');
+  const bannerText = document.getElementById('crm-new-lead-banner-text');
+  if (banner) {
+    banner.classList.toggle('show', _leadNotificationUnread > 0);
+    if (bannerText) {
+      bannerText.textContent = _leadNotificationUnread === 1
+        ? 'Novo lead chegou no CRM.'
+        : `${_leadNotificationUnread} novos leads chegaram no CRM.`;
+    }
+  }
+
+  document.title = _leadNotificationUnread > 0
+    ? `(${_leadNotificationUnread}) Novo lead chegou - ${_leadNotificationTitleBase}`
+    : _leadNotificationTitleBase;
+
+  renderNotificationsCenter();
+}
+
+function addLeadNotifications(leads) {
+  const now = new Date().toISOString();
+  const current = getStoredLeadNotifications();
+  const next = (leads || []).map(lead => ({
+    id: `${getLeadUniqueKey(lead)}_${Date.now()}`,
+    leadKey: getLeadUniqueKey(lead),
+    read: false,
+    createdAt: now,
+    leadName: lead.name || 'Lead novo',
+    clientName: CLIENT_NAMES[lead.act] || 'CRM',
+    origem: lead.origem || lead.redeSocial || '',
+    act: lead.act || ''
+  }));
+  saveStoredLeadNotifications([...next, ...current]);
+  updateLeadNotificationUi();
+}
+
+function formatNotificationTime(value) {
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return '';
+  return date.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+}
+
+function renderNotificationsCenter() {
+  const list = document.getElementById('notifications-list');
+  if (!list) return;
+  const notifications = getStoredLeadNotifications();
+  if (!notifications.length) {
+    list.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:12px;text-align:center;">Nenhuma notificação ainda.</div>';
+    return;
+  }
+  list.innerHTML = notifications.map(n => `
+    <div class="notification-item ${n.read ? '' : 'unread'}">
+      <span class="notification-dot"></span>
+      <div style="min-width:0;flex:1;">
+        <div class="notification-title">${escapeHtml(limitText(n.leadName || 'Lead novo', 120))}</div>
+        <div class="notification-msg">Novo lead chegou para ${escapeHtml(limitText(n.clientName || 'CRM', 120))}${n.origem ? ' · ' + escapeHtml(limitText(n.origem, 160)) : ''}</div>
+        <div class="notification-time">${formatNotificationTime(n.createdAt)}</div>
+      </div>
+    </div>`).join('');
+}
+
+function markLeadNotificationsRead() {
+  const notifications = getStoredLeadNotifications().map(n => ({ ...n, read: true }));
+  saveStoredLeadNotifications(notifications);
+  updateLeadNotificationUi();
+}
+
+function clearUnreadLeadNotifications() {
+  markLeadNotificationsRead();
+}
+
+function openNotificationsCenter() {
+  unlockLeadNotificationSound();
+  requestLeadNotificationPermission();
+  renderNotificationsCenter();
+  const modal = document.getElementById('notifications-modal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeNotificationsCenter() {
+  const modal = document.getElementById('notifications-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function clearNotificationsCenter() {
+  saveStoredLeadNotifications([]);
+  updateLeadNotificationUi();
+}
+
+function unlockLeadNotificationSound() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    if (!_leadNotificationAudioCtx) _leadNotificationAudioCtx = new AudioContextClass();
+    const markReady = () => {
+      _leadNotificationSoundUnlocked = true;
+      if (_leadNotificationSoundPending) {
+        _leadNotificationSoundPending = false;
+        playLeadNotificationSound();
+      }
+    };
+    if (_leadNotificationAudioCtx.state === 'suspended') {
+      _leadNotificationAudioCtx.resume().then(markReady).catch(() => {});
+    } else {
+      markReady();
+    }
+    requestLeadNotificationPermission();
+  } catch(e) {}
+}
+
+function playLeadNotificationSound() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = _leadNotificationAudioCtx || new AudioContextClass();
+    _leadNotificationAudioCtx = ctx;
+    if (ctx.state === 'suspended') {
+      _leadNotificationSoundPending = true;
+      ctx.resume().then(() => {
+        _leadNotificationSoundUnlocked = true;
+        _leadNotificationSoundPending = false;
+        playLeadNotificationSound();
+      }).catch(() => {});
+      return;
+    }
+    _leadNotificationSoundUnlocked = true;
+
+    const playTone = (start, freq, duration) => {
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + start);
+      gain.gain.exponentialRampToValueAtTime(0.22, ctx.currentTime + start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + start + duration);
+      gain.connect(ctx.destination);
+
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+      osc.connect(gain);
+      osc.start(ctx.currentTime + start);
+      osc.stop(ctx.currentTime + start + duration + 0.03);
+    };
+
+    playTone(0, 880, 0.18);
+    playTone(0.22, 1175, 0.24);
+  } catch(e) {}
+}
+
+function requestLeadNotificationPermission() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    try { Notification.requestPermission(); } catch(e) {}
+  }
+}
+
+function notifyNewLeadArrival(leads) {
+  const count = leads.length;
+  const first = leads[0] || {};
+  const title = count === 1 ? 'Novo lead no CRM' : `${count} novos leads no CRM`;
+  const msg = count === 1
+    ? `${first.name || 'Lead novo'} chegou para ${CLIENT_NAMES[first.act] || 'o cliente selecionado'}.`
+    : `${count} leads novos chegaram no CRM.`;
+
+  addLeadNotifications(leads);
+  playLeadNotificationSound();
+  if (typeof showToast === 'function') showToast(title + ' · ' + msg, 'success', isCrmViewOpen() ? 6500 : 30000);
+
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try {
+      new Notification(title, {
+        body: msg,
+        tag: 'huven-crm-lead-arrival',
+        renotify: true
+      });
+    } catch(e) {}
+  }
+}
+
+async function checkForNewLeads() {
+  if (!window._fbReady) return;
+  const leads = await getLeadsAsync();
+  processLeadNotificationSnapshot(leads);
+}
+
+function processLeadNotificationSnapshot(leads) {
+  const selectedAct = getSelectedCrmActForNotifications();
+  const visibleLeads = selectedAct ? leads.filter(l => leadMatchesClient(l, selectedAct)) : leads;
+  const nextKeys = new Set(visibleLeads.map(getLeadUniqueKey).filter(Boolean));
+
+  if (!_leadNotifierPrimed) {
+    _knownLeadKeys = nextKeys;
+    _leadNotifierPrimed = true;
+    return;
+  }
+
+  const newLeads = visibleLeads.filter(lead => {
+    const key = getLeadUniqueKey(lead);
+    return key && !_knownLeadKeys.has(key);
+  });
+  _knownLeadKeys = nextKeys;
+
+  if (newLeads.length) {
+    renderKanban();
+    if (typeof renderFunilChart === 'function') renderFunilChart();
+    if (typeof renderFunilEvolucao === 'function') renderFunilEvolucao();
+    notifyNewLeadArrival(newLeads);
+  }
+}
+
+function startLeadRealtimeListener() {
+  if (!window._fbReady || !window._fb || typeof window._fb.listenLeads !== 'function') return false;
+  if (_leadRealtimeUnsubscribe) return true;
+  try {
+    _leadRealtimeUnsubscribe = window._fb.listenLeads((freshLeads) => {
+      _leadsCache = normalizeImportedLeadsFields(freshLeads || []);
+      processLeadNotificationSnapshot(_leadsCache);
+      if (document.getElementById('crm-view') && document.getElementById('crm-view').style.display === 'block') {
+        renderKanban();
+        if (typeof renderFunilChart === 'function') renderFunilChart();
+        if (typeof renderFunilEvolucao === 'function') renderFunilEvolucao();
+      }
+    });
+    return true;
+  } catch(e) {
+    console.warn('Lead realtime listener failed:', e);
+    return false;
+  }
+}
+
+function startLeadNotifier() {
+  if (_leadNotifierStarted) return;
+  _leadNotifierStarted = true;
+  requestLeadNotificationPermission();
+  updateLeadNotificationUi();
+  ['pointerdown', 'keydown', 'touchstart'].forEach(evt => {
+    window.addEventListener(evt, unlockLeadNotificationSound, { passive: true });
+  });
+  const realtimeStarted = startLeadRealtimeListener();
+  if (!realtimeStarted) checkForNewLeads().catch(e => console.warn('Lead notifier prime error:', e));
+  setInterval(() => {
+    if (!_leadRealtimeUnsubscribe) checkForNewLeads().catch(e => console.warn('Lead notifier error:', e));
+  }, LEAD_NOTIFIER_INTERVAL_MS);
+}
+window.openNotificationsCenter = openNotificationsCenter;
+window.closeNotificationsCenter = closeNotificationsCenter;
+window.clearNotificationsCenter = clearNotificationsCenter;
+window.clearUnreadLeadNotifications = clearUnreadLeadNotifications;
+window.addEventListener('fbready', async () => {
+  await loadCustomPasswords();
+  await loadExtraClients();
+  startLeadNotifier();
   getLeadsAsync().then(() => {
     if (document.getElementById('crm-view') && document.getElementById('crm-view').style.display === 'block') {
       renderKanban();
@@ -6615,33 +7486,63 @@ window.addEventListener('fbready', () => {
 const SESSION_KEY = 'catapulta_session_v1';
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 dias em ms
 
-function saveSession(user) {
-  const session = { user, expiresAt: Date.now() + SESSION_DURATION };
+async function getSessionSignature(user, pass, expiresAt) {
+  const payload = `${user}|${expiresAt}|${pass || ''}|huven-crm-v2`;
+  if (window.crypto && crypto.subtle && window.TextEncoder) {
+    const bytes = new TextEncoder().encode(payload);
+    const hash = await crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  return btoa(unescape(encodeURIComponent(payload))).slice(0, 64);
+}
+
+async function saveSession(user, pass) {
+  const expiresAt = Date.now() + SESSION_DURATION;
+  const session = {
+    v: 2,
+    user,
+    expiresAt,
+    sig: await getSessionSignature(user, pass, expiresAt)
+  };
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
-function getSession() {
+async function getSession() {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
-    console.log('[Session] raw:', raw);
     const session = JSON.parse(raw);
-    if (!session) { console.log('[Session] null session'); return null; }
-    if (Date.now() > session.expiresAt) {
-      console.log('[Session] expired');
+    if (!session || session.v !== 2 || !session.user || !session.expiresAt || !session.sig) {
       localStorage.removeItem(SESSION_KEY);
       return null;
     }
-    console.log('[Session] valid:', session.user);
+    if (Date.now() > session.expiresAt) {
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    const effectivePass = getEffectivePassword(session.user);
+    const expected = await getSessionSignature(session.user, effectivePass, session.expiresAt);
+    if (!effectivePass || expected !== session.sig) {
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
     return session;
-  } catch(e) { console.log('[Session] error:', e); return null; }
+  } catch(e) {
+    localStorage.removeItem(SESSION_KEY);
+    return null;
+  }
 }
 
 function clearSession() {
   localStorage.removeItem(SESSION_KEY);
 }
 
-function restoreSession() {
-  const session = getSession();
+async function restoreSession() {
+  if (!window._fbReady) {
+    await new Promise(resolve => window.addEventListener('fbready', resolve, { once: true }));
+  }
+  await loadCustomPasswords();
+  await loadExtraClients();
+  const session = await getSession();
   if (!session) {
     document.getElementById('login-overlay').style.display = 'flex';
     return false;
@@ -6666,6 +7567,7 @@ function restoreSession() {
   isAdmin = (user === 'admin');
   setupCrmForClient();
   renderSidebar();
+  ensureAdminClientSidebar();
   updateMobileHeader();
   updateSidebarForUser();
   const mobileNav = document.getElementById('mobile-nav');
@@ -6673,6 +7575,7 @@ function restoreSession() {
   const mobileFilters = document.getElementById('mobile-filters');
   if (mobileFilters && isAdmin === false) mobileFilters.style.display = 'flex';
   updateSidebarForUser();
+  startLeadNotifier();
   return true;
 }
 
@@ -6680,6 +7583,15 @@ function restoreSession() {
 document.addEventListener('DOMContentLoaded', function() {
   if (!IS_CLIENT_LINK) {
     setTimeout(restoreSession, 80);
+    let sidebarRepairTries = 0;
+    const sidebarRepairTimer = setInterval(() => {
+      sidebarRepairTries += 1;
+      ensureAdminClientSidebar();
+      const list = document.getElementById('client-list');
+      if ((list && list.children.length > 0) || sidebarRepairTries >= 20) {
+        clearInterval(sidebarRepairTimer);
+      }
+    }, 250);
   }
 });
 
@@ -6708,8 +7620,8 @@ function updateSidebarForUser() {
     if (isAdmin) {
       mobileSel.style.display = 'block';
       mobileSel.innerHTML = '<option value="">Selecione um cliente</option>' +
-        Object.entries(CLIENT_NAMES).map(([act, name]) =>
-          `<option value="${act}">${name}</option>`
+        getSidebarClientEntries().map(([act, name]) =>
+          `<option value="${escapeHtml(act)}">${escapeHtml(name)}</option>`
         ).join('');
       if (activeClient && activeClient.account) mobileSel.value = activeClient.account;
     } else {
@@ -6752,17 +7664,12 @@ async function loadExtraClients() {
       const sel = document.getElementById('crm-client-select');
       if (sel) {
         sel.innerHTML = '<option value="all">Todos os clientes</option>' +
-          Object.entries(CLIENT_NAMES).map(([act, name]) => `<option value="${act}">${name}</option>`).join('');
+          getSidebarClientEntries().map(([act, name]) => `<option value="${escapeHtml(act)}">${escapeHtml(name)}</option>`).join('');
       }
     }
-    // Re-rodar restoreSession para garantir que cliente extra seja reconhecido
-    const session = getSession();
-    if (session) {
-      restoreSession();
-    } else {
-      renderSidebar();
-      updateSidebarForUser();
-    }
+    renderSidebar();
+    ensureAdminClientSidebar();
+    updateSidebarForUser();
   } catch(e) { console.warn('loadExtraClients erro:', e); }
 }
 
@@ -6779,7 +7686,7 @@ function getEffectivePassword(user) {
 }
 
 async function changePassword() {
-  const session = getSession();
+  const session = await getSession();
   if (!session) return;
   const user = session.user;
 
@@ -6854,7 +7761,7 @@ function openSheetsIntegrationModal() {
   document.getElementById('sheets-act').value = clientName ? clientName + ' | ' + act : act;
   const saved = getSheetsIntegrationConfig(act);
   document.getElementById('sheets-worker-url').value = saved.url || '';
-  document.getElementById('sheets-worker-secret').value = saved.secret || 'huven_sheets_2026';
+  document.getElementById('sheets-worker-secret').value = saved.secret || '';
   document.getElementById('sheets-script-output').value = '';
   modal.style.display = 'flex';
   modal.classList.add('open');
@@ -6997,12 +7904,24 @@ function onCrmClientChange() {
     activeClient = { name, account: act };
     renderSidebar();
   }
-  renderKanban(); renderFunilChart(); renderFunilEvolucao();
+  getLeadsAsync().then(() => { renderKanban(); renderFunilChart(); renderFunilEvolucao(); });
 }
 
 </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
