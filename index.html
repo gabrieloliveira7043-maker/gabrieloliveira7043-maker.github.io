@@ -1409,6 +1409,50 @@ function getLeads() {
   return normalizeImportedLeadsFields(_leadsCache || []);
 }
 
+function getLeadCrmSortTime(lead) {
+  const candidates = [
+    lead && lead._crmArrivalSeenAt,
+    lead && lead.arrivalAt,
+    lead && lead.updatedAt,
+    lead && lead.updated_at,
+    lead && lead.createdTime,
+    lead && lead.created_time,
+    lead && lead.createdAt,
+    lead && lead._createdAt,
+    lead && lead.timestamp,
+    lead && lead.chegada,
+    lead && lead.entrada,
+    lead && lead.data,
+    lead && lead.dataCriacao,
+    lead && lead.created_at
+  ];
+
+  for (const value of candidates) {
+    if (!value) continue;
+    if (typeof value === 'number' && isFinite(value)) return value;
+    let parsed;
+    try {
+      parsed = new Date(parseCrmDateToISO(value, ''));
+    } catch(e) {
+      parsed = new Date(value);
+    }
+    if (!isNaN(parsed.getTime())) return parsed.getTime();
+  }
+
+  const idMatch = String((lead && lead.id) || '').match(/(\d{10,})/);
+  return idMatch ? Number(idMatch[1]) : 0;
+}
+
+function sortCrmLeadsNewestFirst(leads) {
+  return (leads || [])
+    .map((lead, index) => ({ lead, index }))
+    .sort((a, b) => {
+      const diff = getLeadCrmSortTime(b.lead) - getLeadCrmSortTime(a.lead);
+      return diff || (b.index - a.index);
+    })
+    .map(item => item.lead);
+}
+
 async function saveLeadToDb(lead) {
   if (window._fbReady) {
     const docId = await window._fb.saveLead(lead);
@@ -1676,6 +1720,7 @@ function renderKanban() {
   } catch (e) {
     console.warn('Filtro mensal do CRM ignorado:', e);
   }
+  leads = sortCrmLeadsNewestFirst(leads);
 
   let STAGES = getStages(filterAct || (activeClient ? activeClient.account : ''));
   if (!Array.isArray(STAGES) || !STAGES.length) STAGES = STAGES_DEFAULT;
@@ -5298,8 +5343,10 @@ async function limparCrmCliente() {
   const leads = getLeads().filter(l => l.act === act);
   if (!leads.length) { showToast('Nenhum lead para remover.', 'info'); return; }
   try {
+    if (typeof muteLeadNotifier === 'function') muteLeadNotifier(18000);
     await Promise.all(leads.map(l => deleteLeadFromDb(l.id)));
     await getLeadsAsync();
+    if (typeof syncLeadNotifierKnownKeys === 'function') syncLeadNotifierKnownKeys(getLeads());
     renderKanban();
     renderFunilChart();
     if (typeof renderFunilEvolucao === 'function') renderFunilEvolucao();
@@ -5365,7 +5412,8 @@ async function confirmarImportacao() {
   const promises = [];
 
   for (const row of rows) {
-    const lead = { act, stage: stages[0]?.id || 'novo', createdAt: new Date().toISOString() };
+    const importedAt = new Date().toISOString();
+    const lead = { act, stage: stages[0]?.id || 'novo', createdAt: importedAt, updatedAt: importedAt };
     let rawValor = null;
     let isFechado = false;
 
@@ -5910,6 +5958,50 @@ async function getLeadsAsync() {
 
 function getLeads() {
   return normalizeImportedLeadsFields(_leadsCache || []);
+}
+
+function getLeadCrmSortTime(lead) {
+  const candidates = [
+    lead && lead._crmArrivalSeenAt,
+    lead && lead.arrivalAt,
+    lead && lead.updatedAt,
+    lead && lead.updated_at,
+    lead && lead.createdTime,
+    lead && lead.created_time,
+    lead && lead.createdAt,
+    lead && lead._createdAt,
+    lead && lead.timestamp,
+    lead && lead.chegada,
+    lead && lead.entrada,
+    lead && lead.data,
+    lead && lead.dataCriacao,
+    lead && lead.created_at
+  ];
+
+  for (const value of candidates) {
+    if (!value) continue;
+    if (typeof value === 'number' && isFinite(value)) return value;
+    let parsed;
+    try {
+      parsed = new Date(parseCrmDateToISO(value, ''));
+    } catch(e) {
+      parsed = new Date(value);
+    }
+    if (!isNaN(parsed.getTime())) return parsed.getTime();
+  }
+
+  const idMatch = String((lead && lead.id) || '').match(/(\d{10,})/);
+  return idMatch ? Number(idMatch[1]) : 0;
+}
+
+function sortCrmLeadsNewestFirst(leads) {
+  return (leads || [])
+    .map((lead, index) => ({ lead, index }))
+    .sort((a, b) => {
+      const diff = getLeadCrmSortTime(b.lead) - getLeadCrmSortTime(a.lead);
+      return diff || (b.index - a.index);
+    })
+    .map(item => item.lead);
 }
 
 async function saveLeadToDb(lead) {
@@ -6564,6 +6656,7 @@ function renderKanban() {
   } catch (e) {
     console.warn('Filtro mensal do CRM ignorado:', e);
   }
+  leads = sortCrmLeadsNewestFirst(leads);
 
   let STAGES = getStages(filterAct || (activeClient ? activeClient.account : ''));
   if (!Array.isArray(STAGES) || !STAGES.length) STAGES = STAGES_DEFAULT;
@@ -7186,9 +7279,14 @@ let _leadNotificationUnread = 0;
 let _leadNotificationTitleBase = document.title || 'Ads Report';
 let _leadNotificationSoundUnlocked = false;
 let _leadNotificationSoundPending = false;
+let _leadNotifierMutedUntil = 0;
 
 function getLeadUniqueKey(lead) {
   return String((lead && (lead._docId || lead.id || lead.email || lead.phone || lead.name)) || '').trim();
+}
+
+function muteLeadNotifier(ms = 12000) {
+  _leadNotifierMutedUntil = Date.now() + ms;
 }
 
 function getSelectedCrmActForNotifications() {
@@ -7198,6 +7296,14 @@ function getSelectedCrmActForNotifications() {
   if (crmClientFilter) return crmClientFilter;
   if (activeClient && activeClient.account) return activeClient.account;
   return '';
+}
+
+function syncLeadNotifierKnownKeys(leads) {
+  const selectedAct = getSelectedCrmActForNotifications();
+  const sourceLeads = Array.isArray(leads) ? leads : getLeads();
+  const visibleLeads = selectedAct ? sourceLeads.filter(l => leadMatchesClient(l, selectedAct)) : sourceLeads;
+  _knownLeadKeys = new Set(visibleLeads.map(getLeadUniqueKey).filter(Boolean));
+  _leadNotifierPrimed = true;
 }
 
 function getStoredLeadNotifications() {
@@ -7413,6 +7519,12 @@ function processLeadNotificationSnapshot(leads) {
   const visibleLeads = selectedAct ? leads.filter(l => leadMatchesClient(l, selectedAct)) : leads;
   const nextKeys = new Set(visibleLeads.map(getLeadUniqueKey).filter(Boolean));
 
+  if (Date.now() < _leadNotifierMutedUntil) {
+    _knownLeadKeys = nextKeys;
+    _leadNotifierPrimed = true;
+    return;
+  }
+
   if (!_leadNotifierPrimed) {
     _knownLeadKeys = nextKeys;
     _leadNotifierPrimed = true;
@@ -7426,6 +7538,11 @@ function processLeadNotificationSnapshot(leads) {
   _knownLeadKeys = nextKeys;
 
   if (newLeads.length) {
+    const arrivalSeenAt = Date.now();
+    newLeads.forEach((lead, index) => {
+      lead._crmArrivalSeenAt = arrivalSeenAt + index;
+      if (!lead.updatedAt) lead.updatedAt = new Date(arrivalSeenAt + index).toISOString();
+    });
     renderKanban();
     if (typeof renderFunilChart === 'function') renderFunilChart();
     if (typeof renderFunilEvolucao === 'function') renderFunilEvolucao();
