@@ -489,8 +489,18 @@ tr:hover td { background: var(--surface2); }
   .kanban-card.drop-after { border-bottom-color: var(--accent); box-shadow: inset 0 -3px 0 var(--accent), 0 4px 12px rgba(0,0,0,0.3); }
   .kanban-col.drag-over { border-color: var(--accent); background: var(--accent-glow2); }
   .card-name { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 6px; }
-  .card-phone { font-size: 11px; color: var(--muted2); font-family: 'JetBrains Mono', monospace; margin-bottom: 3px; }
+  .card-phone { font-size: 11px; color: var(--muted2); font-family: 'JetBrains Mono', monospace; margin-bottom: 3px; overflow-wrap: anywhere; }
   .card-email { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-obs {
+    font-size: 11px; color: var(--muted); margin-top: 4px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .card-obs-label {
+    display: none;
+  }
+  .card-obs-text {
+    display: inline; overflow: hidden; text-overflow: ellipsis;
+  }
   .card-actions { display: flex; gap: 6px; margin-top: 10px; }
   .card-btn-first-msg {
     color: #25d366 !important;
@@ -693,7 +703,6 @@ tr:hover td { background: var(--surface2); }
   .col-search-wrap { position: relative; }
   .col-search-icon { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
 .card-proxima { font-size: 10px; color: var(--amber); margin-top: 4px; }
-.card-obs { font-size: 11px; color: var(--muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .btn-manage-stages {
     padding: 0 18px; height: 36px;
     background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--r);
@@ -922,16 +931,40 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
   .crm-board-scroll.force-horizontal { overflow-x: visible; }
   .crm-board-scroll.force-horizontal .kanban-board { min-width: 100%; width: 100%; }
   .kanban-board { display: flex; min-width: 100% !important; width: 100%; gap: 16px; }
-  .kanban-col { width: 100%; max-height: none !important; overflow: visible; flex: none; }
+  .kanban-col {
+    width: 100%; height: min(560px, calc(100vh - 210px)); max-height: min(560px, calc(100vh - 210px)) !important;
+    overflow: hidden; flex: none;
+  }
   .kanban-col-header { padding: 16px 18px; min-height: 54px; }
   .kanban-col-title { font-size: 14px; line-height: 1.3; white-space: normal; overflow-wrap: anywhere; letter-spacing: 0; }
-  .kanban-cards { max-height: none; overflow-y: visible; flex: none; padding: 12px; gap: 12px; }
+  .kanban-cards {
+    min-height: 180px; max-height: none; overflow-y: auto; flex: 1;
+    padding: 12px; gap: 12px; -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain; scrollbar-width: thin;
+  }
+  .kanban-cards::-webkit-scrollbar { width: 5px; }
+  .kanban-cards::-webkit-scrollbar-track { background: transparent; }
+  .kanban-cards::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 999px; }
   .kanban-card { overflow: visible !important; min-height: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 5px; }
-  .card-origem, .card-rede, .card-name, .card-phone, .card-email, .card-obs, .card-valor, .card-proxima, .kanban-card > div { line-height: 1.35; min-height: auto; }
+  .card-origem, .card-rede, .card-name, .card-phone, .card-email, .card-valor, .card-proxima, .kanban-card > div { line-height: 1.35; min-height: auto; }
   .card-origem, .card-rede { font-size: 12px; white-space: normal; overflow: visible; text-overflow: clip; }
   .card-name { font-size: 15px; font-weight: 600; margin-bottom: 2px; white-space: normal; overflow-wrap: anywhere; }
   .card-phone, .card-email { font-size: 12px; white-space: normal; overflow-wrap: anywhere; overflow: visible; text-overflow: clip; }
-  .card-obs { white-space: normal; overflow: visible; text-overflow: clip; }
+  .card-obs {
+    margin-top: 9px; padding: 9px 10px; border: 1px solid var(--border);
+    border-radius: 6px; background: rgba(255,255,255,0.025);
+    color: var(--muted2); font-size: 11px; line-height: 1.45;
+    white-space: normal; overflow: hidden; text-overflow: clip;
+  }
+  .card-obs-label {
+    display: flex; align-items: center; gap: 5px; margin-bottom: 5px;
+    color: var(--text); font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .card-obs-text {
+    display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical;
+    overflow: hidden; overflow-wrap: anywhere; white-space: pre-line;
+  }
   .card-actions { margin-top: 8px; align-items: center; }
   .card-btn { min-height: 32px; line-height: 1.2; }
 }
@@ -1920,7 +1953,7 @@ function renderKanban() {
       cardHTML += `<div class="card-name">${escapeHtml(limitText(lead.name || 'Lead sem nome', 120))}</div>`;
       cardHTML += `<div class="card-phone">${escapeHtml(lead.phone || '—')}</div>`;
       cardHTML += `<div class="card-email">${escapeHtml(lead.email || '—')}</div>`;
-      if (lead.obs) cardHTML += `<div class="card-obs">💬 ${escapeHtml(limitText(lead.obs, 260))}</div>`;
+      if (lead.obs) cardHTML += renderLeadObservationHtml(lead.obs);
       if (lead.valor) cardHTML += `<div class="card-valor">💰 R$ ${escapeHtml(limitText(lead.valor, 40))}</div>`;
       if (lead.proximaAcao) cardHTML += `<div class="card-proxima">⏰ ${escapeHtml(limitText(lead.proximaAcao, 120))}${lead.proximaData ? ' · ' + new Date(lead.proximaData + 'T12:00:00').toLocaleDateString('pt-BR') : ''}</div>`;
       if (lead.createdAt) cardHTML += `<div style="font-size:10px;color:var(--muted);margin-top:4px;">Entrada: ${escapeHtml(new Date(lead.createdAt).toLocaleDateString('pt-BR'))}</div>`;
@@ -2298,6 +2331,25 @@ function onlyDigits(value) {
 function limitText(value, max = 600) {
   const text = String(value ?? '').trim();
   return text.length > max ? text.slice(0, max) + '...' : text;
+}
+
+function formatLeadObservationText(text, max = 420) {
+  let value = String(text || '').trim();
+  if (!value) return '';
+  value = value
+    .replace(/_{2,}/g, ' ')
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([?.!,;:])/g, '$1')
+    .trim();
+  value = value.replace(/\.\s+(?=[A-Za-zÀ-ÿ0-9])/g, '.\n');
+  return limitText(value, max);
+}
+
+function renderLeadObservationHtml(text) {
+  const formatted = formatLeadObservationText(text);
+  if (!formatted) return '';
+  return `<div class="card-obs"><div class="card-obs-label">💬 Observações</div><div class="card-obs-text">${escapeHtml(formatted)}</div></div>`;
 }
 
 function buildCrmChart(leads, stages) {
@@ -4688,6 +4740,25 @@ function limitText(value, max = 600) {
   return text.length > max ? text.slice(0, max) + '...' : text;
 }
 
+function formatLeadObservationText(text, max = 420) {
+  let value = String(text || '').trim();
+  if (!value) return '';
+  value = value
+    .replace(/_{2,}/g, ' ')
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([?.!,;:])/g, '$1')
+    .trim();
+  value = value.replace(/\.\s+(?=[A-Za-zÀ-ÿ0-9])/g, '.\n');
+  return limitText(value, max);
+}
+
+function renderLeadObservationHtml(text) {
+  const formatted = formatLeadObservationText(text);
+  if (!formatted) return '';
+  return `<div class="card-obs"><div class="card-obs-label">💬 Observações</div><div class="card-obs-text">${escapeHtml(formatted)}</div></div>`;
+}
+
 function getAdThumbnail(row) {
   const creative = row && row.creative;
   if (row && row.thumbnail_url) return row.thumbnail_url;
@@ -6934,7 +7005,7 @@ function renderKanban() {
       cardHTML += `<div class="card-name">${escapeHtml(limitText(lead.name || 'Lead sem nome', 120))}</div>`;
       cardHTML += `<div class="card-phone">${escapeHtml(lead.phone || '—')}</div>`;
       cardHTML += `<div class="card-email">${escapeHtml(lead.email || '—')}</div>`;
-      if (lead.obs) cardHTML += `<div class="card-obs">💬 ${escapeHtml(limitText(lead.obs, 260))}</div>`;
+      if (lead.obs) cardHTML += renderLeadObservationHtml(lead.obs);
       if (lead.valor) cardHTML += `<div class="card-valor">💰 R$ ${escapeHtml(limitText(lead.valor, 40))}</div>`;
       if (lead.proximaAcao) cardHTML += `<div class="card-proxima">⏰ ${escapeHtml(limitText(lead.proximaAcao, 120))}${lead.proximaData ? ' · ' + new Date(lead.proximaData + 'T12:00:00').toLocaleDateString('pt-BR') : ''}</div>`;
       if (lead.createdAt) cardHTML += `<div style="font-size:10px;color:var(--muted);margin-top:4px;">Entrada: ${escapeHtml(new Date(lead.createdAt).toLocaleDateString('pt-BR'))}</div>`;
