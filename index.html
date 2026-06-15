@@ -980,6 +980,57 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
   .card-actions { margin-top: 8px; align-items: center; }
   .card-btn { min-height: 32px; line-height: 1.2; }
 }
+.help-view { display:none; padding:28px 32px; overflow-x:hidden; box-sizing:border-box; }
+.help-wrap { max-width:980px; }
+.help-title { font-size:24px; font-weight:700; color:var(--text); margin-bottom:6px; }
+.help-subtitle { font-size:13px; color:var(--muted); margin-bottom:22px; line-height:1.55; }
+.help-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:14px; }
+.help-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:18px; }
+.help-card h3 { margin:0 0 10px; color:var(--text); font-size:15px; line-height:1.35; }
+.help-card p, .help-card li { color:var(--muted2); font-size:13px; line-height:1.55; }
+.help-card p { margin:0; }
+.help-card ul, .help-card ol { margin:0; padding-left:18px; }
+.help-card li + li { margin-top:6px; }
+.help-tag { display:inline-flex; align-items:center; gap:6px; margin-bottom:10px; padding:4px 8px; border-radius:999px; border:1px solid var(--border); color:var(--accent2); background:var(--accent-glow2); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+.help-callout { margin-top:14px; padding:14px 16px; border-radius:8px; border:1px solid rgba(212,175,55,.35); background:rgba(212,175,55,.08); color:var(--text); font-size:13px; line-height:1.55; }
+.help-search { display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:11px 14px; margin-bottom:18px; max-width:620px; }
+.help-search svg { flex-shrink:0; stroke:var(--muted); }
+.help-search input { width:100%; border:0; outline:0; background:transparent; color:var(--text); font:500 13px 'Inter', sans-serif; }
+.help-search input::placeholder { color:var(--muted); }
+.help-empty { display:none; padding:22px; border:1px dashed var(--border); border-radius:8px; color:var(--muted); font-size:13px; text-align:center; }
+.help-demo { position:relative; height:92px; margin-bottom:14px; border:1px solid var(--border); border-radius:8px; background:linear-gradient(135deg, rgba(255,255,255,.03), rgba(212,175,55,.05)); overflow:hidden; }
+.help-demo-btn { position:absolute; right:18px; top:24px; padding:9px 16px; border-radius:8px; background:var(--gold); color:#111; font-size:12px; font-weight:800; }
+.help-demo-card { position:absolute; left:16px; top:18px; width:112px; height:54px; border-radius:7px; border:1px solid var(--border2); background:var(--surface2); box-shadow:0 8px 18px rgba(0,0,0,.18); }
+.help-demo-card::before { content:'Lead'; position:absolute; left:10px; top:9px; color:var(--text); font-size:12px; font-weight:700; }
+.help-demo-card::after { content:'3899 0000'; position:absolute; left:10px; top:29px; color:var(--muted); font-size:10px; }
+.help-demo-col { position:absolute; inset:12px 16px; display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.help-demo-col span { border:1px dashed var(--border2); border-radius:7px; color:var(--muted); font-size:10px; padding:8px; }
+.help-demo-pointer { position:absolute; width:18px; height:18px; transform:rotate(-18deg); color:#fff; filter:drop-shadow(0 4px 8px rgba(0,0,0,.35)); }
+.help-demo-pointer::before { content:''; position:absolute; left:0; top:0; width:0; height:0; border-left:9px solid currentColor; border-top:16px solid transparent; border-bottom:3px solid transparent; }
+.help-demo-click .help-demo-pointer { right:54px; top:52px; animation:helpClickPointer 2.3s ease-in-out infinite; }
+.help-demo-click .help-demo-btn { animation:helpButtonPulse 2.3s ease-in-out infinite; }
+.help-demo-drag .help-demo-card { animation:helpDragCard 3s ease-in-out infinite; }
+.help-demo-drag .help-demo-pointer { left:92px; top:56px; animation:helpDragPointer 3s ease-in-out infinite; }
+.help-demo-dashboard .help-demo-card { width:70px; height:42px; top:34px; }
+.help-demo-dashboard .help-demo-card:nth-child(1) { left:18px; animation:helpMetricPop 2.6s ease-in-out infinite; }
+.help-demo-dashboard .help-demo-card:nth-child(2) { left:100px; animation:helpMetricPop 2.6s ease-in-out .2s infinite; }
+.help-demo-dashboard .help-demo-card:nth-child(3) { left:182px; animation:helpMetricPop 2.6s ease-in-out .4s infinite; }
+.help-demo-dashboard .help-demo-pointer { left:172px; top:18px; animation:helpClickPointer 2.6s ease-in-out infinite; }
+.help-demo-import .help-demo-card { animation:helpImportCard 2.8s ease-in-out infinite; }
+.help-demo-import .help-demo-pointer { right:62px; top:50px; animation:helpClickPointer 2.8s ease-in-out infinite; }
+@keyframes helpClickPointer { 0%,100% { transform:translate(18px,14px) rotate(-18deg); opacity:.25; } 38% { transform:translate(0,0) rotate(-18deg); opacity:1; } 52% { transform:translate(0,0) scale(.86) rotate(-18deg); opacity:1; } 70% { transform:translate(4px,4px) rotate(-18deg); opacity:.75; } }
+@keyframes helpButtonPulse { 0%,44%,100% { transform:scale(1); box-shadow:none; } 52% { transform:scale(.96); box-shadow:0 0 0 6px rgba(212,175,55,.2); } }
+@keyframes helpDragCard { 0%,100% { transform:translate(0,0); } 45%,65% { transform:translate(128px,0); } }
+@keyframes helpDragPointer { 0%,100% { transform:translate(0,0) rotate(-18deg); opacity:.35; } 42%,65% { transform:translate(128px,0) rotate(-18deg); opacity:1; } }
+@keyframes helpMetricPop { 0%,100% { transform:translateY(0); border-color:var(--border2); } 45% { transform:translateY(-8px); border-color:var(--gold); } }
+@keyframes helpImportCard { 0%,100% { transform:translate(-130px,0); opacity:0; } 35%,70% { transform:translate(0,0); opacity:1; } }
+@media (max-width: 768px) {
+  .help-view { padding:18px 16px 96px; }
+  .help-title { font-size:22px; }
+  .help-grid { grid-template-columns:1fr; gap:12px; }
+  .help-card { padding:16px; }
+  .help-demo { height:84px; }
+}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js">
 let mainChart = null;
@@ -1557,11 +1608,12 @@ function abrirContatos() {
   document.querySelector('.content').style.display = 'none';
   const crmV = document.getElementById('crm-view'); if(crmV) crmV.style.display = 'none';
   const contaV = document.getElementById('conta-view'); if(contaV) contaV.style.display = 'none';
+  const ajudaV = document.getElementById('ajuda-view'); if(ajudaV) ajudaV.style.display = 'none';
   // Mostrar contatos
   const contV = document.getElementById('contatos-view');
   if (contV) { contV.style.display = 'block'; contV.style.visibility = 'visible'; contV.style.opacity = '1'; }
   // Nav active
-  ['report','crm','conta','contatos','integracoes'].forEach(v => {
+  ['report','crm','ajuda','conta','contatos','integracoes'].forEach(v => {
     const el = document.getElementById('nav-' + v);
     if (el) el.classList.toggle('active', v === 'contatos');
   });
@@ -1575,16 +1627,19 @@ function abrirAtendimento() {
   const crmV = document.getElementById('crm-view'); if(crmV) crmV.style.display = 'none';
   const contaV = document.getElementById('conta-view'); if(contaV) contaV.style.display = 'none';
   const contV = document.getElementById('contatos-view'); if(contV) contV.style.display = 'none';
+  const ajudaV = document.getElementById('ajuda-view'); if(ajudaV) ajudaV.style.display = 'none';
 }
 
 function switchView(view) {
-  ['report','crm','conta','contatos','integracoes'].forEach(v => {
+  ['report','crm','ajuda','conta','contatos','integracoes'].forEach(v => {
     const el = document.getElementById('nav-' + v);
     if (el) el.classList.toggle('active', v === view);
   });
   document.querySelector('.topbar').style.display = view === 'report' ? 'flex' : 'none';
   document.querySelector('.content').style.display = view === 'report' ? 'block' : 'none';
   document.getElementById('crm-view').style.display = view === 'crm' ? 'block' : 'none';
+  const ajudaView = document.getElementById('ajuda-view');
+  if (ajudaView) ajudaView.style.display = view === 'ajuda' ? 'block' : 'none';
   document.getElementById('conta-view').style.display = view === 'conta' ? 'block' : 'none';
   const contView = document.getElementById('contatos-view');
   if (contView) contView.style.display = view === 'contatos' ? 'block' : 'none';
@@ -1605,6 +1660,20 @@ function switchView(view) {
     document.getElementById('pw-success').style.display = 'none';
     if (isAdmin) renderAdminLogins();
   }
+}
+
+function filterHelpCards(query) {
+  const term = (query || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  const cards = Array.from(document.querySelectorAll('#ajuda-view .help-card'));
+  const empty = document.getElementById('help-empty');
+  let visible = 0;
+  cards.forEach(card => {
+    const text = card.textContent.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const match = !term || text.includes(term);
+    card.style.display = match ? '' : 'none';
+    if (match) visible += 1;
+  });
+  if (empty) empty.style.display = visible ? 'none' : 'block';
 }
 
 function getCurrentMonthKey() {
@@ -2290,7 +2359,7 @@ function moveLeadTo(id, stageId) {
 
 
 function setMobileNav(view) {
-  ['report','crm','conta','integracoes','cfg'].forEach(v => {
+  ['report','crm','ajuda','conta','integracoes','cfg'].forEach(v => {
     const el = document.getElementById('mnav-' + v);
     if (el) el.classList.toggle('active', v === view);
   });
@@ -2742,7 +2811,7 @@ function getCurrentCrmActForSheets() {
 
 function openIntegrationsFromNav() {
   switchView('crm');
-  ['report','crm','conta','contatos','integracoes'].forEach(v => {
+  ['report','crm','ajuda','conta','contatos','integracoes'].forEach(v => {
     const el = document.getElementById('nav-' + v);
     if (el) el.classList.toggle('active', v === 'integracoes');
   });
@@ -3202,7 +3271,7 @@ function getCurrentCrmActForSheets() {
 
 function openIntegrationsFromNav() {
   switchView('crm');
-  ['report','crm','conta','contatos','integracoes'].forEach(v => {
+  ['report','crm','ajuda','conta','contatos','integracoes'].forEach(v => {
     const el = document.getElementById('nav-' + v);
     if (el) el.classList.toggle('active', v === 'integracoes');
   });
@@ -3401,6 +3470,10 @@ function onCrmClientChange() {
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
     CRM
   </div>
+  <div class="mobile-nav-item" id="mnav-ajuda" onclick="switchView('ajuda'); setMobileNav('ajuda')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 1 1 5.82 1c0 2-3 2-3 4"/><path d="M12 17h.01"/></svg>
+    Ajuda
+  </div>
   <div class="mobile-nav-item" id="mnav-conta" onclick="switchView('conta'); setMobileNav('conta')">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
     Conta
@@ -3461,6 +3534,10 @@ function onCrmClientChange() {
         <div class="nav-item" id="nav-crm" onclick="switchView('crm')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           CRM
+        </div>
+        <div class="nav-item" id="nav-ajuda" onclick="switchView('ajuda')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 1 1 5.82 1c0 2-3 2-3 4"/><path d="M12 17h.01"/></svg>
+          Ajuda
         </div>
         <div class="nav-item" id="nav-conta" onclick="switchView('conta')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -4074,6 +4151,126 @@ function onCrmClientChange() {
         <div style="font-size:12px; color:var(--muted); margin-bottom:12px;" id="contatos-count"></div>
         <div id="contatos-list"></div>
         <div id="contatos-empty" style="display:none; text-align:center; padding:2rem; font-size:13px; color:var(--muted);">Nenhum contato encontrado</div>
+      </div>
+    </div>
+
+
+    <!-- Ajuda View -->
+    <div id="ajuda-view" class="help-view">
+      <div class="help-wrap">
+        <div class="help-title">Ajuda do CRM</div>
+        <div class="help-subtitle">Guia rápido para usar o painel Huven no dia a dia: acompanhar resultados, organizar leads, importar contatos e manter o funil atualizado.</div>
+        <label class="help-search" for="help-search-input">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input id="help-search-input" type="search" placeholder="Buscar dúvida: novo lead, dashboard, importar, mover card..." oninput="filterHelpCards(this.value)">
+        </label>
+        <div class="help-empty" id="help-empty">Nenhum tópico encontrado. Tente buscar por CRM, lead, dashboard, importar, exportar ou WhatsApp.</div>
+
+        <div class="help-grid">
+          <section class="help-card">
+            <div class="help-tag">Dashboard</div>
+            <div class="help-demo help-demo-dashboard" aria-hidden="true">
+              <div class="help-demo-card"></div>
+              <div class="help-demo-card"></div>
+              <div class="help-demo-card"></div>
+              <div class="help-demo-pointer"></div>
+            </div>
+            <h3>Como visualizar os resultados</h3>
+            <ol>
+              <li>Entre no app para abrir o dashboard do cliente.</li>
+              <li>Escolha o período nos campos de data.</li>
+              <li>Clique em Atualizar para buscar os dados da Meta.</li>
+              <li>Use o seletor de Métricas para exibir ou ocultar indicadores.</li>
+            </ol>
+          </section>
+
+          <section class="help-card">
+            <div class="help-tag">CRM</div>
+            <h3>Como acompanhar os leads</h3>
+            <p>A aba CRM mostra os leads em colunas de etapa. Cada card representa um contato e pode trazer nome, telefone, e-mail, campanha, origem, observações e data de entrada.</p>
+            <div class="help-callout">No celular, cada coluna tem rolagem própria para facilitar a busca por leads longos.</div>
+          </section>
+
+          <section class="help-card">
+            <div class="help-tag">Novo lead</div>
+            <div class="help-demo help-demo-click" aria-hidden="true">
+              <div class="help-demo-btn">+ Novo lead</div>
+              <div class="help-demo-pointer"></div>
+            </div>
+            <h3>Como adicionar um lead manualmente</h3>
+            <ol>
+              <li>Acesse a aba CRM.</li>
+              <li>Clique em Novo lead.</li>
+              <li>Preencha os dados principais do contato.</li>
+              <li>Salve o lead para ele aparecer na coluna inicial do cliente selecionado.</li>
+            </ol>
+          </section>
+
+          <section class="help-card">
+            <div class="help-tag">Kanban</div>
+            <div class="help-demo help-demo-drag" aria-hidden="true">
+              <div class="help-demo-col"><span>Novo lead</span><span>Conversando</span></div>
+              <div class="help-demo-card"></div>
+              <div class="help-demo-pointer"></div>
+            </div>
+            <h3>Como mover e ordenar cards</h3>
+            <ul>
+              <li>Arraste um card para outra coluna para mudar a etapa do atendimento.</li>
+              <li>Arraste um card dentro da mesma coluna para mudar a prioridade ou sequência.</li>
+              <li>Também é possível usar o botão Mover dentro do card.</li>
+            </ul>
+          </section>
+
+          <section class="help-card">
+            <div class="help-tag">Atendimento</div>
+            <h3>Botões dentro do card</h3>
+            <ul>
+              <li>Editar altera as informações do lead.</li>
+              <li>Mover troca o lead de etapa.</li>
+              <li>Hist. mostra o histórico de mudanças.</li>
+              <li>1ª msg abre a primeira mensagem no WhatsApp, quando disponível.</li>
+              <li>X remove o lead do CRM.</li>
+            </ul>
+          </section>
+
+          <section class="help-card">
+            <div class="help-tag">Importar</div>
+            <div class="help-demo help-demo-import" aria-hidden="true">
+              <div class="help-demo-btn">Importar</div>
+              <div class="help-demo-card"></div>
+              <div class="help-demo-pointer"></div>
+            </div>
+            <h3>Como subir leads em lote</h3>
+            <ol>
+              <li>No CRM, clique em Importar.</li>
+              <li>Escolha o arquivo com os leads.</li>
+              <li>Confira se os campos principais foram reconhecidos.</li>
+              <li>Finalize a importação para os contatos entrarem no funil.</li>
+            </ol>
+          </section>
+
+          <section class="help-card">
+            <div class="help-tag">Exportar</div>
+            <h3>Como baixar os dados</h3>
+            <p>Use Exportar Excel para gerar uma planilha com os leads do cliente e do período selecionado. Esse arquivo ajuda em conferências, repasses e backups.</p>
+          </section>
+
+          <section class="help-card">
+            <div class="help-tag">Notificações</div>
+            <h3>Como entender novos leads</h3>
+            <p>Quando chegam leads novos, o app mostra um aviso no CRM e no centro de notificações. Ao movimentar ou reorganizar cards manualmente, essa ação não deve gerar alerta de lead novo.</p>
+          </section>
+
+          <section class="help-card">
+            <div class="help-tag">Mobile</div>
+            <h3>Como usar no celular</h3>
+            <ul>
+              <li>Use a barra inferior para alternar entre Dashboard, CRM, Ajuda e Conta.</li>
+              <li>No CRM, role a página para escolher a coluna desejada.</li>
+              <li>Dentro da coluna, role a lista para encontrar leads sem sair do Kanban.</li>
+            </ul>
+          </section>
+        </div>
       </div>
     </div>
 
@@ -5630,7 +5827,7 @@ window.abrirContatos = function abrirContatos() {
     });
     const v = document.getElementById('contatos-view');
     if(v) { v.style.cssText += ';display:block!important;visibility:visible!important;opacity:1!important;'; }
-    ['report','crm','conta','contatos','integracoes'].forEach(n => {
+    ['report','crm','ajuda','conta','contatos','integracoes'].forEach(n => {
       const el = document.getElementById('nav-'+n);
       if(el) el.classList.toggle('active', n==='contatos');
     });
@@ -6380,13 +6577,15 @@ function renderAtendimento() {
 }
 
 function switchView(view) {
-  ['report','crm','conta','contatos','integracoes'].forEach(v => {
+  ['report','crm','ajuda','conta','contatos','integracoes'].forEach(v => {
     const el = document.getElementById('nav-' + v);
     if (el) el.classList.toggle('active', v === view);
   });
   document.querySelector('.topbar').style.display = view === 'report' ? 'flex' : 'none';
   document.querySelector('.content').style.display = view === 'report' ? 'block' : 'none';
   document.getElementById('crm-view').style.display = view === 'crm' ? 'block' : 'none';
+  const ajudaView = document.getElementById('ajuda-view');
+  if (ajudaView) ajudaView.style.display = view === 'ajuda' ? 'block' : 'none';
   document.getElementById('conta-view').style.display = view === 'conta' ? 'block' : 'none';
   const contView = document.getElementById('contatos-view');
   if (contView) contView.style.display = view === 'contatos' ? 'block' : 'none';
@@ -6407,6 +6606,20 @@ function switchView(view) {
     document.getElementById('pw-success').style.display = 'none';
     if (isAdmin) renderAdminLogins();
   }
+}
+
+function filterHelpCards(query) {
+  const term = (query || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  const cards = Array.from(document.querySelectorAll('#ajuda-view .help-card'));
+  const empty = document.getElementById('help-empty');
+  let visible = 0;
+  cards.forEach(card => {
+    const text = card.textContent.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const match = !term || text.includes(term);
+    card.style.display = match ? '' : 'none';
+    if (match) visible += 1;
+  });
+  if (empty) empty.style.display = visible ? 'none' : 'block';
 }
 
 async function renderAdminLogins() {
@@ -7579,7 +7792,7 @@ function moveLeadTo(id, stageId) {
 
 
 function setMobileNav(view) {
-  ['report','crm','conta','integracoes','cfg'].forEach(v => {
+  ['report','crm','ajuda','conta','integracoes','cfg'].forEach(v => {
     const el = document.getElementById('mnav-' + v);
     if (el) el.classList.toggle('active', v === view);
   });
@@ -8254,7 +8467,7 @@ function getCurrentCrmActForSheets() {
 
 function openIntegrationsFromNav() {
   switchView('crm');
-  ['report','crm','conta','contatos','integracoes'].forEach(v => {
+  ['report','crm','ajuda','conta','contatos','integracoes'].forEach(v => {
     const el = document.getElementById('nav-' + v);
     if (el) el.classList.toggle('active', v === 'integracoes');
   });
