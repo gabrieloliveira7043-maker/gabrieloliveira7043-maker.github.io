@@ -922,6 +922,7 @@ body { transition: background 0.2s ease, color 0.2s ease; }
 .sidebar-footer .huven-theme-toggle { justify-content: flex-start; height: auto; padding: 8px 12px; }
 html[data-theme="light"] .sidebar, html[data-theme="light"] .topbar { background: #FFFFFF; }
 html[data-theme="light"] .login-overlay { background: var(--paper); }
+#nav-integracoes, #mnav-integracoes { display: none !important; }
 
 /* Mobile CRM readability fixes */
 @media (max-width: 768px) {
@@ -930,7 +931,7 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
   .crm-scrollbar-wrap { display: none !important; }
   .crm-board-scroll.force-horizontal { overflow-x: visible; }
   .crm-board-scroll.force-horizontal .kanban-board { min-width: 100%; width: 100%; }
-  .kanban-board { display: flex; min-width: 100% !important; width: 100%; gap: 16px; }
+  .kanban-board { display: flex; flex-direction: column; min-width: 100% !important; width: 100%; gap: 16px; }
   .kanban-col {
     width: 100%; height: 68vh; max-height: 68vh !important; min-height: 420px;
     overflow: hidden !important; flex: none; display: grid !important;
@@ -1761,6 +1762,44 @@ function adjustKanbanBoardScroll() {
     updateCrmScrollbarProgress();
   });
 }
+function lockMobileKanbanColumnScroll() {
+  const board = document.getElementById('kanban-board');
+  if (!board) return;
+  const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+  const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const columnHeight = Math.max(380, Math.min(560, Math.floor((viewportHeight || 700) * 0.62)));
+  board.querySelectorAll('.kanban-col').forEach(col => {
+    const cards = col.querySelector('.kanban-cards');
+    if (!cards) return;
+    if (!isMobile) {
+      col.style.height = '';
+      col.style.maxHeight = '';
+      col.style.overflow = '';
+      col.style.display = '';
+      col.style.gridTemplateRows = '';
+      cards.style.height = '';
+      cards.style.maxHeight = '';
+      cards.style.minHeight = '';
+      cards.style.overflowY = '';
+      cards.style.overflowX = '';
+      cards.style.webkitOverflowScrolling = '';
+      cards.style.touchAction = '';
+      return;
+    }
+    col.style.height = columnHeight + 'px';
+    col.style.maxHeight = columnHeight + 'px';
+    col.style.overflow = 'hidden';
+    col.style.display = 'grid';
+    col.style.gridTemplateRows = 'auto auto minmax(0, 1fr)';
+    cards.style.height = '100%';
+    cards.style.maxHeight = '100%';
+    cards.style.minHeight = '0';
+    cards.style.overflowY = 'scroll';
+    cards.style.overflowX = 'hidden';
+    cards.style.webkitOverflowScrolling = 'touch';
+    cards.style.touchAction = 'pan-y';
+  });
+}
 function updateCrmScrollbarProgress() {
   const board = document.getElementById('kanban-board');
   const boardScroll = board ? board.closest('.crm-board-scroll') : null;
@@ -1783,7 +1822,11 @@ function bindCrmBoardScrollbar() {
     updateCrmScrollbarProgress();
   });
   boardScroll.addEventListener('scroll', updateCrmScrollbarProgress, { passive: true });
-  window.addEventListener('resize', () => { arrangeCrmMobileOrder(); adjustKanbanBoardScroll(); });
+  window.addEventListener('resize', () => { arrangeCrmMobileOrder(); adjustKanbanBoardScroll(); lockMobileKanbanColumnScroll(); });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', lockMobileKanbanColumnScroll);
+  }
+  window.addEventListener('orientationchange', () => setTimeout(lockMobileKanbanColumnScroll, 250));
 }
 function renderKanban() {
   const sel = document.getElementById('crm-client-select');
@@ -1993,6 +2036,7 @@ function renderKanban() {
   arrangeCrmMobileOrder();
   bindCrmBoardScrollbar();
   adjustKanbanBoardScroll();
+  lockMobileKanbanColumnScroll();
 }
 
 function onDragStart(e) {
@@ -3357,10 +3401,6 @@ function onCrmClientChange() {
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
     CRM
   </div>
-  <div class="mobile-nav-item" id="mnav-integracoes" onclick="openIntegrationsFromNav(); setMobileNav('integracoes')">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-    Integrações
-  </div>
   <div class="mobile-nav-item" id="mnav-conta" onclick="switchView('conta'); setMobileNav('conta')">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
     Conta
@@ -3425,10 +3465,6 @@ function onCrmClientChange() {
         <div class="nav-item" id="nav-conta" onclick="switchView('conta')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           Conta
-        </div>
-        <div class="nav-item" id="nav-integracoes" onclick="openIntegrationsFromNav()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-          Integrações
         </div>
         <div class="nav-item" id="nav-contatos" onclick="if(window.abrirContatos) abrirContatos(); else switchView('contatos')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/><line x1="20" y1="8" x2="20" y2="14"/></svg>
@@ -6817,6 +6853,44 @@ function adjustKanbanBoardScroll() {
     updateCrmScrollbarProgress();
   });
 }
+function lockMobileKanbanColumnScroll() {
+  const board = document.getElementById('kanban-board');
+  if (!board) return;
+  const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+  const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const columnHeight = Math.max(380, Math.min(560, Math.floor((viewportHeight || 700) * 0.62)));
+  board.querySelectorAll('.kanban-col').forEach(col => {
+    const cards = col.querySelector('.kanban-cards');
+    if (!cards) return;
+    if (!isMobile) {
+      col.style.height = '';
+      col.style.maxHeight = '';
+      col.style.overflow = '';
+      col.style.display = '';
+      col.style.gridTemplateRows = '';
+      cards.style.height = '';
+      cards.style.maxHeight = '';
+      cards.style.minHeight = '';
+      cards.style.overflowY = '';
+      cards.style.overflowX = '';
+      cards.style.webkitOverflowScrolling = '';
+      cards.style.touchAction = '';
+      return;
+    }
+    col.style.height = columnHeight + 'px';
+    col.style.maxHeight = columnHeight + 'px';
+    col.style.overflow = 'hidden';
+    col.style.display = 'grid';
+    col.style.gridTemplateRows = 'auto auto minmax(0, 1fr)';
+    cards.style.height = '100%';
+    cards.style.maxHeight = '100%';
+    cards.style.minHeight = '0';
+    cards.style.overflowY = 'scroll';
+    cards.style.overflowX = 'hidden';
+    cards.style.webkitOverflowScrolling = 'touch';
+    cards.style.touchAction = 'pan-y';
+  });
+}
 function updateCrmScrollbarProgress() {
   const board = document.getElementById('kanban-board');
   const boardScroll = board ? board.closest('.crm-board-scroll') : null;
@@ -6839,7 +6913,11 @@ function bindCrmBoardScrollbar() {
     updateCrmScrollbarProgress();
   });
   boardScroll.addEventListener('scroll', updateCrmScrollbarProgress, { passive: true });
-  window.addEventListener('resize', () => { arrangeCrmMobileOrder(); adjustKanbanBoardScroll(); });
+  window.addEventListener('resize', () => { arrangeCrmMobileOrder(); adjustKanbanBoardScroll(); lockMobileKanbanColumnScroll(); });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', lockMobileKanbanColumnScroll);
+  }
+  window.addEventListener('orientationchange', () => setTimeout(lockMobileKanbanColumnScroll, 250));
 }
 function renderKanban() {
   const sel = document.getElementById('crm-client-select');
@@ -7055,6 +7133,7 @@ function renderKanban() {
   arrangeCrmMobileOrder();
   bindCrmBoardScrollbar();
   adjustKanbanBoardScroll();
+  lockMobileKanbanColumnScroll();
 }
 
 function filtrarColuna(stageId, text) {
