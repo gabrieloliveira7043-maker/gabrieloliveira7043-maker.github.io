@@ -5423,6 +5423,7 @@ const IMPORT_FIELDS = [
   { id: 'email',     label: 'E-mail' },
   { id: 'stage',     label: 'Etapa/Status' },
   { id: 'origem',    label: 'Origem/Tratativa' },
+  { id: 'plantao',   label: 'Plantão' },
   { id: 'redeSocial',label: 'Rede Social' },
   { id: 'valor',     label: 'Valor de fechamento' },
   { id: 'obs',       label: 'Observações' },
@@ -5433,6 +5434,22 @@ const IMPORT_FIELDS = [
 let _importRows = [];
 let _importAct = null;
 let _importEvent = null;
+
+function getImportFieldsForAct(act) {
+  const fields = IMPORT_FIELDS.filter(f => f.id !== 'plantao');
+  const config = act ? getFieldConfig(act) : null;
+  const plantao = config?.fields?.find(f => f.id === 'plantao');
+  const hasPlantaoField = !!plantao?.visible || (typeof isClinicaClient === 'function' && isClinicaClient(act));
+
+  if (hasPlantaoField) {
+    const insertAt = fields.findIndex(f => f.id === 'redeSocial');
+    const option = { id: 'plantao', label: plantao.label || 'Plantão' };
+    if (insertAt >= 0) fields.splice(insertAt, 0, option);
+    else fields.splice(fields.length - 1, 0, option);
+  }
+
+  return fields;
+}
 
 async function importLeads(event) {
   const file = event.target.files[0];
@@ -5516,8 +5533,9 @@ async function importLeads(event) {
   openImportModal(act, headers, rows);
 }
 
-function autoMapField(headerName) {
+function autoMapField(headerName, act) {
   const h = headerName.toLowerCase().trim();
+  const normalized = h.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const map = {
     'nome': 'name', 'nome do lead': 'name', 'name': 'name',
     'telefone': 'phone', 'phone': 'phone', 'fone': 'phone', 'cel': 'phone', 'celular': 'phone',
@@ -5527,10 +5545,11 @@ function autoMapField(headerName) {
     'tratativa': 'origem', 'origem': 'origem', 'source': 'origem',
     'observações': 'obs', 'observacoes': 'obs', 'obs': 'obs',
     'fecharam': 'valor', 'valores': 'valor', 'valor': 'valor', 'valor fechamento': 'valor',
-    'plantão': 'plantao', 'plantao': 'plantao',
+    'plantão': 'plantao', 'plantao': 'plantao', 'plantões': 'plantao', 'plantoes': 'plantao', 'psico': 'plantao',
     'chegada (data)': 'chegada', 'chegada': 'chegada', 'data': 'chegada',
   };
-  return map[h] || 'ignore';
+  const field = map[h] || map[normalized] || 'ignore';
+  return getImportFieldsForAct(act).some(f => f.id === field) ? field : 'ignore';
 }
 
 function openImportModal(act, headers, rows) {
@@ -5556,19 +5575,22 @@ function openImportModal(act, headers, rows) {
   document.getElementById('import-map-info').innerHTML = infoHTML;
 
   const list = document.getElementById('import-map-list');
+  const importFields = getImportFieldsForAct(selectedAct);
   list.innerHTML = headers.map((h, i) => {
-    const auto = autoMapField(h);
+    const auto = autoMapField(h, selectedAct);
     const preview = rows.slice(0,2).map(r => String(r[i] || '').slice(0,30)).filter(Boolean).join(', ');
+    const headerLabel = escapeHtml(h);
+    const previewLabel = escapeHtml(preview);
     return `
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <div style="flex:1;min-width:120px;">
-        <div style="font-size:13px;font-weight:600;color:var(--text);">${h}</div>
-        ${preview ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${preview}</div>` : ''}
+        <div style="font-size:13px;font-weight:600;color:var(--text);">${headerLabel}</div>
+        ${preview ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${previewLabel}</div>` : ''}
       </div>
       <div style="display:flex;align-items:center;gap:6px;">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
         <select id="map-col-${i}" class="field-input" style="padding:4px 8px;font-size:12px;min-width:160px;" onchange="onMapColChange()">
-          ${IMPORT_FIELDS.map(f => `<option value="${f.id}" ${auto === f.id ? 'selected' : ''}>${f.label}</option>`).join('')}
+          ${importFields.map(f => `<option value="${f.id}" ${auto === f.id ? 'selected' : ''}>${escapeHtml(f.label)}</option>`).join('')}
         </select>
       </div>
     </div>`;
@@ -5595,7 +5617,29 @@ function onMapColChange() {
   renderStageMapping();
 }
 
+function refreshImportFieldOptionsForDestination() {
+  const { headers } = _importRows || {};
+  if (!headers) return;
+
+  const destinoSel = document.getElementById('import-destino-act');
+  const act = destinoSel ? destinoSel.value : _importAct;
+  const importFields = getImportFieldsForAct(act);
+
+  headers.forEach((header, i) => {
+    const select = document.getElementById('map-col-' + i);
+    if (!select) return;
+
+    const previous = select.value;
+    const auto = autoMapField(header, act);
+    const selected = importFields.some(f => f.id === previous) ? previous : auto;
+    select.innerHTML = importFields.map(f =>
+      `<option value="${f.id}" ${selected === f.id ? 'selected' : ''}>${escapeHtml(f.label)}</option>`
+    ).join('');
+  });
+}
+
 function atualizarStageMappingDestino() {
+  refreshImportFieldOptionsForDestination();
   renderStageMapping();
 }
 
