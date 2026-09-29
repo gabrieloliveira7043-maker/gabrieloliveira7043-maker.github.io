@@ -1032,1951 +1032,11 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
   .help-demo { height:84px; }
 }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js">
-let mainChart = null;
-let chartType = 'line';
-let activeMetric = 'spend';
-let dailyData = [];
-
-const metricConfig = {
-  spend:  { label: 'Valor gasto (R$)',      color: '#a78bfa', extract: d => parseFloat(d.spend || 0),     fmt: v => 'R$ ' + v.toFixed(2).replace('.',',') },
-  reach:  { label: 'Alcance',               color: '#60a5fa', extract: d => parseInt(d.reach || 0),        fmt: v => v.toLocaleString('pt-BR') },
-  conv:   { label: 'Conversas iniciadas',   color: '#34d399', extract: d => (d.actions||[]).filter(a=>a.action_type==='onsite_conversion.messaging_conversation_started_7d'||a.action_type==='onsite_conversion.messaging_first_reply'||a.action_type==='messaging_conversation_started_7d').reduce((s,a)=>s+parseInt(a.value||0),0), fmt: v => v },
-  leads:  { label: 'Leads',                 color: '#f87171', extract: d => (d.actions||[]).filter(a=>a.action_type==='lead').reduce((s,a)=>s+parseInt(a.value||0),0), fmt: v => v },
-};
-
-function buildChart() {
-  if (!dailyData.length) return;
-  const cfg = metricConfig[activeMetric];
-  const labels = dailyData.map(d => {
-    const [y,m,day] = d.date_start.split('-');
-    return `${day}/${m}`;
-  });
-  const values = dailyData.map(cfg.extract);
-  const ctx = document.getElementById('main-chart').getContext('2d');
-
-  if (mainChart) mainChart.destroy();
-
-  const isLine = chartType === 'line';
-  const gradient = ctx.createLinearGradient(0, 0, 0, 240);
-  gradient.addColorStop(0, cfg.color + '33');
-  gradient.addColorStop(1, cfg.color + '00');
-
-  mainChart = new Chart(ctx, {
-    type: isLine ? 'line' : 'bar',
-    data: {
-      labels,
-      datasets: [{
-        label: cfg.label,
-        data: values,
-        borderColor: cfg.color,
-        backgroundColor: isLine ? gradient : cfg.color + '99',
-        borderWidth: isLine ? 2 : 0,
-        borderRadius: isLine ? 0 : 6,
-        fill: isLine,
-        tension: 0.4,
-        pointBackgroundColor: cfg.color,
-        pointRadius: isLine ? 3 : 0,
-        pointHoverRadius: 5,
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { intersect: false, mode: 'index' },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: '#1e1e35',
-          borderColor: 'rgba(120,120,255,0.2)',
-          borderWidth: 1,
-          titleColor: '#8888aa',
-          bodyColor: '#e8e8f0',
-          titleFont: { family: 'Inter', size: 11 },
-          bodyFont: { family: 'JetBrains Mono', size: 13 },
-          padding: 12,
-          callbacks: { label: ctx => '  ' + cfg.label + ': ' + cfg.fmt(ctx.parsed.y) }
-        }
-      },
-      scales: {
-        x: {
-          grid: { color: 'rgba(120,120,255,0.06)', drawBorder: false },
-          ticks: { color: '#5a5a7a', font: { family: 'Inter', size: 11 }, maxRotation: 0 },
-          border: { display: false }
-        },
-        y: {
-          grid: { color: 'rgba(120,120,255,0.06)', drawBorder: false },
-          ticks: { color: '#5a5a7a', font: { family: 'JetBrains Mono', size: 11 }, callback: v => cfg.fmt(v) },
-          border: { display: false }
-        }
-      }
-    }
-  });
-}
-
-function switchMetric(m) {
-  activeMetric = m;
-  document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
-  event.target.classList.add('active');
-  buildChart();
-}
-
-function switchChartType(t) {
-  chartType = t;
-  document.getElementById('btn-line').classList.toggle('active', t === 'line');
-  document.getElementById('btn-bar').classList.toggle('active', t === 'bar');
-  buildChart();
-}
-
-async function loadDailyData(account, from, to) {
-  const url = `${WORKER_URL}?account=${account}&from=${from}&to=${to}&fields=spend,reach,actions&time_increment=1`;
-  try {
-    const res = await fetch(url);
-    const json = await res.json();
-    if (json.error || !json.data) return [];
-    return json.data;
-  } catch { return []; }
-}
-
-
-const CREDENTIALS = {
-  "admin":      { pass: null, act: null },
-  "raquel":     { pass: null,   act: "act_1324786597927962" },
-  "vital":      { pass: null,    act: "act_1311713804053571" },
-  "petland":    { pass: null,  act: "act_728532149829958"  },
-  "contabiliza":{ pass: null,   act: "act_1515794876111984" },
-  "english":    { pass: null,  act: "act_2690757151096950" },
-  "thayelli":   { pass: null, act: "act_1281304275983449" },
-  "adriana":    { pass: null,  act: "act_456685107743703"  },
-  "travi":      { pass: null,    act: "act_379348482601330"  },
-  "boleto":     { pass: null,    act: "act_1712273919281701" },
-};
-
-const CLIENT_NAMES = {
-  "act_1324786597927962": "Raquel Odonto",
-  "act_1311713804053571": "Clínica Vital",
-  "act_728532149829958":  "Petland Campinas",
-  "act_1515794876111984": "Contabiliza Tech",
-  "act_2690757151096950": "English Sniper",
-  "act_1281304275983449": "Thayelli Registro de Marcas",
-  "act_456685107743703":  "Adriana Jimenez",
-  "act_379348482601330":  "Travi",
-  "act_1712273919281701": "Catapulta Boleto",
-  };
-
-function initials(name) {
-  if (!name) return '?';
-  const parts = name.trim().split(' ');
-  return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
-}
-
-function stageColor2(stage) {
-  const map = { 'novo': '#60a5fa', 'conversando': '#fbbf24', 'contato': '#fbbf24', 'agendou': '#a78bfa', 'compareceu': '#34d399', 'fechado': '#34d399', 'fechou': '#34d399', 'perdido': '#f87171', 'nresp': '#f87171', 'ncompareceu': '#f87171', 'proposta': '#a78bfa', 'nfechou': '#34d399' };
-  return map[stage] || '#7c6dfa';
-}
-
-function renderContatos() {
-  const q = (document.getElementById('contatos-search')?.value || '').toLowerCase();
-  const filterAct = typeof isAdmin !== 'undefined' && isAdmin ? (() => { const sel = document.getElementById('crm-client-select'); return sel && sel.value !== 'all' ? sel.value : null; })() : (typeof crmClientFilter !== 'undefined' ? crmClientFilter : null);
-  let leads = getLeads();
-  if (filterAct) leads = leads.filter(l => leadMatchesClient(l, filterAct));
-  try { leads = filterLeadsByCrmMonth(leads); } catch(e) { console.warn('Filtro mensal do CRM ignorado:', e); }
-  if (q) leads = leads.filter(l => (l.name||'').toLowerCase().includes(q) || (l.email||'').toLowerCase().includes(q) || (l.phone||'').includes(q));
-  leads.sort((a,b) => (a.name||'').localeCompare(b.name||''));
-
-  const list = document.getElementById('contatos-list');
-  const empty = document.getElementById('contatos-empty');
-  const count = document.getElementById('contatos-count');
-  if (!list) return;
-
-  count.textContent = leads.length + ' contato' + (leads.length !== 1 ? 's' : '');
-
-  if (leads.length === 0) { list.innerHTML = ''; empty.style.display = 'block'; return; }
-  empty.style.display = 'none';
-
-  const STAGES = typeof getStages === 'function' ? getStages(filterAct || '') : [];
-  list.innerHTML = leads.map(lead => {
-    const leadStages = typeof getStages === 'function' ? getStages(lead.act || filterAct || '') : STAGES;
-    const stageLabel = leadStages.find(s => s.id === lead.stage)?.label || STAGES.find(s => s.id === lead.stage)?.label || lead.stage || '';
-    const color = stageColor2(lead.stage);
-    const ini = initials(lead.name);
-    const waPhone = lead.phone ? lead.phone.replace(/\D/g,'') : '';
-    const waBtn = waPhone ? `<a href="https://wa.me/55${waPhone}" target="_blank" style="display:flex;align-items:center;gap:4px;font-size:12px;color:#25d366;text-decoration:none;padding:5px 10px;border:0.5px solid rgba(37,211,102,0.3);border-radius:6px;background:rgba(37,211,102,0.08);"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.112.554 4.094 1.523 5.812L.057 23.997l6.305-1.654A11.954 11.954 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.012-1.376l-.36-.214-3.733.979 1-3.647-.235-.374A9.818 9.818 0 0 1 2.182 12C2.182 6.58 6.58 2.182 12 2.182S21.818 6.58 21.818 12 17.42 21.818 12 21.818z"/></svg>WhatsApp</a>` : '';
-    return `<div style="display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);margin-bottom:8px;">
-      <div style="width:38px;height:38px;border-radius:50%;background:rgba(124,109,250,0.15);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:#7c6dfa;flex-shrink:0;">${ini}</div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:14px;font-weight:500;color:var(--text);margin-bottom:2px;">${lead.name}</div>
-        <div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${[lead.phone, lead.email].filter(Boolean).join(' · ') || '—'}</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-        ${waBtn}
-        <span style="font-size:11px;padding:3px 10px;border-radius:20px;font-weight:500;background:${color}22;color:${color};">${stageLabel}</span>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function renderAtendimento() {
-  const filterAct = typeof isAdmin !== 'undefined' && isAdmin ? (() => { const sel = document.getElementById('crm-client-select'); return sel && sel.value !== 'all' ? sel.value : null; })() : (typeof crmClientFilter !== 'undefined' ? crmClientFilter : null);
-  let leads = getLeads().filter(l => l.phone && (!filterAct || leadMatchesClient(l, filterAct)));
-  const list = document.getElementById('atendimento-leads-list');
-  const empty = document.getElementById('atendimento-empty');
-  if (!list) return;
-  if (leads.length === 0) { list.innerHTML = ''; empty.style.display = 'block'; return; }
-  empty.style.display = 'none';
-  list.innerHTML = leads.map(lead => {
-    const waPhone = lead.phone.replace(/\D/g,'');
-    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r2);">
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:500;color:var(--text);">${lead.name}</div>
-        <div style="font-size:12px;color:var(--muted);">${lead.phone}</div>
-      </div>
-      <a href="https://wa.me/55${waPhone}" target="_blank" style="display:flex;align-items:center;gap:5px;font-size:12px;color:#25d366;text-decoration:none;padding:6px 12px;border:0.5px solid rgba(37,211,102,0.3);border-radius:6px;background:rgba(37,211,102,0.08);">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.112.554 4.094 1.523 5.812L.057 23.997l6.305-1.654A11.954 11.954 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.012-1.376l-.36-.214-3.733.979 1-3.647-.235-.374A9.818 9.818 0 0 1 2.182 12C2.182 6.58 6.58 2.182 12 2.182S21.818 6.58 21.818 12 17.42 21.818 12 21.818z"/></svg>
-        Abrir conversa
-      </a>
-    </div>`;
-  }).join('');
-}
-
-function getActForStages() {
-  // Para admin: pegar do dropdown ou crmClientFilter
-  if (isAdmin) {
-    const sel = document.getElementById('crm-client-select');
-    const fromSel = sel && sel.value !== 'all' ? sel.value : null;
-    return fromSel || crmClientFilter || (activeClient ? activeClient.account : null);
-  }
-  return crmClientFilter || (activeClient ? activeClient.account : null);
-}
-
-function editStageLabel(stageId) {
-  const act = getActForStages();
-  if (!act) { alert('Selecione um cliente específico primeiro.'); return; }
-  const currentStages = getStages(act);
-  const stage = currentStages.find(s => s.id === stageId);
-  if (!stage) return;
-  const currentLabel = stage.label;
-  const newLabel = prompt('Novo nome para a coluna:', currentLabel);
-  if (newLabel === null) return; // cancelou
-  const trimmed = newLabel.trim();
-  if (!trimmed) return;
-  const updated = currentStages.map(s => s.id === stageId ? { ...s, label: trimmed } : s);
-  saveCustomStages(act, updated);
-  renderKanban();
-}
-
-function openStagesModal() {
-  const act = getActForStages();
-  if (!act) { alert('Selecione um cliente específico para gerenciar as colunas.'); return; }
-  const stages = getStages(act);
-  const list = document.getElementById('stages-list');
-  if (!list) return;
-  list.innerHTML = '';
-  stages.forEach((s) => {
-    const item = document.createElement('div');
-    item.className = 'stage-item';
-    item.dataset.stageid = s.id;
-    const inp = document.createElement('input');
-    inp.type = 'text';
-    inp.value = (s.label && !s.label.startsWith('col_') && !s.label.startsWith('stage_')) ? s.label : '';
-    inp.placeholder = 'Nome da coluna';
-    const del = document.createElement('button');
-    del.className = 'btn-del-stage';
-    del.textContent = '×';
-    del.title = 'Remover coluna';
-    del.onclick = () => item.remove();
-    item.appendChild(document.createTextNode('☰ '));
-    item.appendChild(inp);
-    item.appendChild(del);
-    list.appendChild(item);
-  });
-  const modal = document.getElementById('stages-modal');
-  if (!modal) return;
-  modal.style.display = 'flex';
-}
-
-function addCustomStageItem() {
-  const list = document.getElementById('stages-list');
-  if (!list) return;
-  const item = document.createElement('div');
-  item.className = 'stage-item';
-  const inp = document.createElement('input');
-  inp.type = 'text';
-  inp.value = '';
-  inp.placeholder = 'Nome da nova coluna';
-  const del = document.createElement('button');
-  del.className = 'btn-del-stage';
-  del.textContent = '×';
-  del.onclick = () => item.remove();
-  item.appendChild(document.createTextNode('☰ '));
-  item.appendChild(inp);
-  item.appendChild(del);
-  list.appendChild(item);
-  inp.focus();
-}
-
-function saveStagesFromModal() {
-  const act = getActForStages();
-  if (!act) return;
-  const items = document.querySelectorAll('#stages-list .stage-item');
-  const stages = [];
-  let newIdx = 0;
-  items.forEach((item, i) => {
-    const inp = item.querySelector('input');
-    const label = inp ? inp.value.trim() : '';
-    // Ignorar colunas sem label ou com label parecendo ID interno
-    if (!label || label.startsWith('col_') || label.startsWith('stage_')) return;
-    // Preservar ID original se existir, senão gerar novo para colunas novas
-    const existingId = item.dataset.stageid || item.dataset.stageId;
-    const id = existingId || ('col_new_' + newIdx + '_' + Date.now());
-    newIdx++;
-    stages.push({ id, label, cls: stageColor(i) });
-  });
-  if (stages.length < 1) { alert('Adicione pelo menos uma coluna.'); return; }
-  saveCustomStages(act, stages);
-  const modal = document.getElementById('stages-modal');
-  if (modal) modal.style.display = 'none';
-  renderKanban();
-}
-
-function togglePassVisibility() {
-  const input = document.getElementById('login-pass');
-  const eyeOn = document.getElementById('eye-icon');
-  const eyeOff = document.getElementById('eye-off-icon');
-  if (input.type === 'password') {
-    input.type = 'text';
-    eyeOn.style.display = 'none';
-    eyeOff.style.display = '';
-  } else {
-    input.type = 'password';
-    eyeOn.style.display = '';
-    eyeOff.style.display = 'none';
-  }
-}
-
-// doLogin handled by async version below
-
-
-document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && document.getElementById('login-overlay').style.display !== 'none') doLogin();
-});
-
-
-const STAGES_DEFAULT = [
-  { id: 'novo',      label: 'Novo lead',        cls: 'col-novo' },
-  { id: 'contato',   label: 'Em contato',       cls: 'col-contato' },
-  { id: 'proposta',  label: 'Proposta enviada', cls: 'col-proposta' },
-  { id: 'fechado',   label: 'Fechado',          cls: 'col-fechado' },
-  { id: 'perdido',   label: 'Perdido',          cls: 'col-perdido' },
-];
-
-const STAGES_CLINICA = [
-  { id: 'novo',         label: 'Novo lead',        cls: 'col-novo' },
-  { id: 'conversando',  label: 'Conversando',      cls: 'col-contato' },
-  { id: 'nresp',        label: 'Não respondeu',    cls: 'col-perdido' },
-  { id: 'agendou',      label: 'Agendou visita',   cls: 'col-proposta' },
-  { id: 'compareceu',   label: 'Compareceu',       cls: 'col-fechado' },
-  { id: 'ncompareceu',  label: 'Não compareceu',   cls: 'col-perdido' },
-  { id: 'fechou',       label: 'Fechou',           cls: 'col-fechado' },
-];
-
-const STAGES_ARTE_AZULEJO = [
-  { id: 'contato',  label: 'Em contato',    cls: 'col-novo' },
-  { id: 'nresp',    label: 'Não Respondeu', cls: 'col-contato' },
-  { id: 'fechou',   label: 'Fechou',        cls: 'col-proposta' },
-  { id: 'nfechou',  label: 'Não Fechou',    cls: 'col-fechado' },
-];
-
-function normalizeClientNameForStages(name) {
-  return String(name || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-    .toLowerCase();
-}
-
-function isArteAzulejoClient(act) {
-  return normalizeClientNameForStages(CLIENT_NAMES[act]) === 'arte em azulejo';
-}
-
-const CLINICA_ACTS = ['act_1324786597927962', 'act_1311713804053571', 'act_728532149829958', 'act_379348482601330', 'act_456685107743703', 'act_457365536961711'];
-
-function getArteStagesMigrationKey(act) {
-  return 'arte_stages_default_migrated_' + act;
-}
-
-function getStagesForArteAzulejo(act, custom) {
-  const migrationKey = getArteStagesMigrationKey(act);
-  const migrated = localStorage.getItem(migrationKey) === '1';
-  if (!migrated) {
-    try { localStorage.removeItem('custom_stages_' + act); } catch(e) {}
-    try { localStorage.setItem(migrationKey, '1'); } catch(e) {}
-    return STAGES_ARTE_AZULEJO;
-  }
-  return (custom && custom.length) ? custom : STAGES_ARTE_AZULEJO;
-}
-function getCustomStages(act) {
-  try {
-    const raw = localStorage.getItem('custom_stages_' + act);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-
-function saveCustomStages(act, stages) {
-  localStorage.setItem('custom_stages_' + act, JSON.stringify(stages));
-  if (isArteAzulejoClient(act)) localStorage.setItem(getArteStagesMigrationKey(act), '1');
-}
-
-function getStages(act) {
-  const custom = getCustomStages(act);
-  if (isArteAzulejoClient(act)) return getStagesForArteAzulejo(act, custom);
-  if (custom && custom.length) return custom;
-  return CLINICA_ACTS.includes(act) ? STAGES_CLINICA : STAGES_DEFAULT;
-}
-
-function isClinicaClient(act) {
-  return CLINICA_ACTS.includes(act);
-}
-
-const STAGE_COLORS = ['col-novo','col-contato','col-proposta','col-fechado','col-perdido'];
-function stageColor(idx) { return STAGE_COLORS[idx % STAGE_COLORS.length]; }
-
-const CRM_KEY = 'catapulta_crm_v1';
-function adrianaCampaignLabelFromLead(lead, rawSheet) {
-  const act = String(lead.act || rawSheet.act || rawSheet.account || rawSheet.conta || '').trim();
-  if (act !== 'act_456685107743703') return '';
-  const sourceText = [
-    lead.origem,
-    lead.campaignName,
-    lead.campanha,
-    lead.anuncio,
-    rawSheet.origem,
-    rawSheet.campaign_name,
-    rawSheet.campanha,
-    rawSheet.ad_name,
-    rawSheet.anuncio,
-    rawSheet.form_name,
-    rawSheet.formulario,
-    rawSheet.__huven_origin,
-    rawSheet.__huven_form_name
-  ].filter(Boolean).join(' ').toLowerCase();
-  if (sourceText.includes('cobertura') || sourceText.includes('asa norte') || sourceText.includes('asa_norte') || sourceText.includes('cobertura ia')) {
-    return 'Campanha Cobertura IA';
-  }
-  return 'Campanha imóveis Adriana';
-}
-
-function applyAdrianaCampaignOrigem(lead, rawSheet) {
-  const campaignLabel = adrianaCampaignLabelFromLead(lead, rawSheet || {});
-  if (!campaignLabel) return lead;
-  const social = lead.redeSocial || 'Instagram';
-  lead.origem = `${social} - ${campaignLabel}`;
-  return lead;
-}
-function normalizeImportedLeadFields(lead) {
-  if (!lead || typeof lead !== 'object') return lead;
-  const normalized = { ...lead };
-  normalized.obs = normalized.obs || normalized.observacoes || normalized.observacao || normalized['observações'] || '';
-  const rawSheet = normalized.sheet && normalized.sheet.raw ? normalized.sheet.raw : {};
-  const socialRaw = String(rawSheet.platform || rawSheet.plataforma || rawSheet.rede_social || normalized.platform || normalized.plataforma || normalized.rede_social || normalized.redeSocial || normalized.origem || '').trim();
-  const social = socialRaw.toLowerCase();
-  if (social.includes('insta') || social === 'ig') normalized.redeSocial = 'Instagram';
-  else if (social.includes('face') || social === 'fb' || social.includes('facebook') || social === 'meta') normalized.redeSocial = 'Facebook';
-  else if (social.includes('whats')) normalized.redeSocial = 'WhatsApp';
-  else if (social.includes('tiktok')) normalized.redeSocial = 'TikTok';
-  else if (social.includes('google')) normalized.redeSocial = 'Google';
-  else if (!normalized.redeSocial && socialRaw) normalized.redeSocial = socialRaw;
-  if (typeof applyAdrianaCampaignOrigem === 'function') applyAdrianaCampaignOrigem(normalized, rawSheet);
-  return normalized;
-}
-
-function normalizeImportedLeadsFields(leads) {
-  return Array.isArray(leads) ? leads.map(normalizeImportedLeadFields) : [];
-}
-
-let crmClientFilter = null;
-let dragCard = null;
-let dragCol = null;
-
-// Firebase-backed lead storage with localStorage cache
-let _leadsCache = null;
-
-async function getLeadsAsync() {
-  if (window._fbReady) {
-    try {
-      const leads = await window._fb.getLeads();
-      _leadsCache = normalizeImportedLeadsFields(leads);
-      return _leadsCache;
-    } catch(e) {
-      console.warn('Firebase error, using cache', e);
-      return normalizeImportedLeadsFields(_leadsCache || []);
-    }
-  }
-  return normalizeImportedLeadsFields(_leadsCache || []);
-}
-
-function getLeads() {
-  return normalizeImportedLeadsFields(_leadsCache || []);
-}
-
-function getLeadCrmSortTime(lead) {
-  const candidates = [
-    lead && lead._crmArrivalSeenAt,
-    lead && lead.arrivalAt,
-    lead && lead.updatedAt,
-    lead && lead.updated_at,
-    lead && lead.createdTime,
-    lead && lead.created_time,
-    lead && lead.createdAt,
-    lead && lead._createdAt,
-    lead && lead.timestamp,
-    lead && lead.chegada,
-    lead && lead.entrada,
-    lead && lead.data,
-    lead && lead.dataCriacao,
-    lead && lead.created_at
-  ];
-
-  for (const value of candidates) {
-    if (!value) continue;
-    if (typeof value === 'number' && isFinite(value)) return value;
-    let parsed;
-    try {
-      parsed = new Date(parseCrmDateToISO(value, ''));
-    } catch(e) {
-      parsed = new Date(value);
-    }
-    if (!isNaN(parsed.getTime())) return parsed.getTime();
-  }
-
-  const idMatch = String((lead && lead.id) || '').match(/(\d{10,})/);
-  return idMatch ? Number(idMatch[1]) : 0;
-}
-
-function sortCrmLeadsNewestFirst(leads) {
-  return (leads || [])
-    .map((lead, index) => ({ lead, index }))
-    .sort((a, b) => {
-      const diff = getLeadCrmSortTime(b.lead) - getLeadCrmSortTime(a.lead);
-      return diff || (b.index - a.index);
-    })
-    .map(item => item.lead);
-}
-
-function getLeadCrmOrder(lead) {
-  const order = Number(lead && lead._crmOrder);
-  return Number.isFinite(order) ? order : null;
-}
-
-function sortCrmLeadsForKanban(leads, boardAct) {
-  return sortCrmLeadsNewestFirst(leads).sort((a, b) => {
-    const stageA = getArteAzulejoStageForBoard(a, boardAct);
-    const stageB = getArteAzulejoStageForBoard(b, boardAct);
-    if (stageA !== stageB) return 0;
-    const orderA = getLeadCrmOrder(a);
-    const orderB = getLeadCrmOrder(b);
-    if (orderA !== null && orderB !== null) return orderA - orderB;
-    if (orderA !== null) return -1;
-    if (orderB !== null) return 1;
-    return 0;
-  });
-}
-
-async function saveLeadToDb(lead) {
-  if (window._fbReady) {
-    const docId = await window._fb.saveLead(lead);
-    lead._docId = docId;
-  }
-  if (_leadsCache) {
-    const idx = _leadsCache.findIndex(l => l.id === lead.id);
-    if (idx !== -1) _leadsCache[idx] = lead;
-    else _leadsCache.push(lead);
-  }
-}
-
-async function deleteLeadFromDb(id) {
-  const lead = (_leadsCache || []).find(l => l.id === id);
-  if (window._fbReady && lead && lead._docId) {
-    await window._fb.deleteLead(lead._docId);
-  }
-  _leadsCache = (_leadsCache || []).filter(l => l.id !== id);
-}
-
-function abrirContatos() {
-  // Esconder todas as views
-  document.querySelector('.topbar').style.display = 'none';
-  document.querySelector('.content').style.display = 'none';
-  const crmV = document.getElementById('crm-view'); if(crmV) crmV.style.display = 'none';
-  const contaV = document.getElementById('conta-view'); if(contaV) contaV.style.display = 'none';
-  const ajudaV = document.getElementById('ajuda-view'); if(ajudaV) ajudaV.style.display = 'none';
-  // Mostrar contatos
-  const contV = document.getElementById('contatos-view');
-  if (contV) { contV.style.display = 'block'; contV.style.visibility = 'visible'; contV.style.opacity = '1'; }
-  // Nav active
-  ['report','crm','ajuda','conta','contatos','integracoes'].forEach(v => {
-    const el = document.getElementById('nav-' + v);
-    if (el) el.classList.toggle('active', v === 'contatos');
-  });
-  // Carregar dados
-  if (!_leadsCache) { getLeadsAsync().then(() => renderContatos()); } else { renderContatos(); }
-}
-
-function abrirAtendimento() {
-  document.querySelector('.topbar').style.display = 'none';
-  document.querySelector('.content').style.display = 'none';
-  const crmV = document.getElementById('crm-view'); if(crmV) crmV.style.display = 'none';
-  const contaV = document.getElementById('conta-view'); if(contaV) contaV.style.display = 'none';
-  const contV = document.getElementById('contatos-view'); if(contV) contV.style.display = 'none';
-  const ajudaV = document.getElementById('ajuda-view'); if(ajudaV) ajudaV.style.display = 'none';
-}
-
-function switchView(view) {
-  ['report','crm','ajuda','conta','contatos','integracoes'].forEach(v => {
-    const el = document.getElementById('nav-' + v);
-    if (el) el.classList.toggle('active', v === view);
-  });
-  document.querySelector('.topbar').style.display = view === 'report' ? 'flex' : 'none';
-  document.querySelector('.content').style.display = view === 'report' ? 'block' : 'none';
-  document.getElementById('crm-view').style.display = view === 'crm' ? 'block' : 'none';
-  const ajudaView = document.getElementById('ajuda-view');
-  if (ajudaView) ajudaView.style.display = view === 'ajuda' ? 'block' : 'none';
-  document.getElementById('conta-view').style.display = view === 'conta' ? 'block' : 'none';
-  const contView = document.getElementById('contatos-view');
-  if (contView) contView.style.display = view === 'contatos' ? 'block' : 'none';
-  if (view === 'crm') {
-    if (!_leadsCache) {
-      getLeadsAsync().then(() => renderKanban());
-    } else {
-      renderKanban();
-    }
-  }
-  if (view === 'contatos') { if (!_leadsCache) { getLeadsAsync().then(() => renderContatos()); } else { renderContatos(); } }
-  if (view === 'atendimento') { if (!_leadsCache) { getLeadsAsync().then(() => renderAtendimento()); } else { renderAtendimento(); } }
-  if (view === 'conta') {
-    document.getElementById('pw-current').value = '';
-    document.getElementById('pw-new').value = '';
-    document.getElementById('pw-confirm').value = '';
-    document.getElementById('pw-error').style.display = 'none';
-    document.getElementById('pw-success').style.display = 'none';
-    if (isAdmin) renderAdminLogins();
-  }
-}
-
-function filterHelpCards(query) {
-  const term = (query || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-  const cards = Array.from(document.querySelectorAll('#ajuda-view .help-card'));
-  const empty = document.getElementById('help-empty');
-  let visible = 0;
-  cards.forEach(card => {
-    const text = card.textContent.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const match = !term || text.includes(term);
-    card.style.display = match ? '' : 'none';
-    if (match) visible += 1;
-  });
-  if (empty) empty.style.display = visible ? 'none' : 'block';
-}
-
-function getCurrentMonthKey() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function parseCrmDateToISO(value, fallbackIso) {
-  if (value === null || value === undefined || value === '') return fallbackIso || new Date().toISOString();
-
-  if (typeof value === 'number' && !isNaN(value)) {
-    return new Date((Math.floor(value - 25569)) * 86400 * 1000 + 12 * 60 * 60 * 1000).toISOString();
-  }
-
-  if (value instanceof Date && !isNaN(value.getTime())) {
-    return new Date(value.getFullYear(), value.getMonth(), value.getDate(), 12, 0, 0).toISOString();
-  }
-
-  const raw = String(value).trim();
-  const br = raw.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
-  if (br) {
-    const day = Number(br[1]);
-    const month = Number(br[2]);
-    let year = Number(br[3]);
-    if (year < 100) year += 2000;
-    if (day >= 1 && day <= 31 && month >= 1 && month <= 12) {
-      return new Date(year, month - 1, day, 12, 0, 0).toISOString();
-    }
-  }
-
-  const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (iso) {
-    return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]), 12, 0, 0).toISOString();
-  }
-
-  const parsed = new Date(raw);
-  return isNaN(parsed.getTime()) ? (fallbackIso || new Date().toISOString()) : parsed.toISOString();
-}
-function getLeadMonthKey(lead) {
-  if (!lead) return '';
-  const rawDate = lead.createdAt || lead.chegada || lead.entrada || lead.data || lead.dataCriacao || lead.created_at;
-  if (!rawDate) return '';
-  const d = new Date(parseCrmDateToISO(rawDate, ''));
-  if (isNaN(d.getTime())) return '';
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function formatCrmMonthLabel(monthKey) {
-  const [year, month] = String(monthKey || '').split('-').map(Number);
-  if (!year || !month) return monthKey || '';
-  const label = new Date(year, month - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-  return label.charAt(0).toUpperCase() + label.slice(1);
-}
-
-function leadDateInputValue(lead) {
-  if (!lead || !lead.createdAt) return new Date().toISOString().slice(0, 10);
-  const d = new Date(parseCrmDateToISO(lead.createdAt, ''));
-  return isNaN(d.getTime()) ? new Date().toISOString().slice(0, 10) : d.toISOString().slice(0, 10);
-}
-
-function createdAtFromDateInput(value, fallbackIso) {
-  return parseCrmDateToISO(value, fallbackIso || new Date().toISOString());
-}
-
-function getCrmBaseLeads(filterAct) {
-  let leads = getLeads();
-  if (filterAct) leads = leads.filter(l => leadMatchesClient(l, filterAct));
-  return leads;
-}
-
-function populateCrmMonthFilter(leads) {
-  const sel = document.getElementById('crm-month-filter');
-  if (!sel) return 'all';
-  const currentMonth = getCurrentMonthKey();
-  const previous = sel.dataset.ready === '1' ? (sel.value || currentMonth) : currentMonth;
-  const monthKeys = [...new Set((leads || []).map(getLeadMonthKey).filter(Boolean))];
-  if (!monthKeys.includes(currentMonth)) monthKeys.push(currentMonth);
-  monthKeys.sort().reverse();
-  sel.innerHTML = '<option value="all">Geral</option>' + monthKeys.map(key => {
-    const suffix = key === currentMonth ? ' (vigente)' : '';
-    return `<option value="${key}">${formatCrmMonthLabel(key)}${suffix}</option>`;
-  }).join('');
-  sel.value = [...monthKeys, 'all'].includes(previous) ? previous : currentMonth;
-  sel.dataset.ready = '1';
-  return sel.value;
-}
-
-function filterLeadsByCrmMonth(leads) {
-  const sel = document.getElementById('crm-month-filter');
-  const selected = sel ? sel.value : getCurrentMonthKey();
-  if (!selected || selected === 'all') return leads;
-  return (leads || []).filter(lead => getLeadMonthKey(lead) === selected);
-}
-
-function onCrmMonthChange() {
-  renderKanban();
-  if (typeof renderFunilChart === 'function') renderFunilChart();
-  if (typeof renderFunilEvolucao === 'function') renderFunilEvolucao();
-}
-window.onCrmMonthChange = onCrmMonthChange;
-function setupCrmForClient() {
-  if (isAdmin) {
-    const sel = document.getElementById('crm-client-select');
-    sel.style.display = 'block';
-    sel.innerHTML = '<option value="all">Todos os clientes</option>' +
-      getSidebarClientEntries().map(([act, name]) => `<option value="${escapeHtml(act)}">${escapeHtml(name)}</option>`).join('');
-    crmClientFilter = null;
-  } else {
-    crmClientFilter = activeClient ? activeClient.account : null;
-  }
-}
-
-function arrangeCrmMobileOrder() {
-  const crm = document.getElementById('crm-view');
-  const banner = document.getElementById('valor-fechado-banner');
-  const boardScroll = document.querySelector('#crm-view .crm-board-scroll');
-  const boardRange = document.getElementById('crm-board-scrollbar-wrap');
-  const distChart = document.getElementById('funil-chart-container');
-  const evolChart = document.getElementById('funil-evolucao-container');
-  if (!crm || !banner || !boardScroll || !boardRange || !distChart || !evolChart) return;
-  const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-  if (isMobile) {
-    crm.insertBefore(distChart, boardScroll);
-    crm.insertBefore(evolChart, boardScroll);
-    crm.insertBefore(boardRange, boardScroll.nextSibling);
-  } else {
-    crm.insertBefore(boardScroll, distChart);
-    crm.insertBefore(boardRange, distChart);
-  }
-}
-function adjustKanbanBoardScroll() {
-  const board = document.getElementById('kanban-board');
-  const boardScroll = board ? board.closest('.crm-board-scroll') : null;
-  const range = document.getElementById('crm-board-scrollbar');
-  const wrap = document.getElementById('crm-board-scrollbar-wrap');
-  if (!board || !boardScroll || !range || !wrap) return;
-  if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
-    board.style.width = '';
-    board.style.minWidth = '';
-    wrap.classList.remove('active');
-    return;
-  }
-  requestAnimationFrame(() => {
-    const cols = Array.from(board.querySelectorAll('.kanban-col'));
-    if (!cols.length) {
-      wrap.classList.remove('active');
-      return;
-    }
-    board.style.width = '';
-    board.style.minWidth = '';
-    const maxScroll = Math.max(0, boardScroll.scrollWidth - boardScroll.clientWidth);
-    range.max = String(maxScroll);
-    range.value = String(Math.min(boardScroll.scrollLeft, maxScroll));
-    wrap.classList.toggle('active', maxScroll > 2);
-    updateCrmScrollbarProgress();
-  });
-}
-function lockMobileKanbanColumnScroll() {
-  const board = document.getElementById('kanban-board');
-  if (!board) return;
-  const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-  const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  const columnHeight = Math.max(380, Math.min(560, Math.floor((viewportHeight || 700) * 0.62)));
-  board.querySelectorAll('.kanban-col').forEach(col => {
-    const cards = col.querySelector('.kanban-cards');
-    if (!cards) return;
-    if (!isMobile) {
-      col.style.height = '';
-      col.style.maxHeight = '';
-      col.style.overflow = '';
-      col.style.display = '';
-      col.style.gridTemplateRows = '';
-      cards.style.height = '';
-      cards.style.maxHeight = '';
-      cards.style.minHeight = '';
-      cards.style.overflowY = '';
-      cards.style.overflowX = '';
-      cards.style.webkitOverflowScrolling = '';
-      cards.style.touchAction = '';
-      return;
-    }
-    col.style.height = columnHeight + 'px';
-    col.style.maxHeight = columnHeight + 'px';
-    col.style.overflow = 'hidden';
-    col.style.display = 'grid';
-    col.style.gridTemplateRows = 'auto auto minmax(0, 1fr)';
-    cards.style.height = '100%';
-    cards.style.maxHeight = '100%';
-    cards.style.minHeight = '0';
-    cards.style.overflowY = 'scroll';
-    cards.style.overflowX = 'hidden';
-    cards.style.webkitOverflowScrolling = 'touch';
-    cards.style.touchAction = 'pan-y';
-  });
-}
-function updateCrmScrollbarProgress() {
-  const board = document.getElementById('kanban-board');
-  const boardScroll = board ? board.closest('.crm-board-scroll') : null;
-  const range = document.getElementById('crm-board-scrollbar');
-  if (!boardScroll || !range) return;
-  const max = Number(range.max || 0);
-  const value = Math.min(boardScroll.scrollLeft, max);
-  if (Math.abs(Number(range.value || 0) - value) > 1) range.value = String(value);
-  const progress = max > 0 ? (value / max) * 100 : 0;
-  range.style.setProperty('--scroll-progress', progress + '%');
-}
-function bindCrmBoardScrollbar() {
-  const board = document.getElementById('kanban-board');
-  const boardScroll = board ? board.closest('.crm-board-scroll') : null;
-  const range = document.getElementById('crm-board-scrollbar');
-  if (!boardScroll || !range || range.dataset.bound === '1') return;
-  range.dataset.bound = '1';
-  range.addEventListener('input', () => {
-    boardScroll.scrollLeft = Number(range.value || 0);
-    updateCrmScrollbarProgress();
-  });
-  boardScroll.addEventListener('scroll', updateCrmScrollbarProgress, { passive: true });
-  window.addEventListener('resize', () => { arrangeCrmMobileOrder(); adjustKanbanBoardScroll(); lockMobileKanbanColumnScroll(); });
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', lockMobileKanbanColumnScroll);
-  }
-  window.addEventListener('orientationchange', () => setTimeout(lockMobileKanbanColumnScroll, 250));
-}
-function renderKanban() {
-  const sel = document.getElementById('crm-client-select');
-  const fromSel = sel && sel.value !== 'all' ? sel.value : null;
-  const filterAct = isAdmin ? (fromSel || crmClientFilter) : crmClientFilter;
-  let leads = getLeads();
-  if (filterAct) leads = leads.filter(l => leadMatchesClient(l, filterAct));
-  try {
-    populateCrmMonthFilter(leads);
-    leads = filterLeadsByCrmMonth(leads);
-  } catch (e) {
-    console.warn('Filtro mensal do CRM ignorado:', e);
-  }
-  leads = sortCrmLeadsForKanban(leads, filterAct);
-
-  let STAGES = getStages(filterAct || (activeClient ? activeClient.account : ''));
-  if (!Array.isArray(STAGES) || !STAGES.length) STAGES = STAGES_DEFAULT;
-
-  // Update CRM title
-  const title = document.getElementById('crm-title');
-  const subtitle = document.getElementById('crm-subtitle');
-  if (filterAct && CLIENT_NAMES[filterAct]) {
-    if (title) title.textContent = CLIENT_NAMES[filterAct];
-    if (subtitle) subtitle.textContent = 'CRM de leads';
-  } else if (!filterAct && isAdmin) {
-    if (title) title.textContent = 'CRM de Leads';
-    if (subtitle) subtitle.textContent = 'Todos os clientes';
-  }
-
-  const board = document.getElementById('kanban-board');
-  const boardScroll = board ? board.closest('.crm-board-scroll') : null;
-  if (boardScroll) boardScroll.classList.toggle('force-horizontal', isArteAzulejoClient(filterAct || (activeClient ? activeClient.account : '')));
-  board.innerHTML = '';
-  buildCrmChart(leads, STAGES);
-
-  // Calcular faturamento: soma todos os leads em fechou/fechado com valor
-  let totalFechado = 0;
-  let qtdFechado = 0;
-  leads.forEach(l => {
-    if (['fechado','fechou'].includes(getArteAzulejoStageForBoard(l, filterAct)) && l.valor) {
-      const raw = String(l.valor).replace(/[^0-9,.]/g,'').replace(',','.');
-      const val = parseFloat(raw);
-      if (!isNaN(val) && val > 0) {
-        totalFechado += val;
-        qtdFechado++;
-      }
-    }
-  });
-  const banner = document.getElementById('valor-fechado-banner');
-  if (banner) {
-    banner.style.display = 'flex';
-    document.getElementById('valor-fechado-total').textContent = 'R$ ' + totalFechado.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
-    document.getElementById('valor-fechado-qtd').textContent = qtdFechado > 0 ? '(' + qtdFechado + ' fechamento' + (qtdFechado > 1 ? 's' : '') + ')' : '';
-  }
-
-
-
-  STAGES.forEach(stage => {
-    const stageLeads = leads.filter(l => getArteAzulejoStageForBoard(l, filterAct) === stage.id);
-    const col = document.createElement('div');
-    col.className = `kanban-col ${stage.cls}`;
-    col.dataset.stage = stage.id;
-
-    // Header com drag para reordenar coluna
-    const header = document.createElement('div');
-    header.className = 'kanban-col-header';
-    header.style.cursor = 'grab';
-    header.title = 'Arraste para reordenar';
-    const headerLeft = document.createElement('div');
-    headerLeft.style.cssText = 'display:flex;align-items:center;gap:4px;flex:1;';
-    const titleDiv = document.createElement('div');
-    titleDiv.className = 'kanban-col-title';
-    titleDiv.id = 'col-title-' + stage.id;
-    titleDiv.textContent = stage.label;
-    const editBtn = document.createElement('button');
-    editBtn.title = 'Renomear coluna';
-    editBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>';
-    editBtn.style.cssText = 'background:none;border:none;cursor:pointer;color:var(--muted);padding:2px 4px;opacity:0;transition:opacity 0.15s,color 0.15s;';
-    col.addEventListener('mouseenter', () => editBtn.style.opacity = '1');
-    col.addEventListener('mouseleave', () => editBtn.style.opacity = '0');
-    editBtn.onmouseover = () => editBtn.style.color = 'var(--accent2)';
-    editBtn.onmouseout = () => editBtn.style.color = 'var(--muted)';
-    editBtn.addEventListener('click', (e) => { e.stopPropagation(); editStageLabel(stage.id); });
-    const countSpan = document.createElement('span');
-    countSpan.className = 'kanban-col-count';
-    countSpan.textContent = stageLeads.length;
-    headerLeft.appendChild(titleDiv);
-    headerLeft.appendChild(editBtn);
-    header.appendChild(headerLeft);
-    header.appendChild(countSpan);
-    col.appendChild(header);
-
-    // Drag coluna
-    col.draggable = true;
-    col.dataset.stageid = stage.id;
-    col.addEventListener('dragstart', (e) => {
-      if (e.target.closest('.kanban-card')) return;
-      dragCol = stage.id;
-      col.style.opacity = '0.5';
-      e.dataTransfer.effectAllowed = 'move';
-    });
-    col.addEventListener('dragend', () => {
-      dragCol = null;
-      col.style.opacity = '1';
-    });
-    col.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      if (dragCol && dragCol !== stage.id) col.style.borderColor = 'var(--accent)';
-      else if (!dragCol) col.classList.add('drag-over');
-    });
-    col.addEventListener('dragleave', () => {
-      col.style.borderColor = '';
-      col.classList.remove('drag-over');
-    });
-    col.addEventListener('drop', (e) => {
-      e.preventDefault();
-      col.style.borderColor = '';
-      col.classList.remove('drag-over');
-      if (dragCol && dragCol !== stage.id) {
-        const act = getActForStages();
-        if (!act) return;
-        const stages = getStages(act);
-        const fromIdx = stages.findIndex(s => s.id === dragCol);
-        const toIdx = stages.findIndex(s => s.id === stage.id);
-        if (fromIdx === -1 || toIdx === -1) return;
-        const reordered = [...stages];
-        const [moved] = reordered.splice(fromIdx, 1);
-        reordered.splice(toIdx, 0, moved);
-        saveCustomStages(act, reordered);
-        dragCol = null;
-        renderKanban();
-      } else {
-        dropCard(stage.id);
-      }
-    });
-
-    // Lupinha de busca na coluna
-    const searchWrap = document.createElement('div');
-    searchWrap.className = 'col-search-wrap';
-    searchWrap.innerHTML = `
-      <svg class="col-search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-      <input class="col-search-input" placeholder="Buscar..." oninput="filtrarColuna('${stage.id}', this.value)">`;
-    col.appendChild(searchWrap);
-
-    // Cards container
-    const cardsDiv = document.createElement('div');
-    cardsDiv.className = 'kanban-cards';
-    cardsDiv.id = 'col-' + stage.id;
-
-    function renderColCards(filterText) {
-      cardsDiv.innerHTML = '';
-      const filteredLeads = filterText
-        ? stageLeads.filter(l =>
-            (l.name||'').toLowerCase().includes(filterText) ||
-            (l.phone||'').includes(filterText) ||
-            (l.email||'').toLowerCase().includes(filterText))
-        : stageLeads;
-      if (filteredLeads.length === 0) {
-        const empty = document.createElement('div');
-        empty.style.cssText = 'font-size:12px;color:var(--muted);text-align:center;padding:12px 0;';
-        empty.textContent = filterText ? 'Nenhum resultado' : 'Nenhum lead';
-        cardsDiv.appendChild(empty);
-      }
-      filteredLeads.forEach(lead => {
-      const card = document.createElement('div');
-      card.className = 'kanban-card';
-      card.draggable = true;
-      card.dataset.id = lead.id;
-      card.addEventListener('dragstart', onDragStart);
-      card.addEventListener('dragend', onDragEnd);
-      card.addEventListener('dragover', handleCardDragOver);
-      card.addEventListener('dragleave', handleCardDragLeave);
-      card.addEventListener('drop', handleCardDrop);
-      let cardHTML = '';
-      const safeLeadId = escapeJsString(lead.id);
-      if (lead.origem) cardHTML += `<div class="card-origem">📍 ${escapeHtml(limitText(lead.origem, 160))}</div>`;
-      if (lead.redeSocial) cardHTML += `<div class="card-rede">📱 ${escapeHtml(limitText(lead.redeSocial, 80))}</div>`;
-      cardHTML += `<div class="card-name">${escapeHtml(limitText(lead.name || 'Lead sem nome', 120))}</div>`;
-      cardHTML += `<div class="card-phone">${escapeHtml(lead.phone || '—')}</div>`;
-      cardHTML += `<div class="card-email">${escapeHtml(lead.email || '—')}</div>`;
-      if (lead.obs) cardHTML += renderLeadObservationHtml(lead.obs);
-      if (lead.valor) cardHTML += `<div class="card-valor">💰 R$ ${escapeHtml(limitText(lead.valor, 40))}</div>`;
-      if (lead.proximaAcao) cardHTML += `<div class="card-proxima">⏰ ${escapeHtml(limitText(lead.proximaAcao, 120))}${lead.proximaData ? ' · ' + new Date(lead.proximaData + 'T12:00:00').toLocaleDateString('pt-BR') : ''}</div>`;
-      if (lead.createdAt) cardHTML += `<div style="font-size:10px;color:var(--muted);margin-top:4px;">Entrada: ${escapeHtml(new Date(lead.createdAt).toLocaleDateString('pt-BR'))}</div>`;
-      const waPhone = onlyDigits(lead.phone);
-      const waLink = waPhone ? `https://wa.me/55${waPhone}` : '';
-      cardHTML += `<div class="card-actions">
-        <button class="card-btn" onclick="editLead('${safeLeadId}')">Editar</button>
-        <button class="card-btn" onclick="openMoveModal('${safeLeadId}')">Mover</button>
-        <button class="card-btn" onclick="showHistory('${safeLeadId}')">Hist.</button>
-        ${waLink ? (lead.whatsappFirstMessageAt
-          ? `<button class="card-btn card-btn-whatsapp" onclick="window.open('${waLink}','_blank')" title="Abrir WhatsApp"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.112.554 4.094 1.523 5.812L.057 23.997l6.305-1.654A11.954 11.954 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.012-1.376l-.36-.214-3.733.979 1-3.647-.235-.374A9.818 9.818 0 0 1 2.182 12C2.182 6.58 6.58 2.182 12 2.182S21.818 6.58 21.818 12 17.42 21.818 12 21.818z"/></svg></button>`
-          : `<button class="card-btn card-btn-first-msg" onclick="openFirstWhatsAppMessage('${lead.id}')" title="Enviar primeira mensagem no WhatsApp"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.112.554 4.094 1.523 5.812L.057 23.997l6.305-1.654A11.954 11.954 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.012-1.376l-.36-.214-3.733.979 1-3.647-.235-.374A9.818 9.818 0 0 1 2.182 12C2.182 6.58 6.58 2.182 12 2.182S21.818 6.58 21.818 12 17.42 21.818 12 21.818z"/></svg><span>1ª msg</span></button>`)
-        : ''}
-        <button class="card-btn del" onclick="deleteLead('${safeLeadId}')">✕</button>
-      </div>`;
-      cardHTML = cardHTML.replace(`openFirstWhatsAppMessage('${lead.id}')`, `openFirstWhatsAppMessage('${safeLeadId}')`);
-      card.innerHTML = cardHTML;
-      cardsDiv.appendChild(card);
-    });
-    } // fim renderColCards
-    renderColCards('');
-    col.appendChild(cardsDiv);
-
-    board.appendChild(col);
-  });
-  arrangeCrmMobileOrder();
-  bindCrmBoardScrollbar();
-  adjustKanbanBoardScroll();
-  lockMobileKanbanColumnScroll();
-}
-
-function onDragStart(e) {
-  if (dragCol) return;
-  dragCard = e.currentTarget.dataset.id;
-  e.currentTarget.classList.add('dragging');
-  e.stopPropagation();
-}
-function onDragEnd(e) { e.currentTarget.classList.remove('dragging'); dragCard = null; }
-
-function dropCard(stageId) {
-  if (!dragCard) return;
-  const leads = getLeads();
-  const idx = leads.findIndex(l => l.id === dragCard);
-  if (idx !== -1 && leads[idx].stage !== stageId) {
-    const STAGES = getStages(leads[idx].act);
-    const stageLabel = STAGES.find(s => s.id === stageId)?.label || stageId;
-    leads[idx].stage = stageId;
-    leads[idx].updatedAt = new Date().toISOString();
-    if (!leads[idx].history) leads[idx].history = [];
-    leads[idx].history.push({ stage: stageLabel, at: new Date().toLocaleString('pt-BR') });
-    saveLeadToDb(leads[idx]);
-  }
-  renderKanban();
-}
-
-function openLeadModal() {
-  const act = crmClientFilter || (activeClient ? activeClient.account : '');
-  const clinica = isClinicaClient(act);
-  document.getElementById('lead-id').value = '';
-  document.getElementById('lead-name').value = '';
-  document.getElementById('lead-phone').value = '';
-  document.getElementById('lead-email').value = '';
-  document.getElementById('lead-created-at').value = new Date().toISOString().slice(0, 10);
-  document.getElementById('lead-plantao').value = '';
-  document.getElementById('lead-valor').value = '';
-  document.getElementById('lead-stage').value = 'novo';
-  document.getElementById('lead-origem').value = '';
-  document.getElementById('lead-rede-social').value = '';
-  document.getElementById('lead-obs').value = '';
-  document.getElementById('lead-motivo').value = '';
-  document.getElementById('lead-proxima-acao').value = '';
-  document.getElementById('lead-proxima-data').value = '';
-  document.getElementById('modal-title').textContent = 'Novo lead';
-  document.getElementById('field-plantao').style.display = clinica ? 'block' : 'none';
-  document.getElementById('field-valor').style.display = 'block';
-  document.getElementById('field-motivo-perda').style.display = 'none';
-  // update stage options
-  const stageSelect = document.getElementById('lead-stage');
-  const stages = act ? getStages(act) : (clinica ? STAGES_CLINICA : STAGES_DEFAULT);
-  stageSelect.innerHTML = stages.map(s => `<option value="${s.id}">${s.label}</option>`).join('');
-  document.getElementById('lead-stage').addEventListener('change', function() {
-    const isPerdido = ['perdido','ncompareceu'].includes(this.value);
-    document.getElementById('field-motivo-perda').style.display = isPerdido ? 'block' : 'none';
-  });
-  document.getElementById('lead-modal').classList.add('open');
-}
-
-function editLead(id) {
-  let lead = getLeads().find(l => l.id === id);
-  if (!lead) return;
-  const clinica = isClinicaClient(lead.act);
-  document.getElementById('lead-id').value = lead.id;
-  document.getElementById('lead-name').value = lead.name;
-  document.getElementById('lead-phone').value = lead.phone || '';
-  document.getElementById('lead-email').value = lead.email || '';
-  document.getElementById('lead-created-at').value = leadDateInputValue(lead);
-  document.getElementById('lead-plantao').value = lead.plantao || '';
-  document.getElementById('lead-valor').value = lead.valor || '';
-  document.getElementById('lead-origem').value = lead.origem || '';
-  lead = normalizeImportedLeadFields(lead);
-  document.getElementById('lead-rede-social').value = lead.redeSocial || '';
-  document.getElementById('lead-obs').value = lead.obs || '';
-  document.getElementById('lead-motivo').value = lead.motivo || '';
-  document.getElementById('lead-proxima-acao').value = lead.proximaAcao || '';
-  document.getElementById('lead-proxima-data').value = lead.proximaData || '';
-  document.getElementById('field-plantao').style.display = clinica ? 'block' : 'none';
-  document.getElementById('field-valor').style.display = 'block';
-  document.getElementById('field-motivo-perda').style.display = (lead.stage === 'perdido' || lead.stage === 'ncompareceu') ? 'block' : 'none';
-  const stageSelect = document.getElementById('lead-stage');
-  const stages = (lead && lead.act) ? getStages(lead.act) : (clinica ? STAGES_CLINICA : STAGES_DEFAULT);
-  stageSelect.innerHTML = stages.map(s => `<option value="${s.id}">${s.label}</option>`).join('');
-  stageSelect.value = getArteAzulejoStageForBoard(lead, lead.act);
-  document.getElementById('modal-title').textContent = 'Editar lead';
-  document.getElementById('lead-modal').classList.add('open');
-}
-
-function closeLeadModal() { document.getElementById('lead-modal').classList.remove('open'); }
-
-async function saveLead() {
-  const name = document.getElementById('lead-name').value.trim();
-  if (!name) { alert('Informe o nome do lead.'); return; }
-  const id = document.getElementById('lead-id').value || Date.now().toString();
-  const allLeads = getLeads();
-  const existing = allLeads.find(l => l.id === id);
-  const newStage = document.getElementById('lead-stage').value;
-  const act = existing ? existing.act : (crmClientFilter || (isAdmin && document.getElementById('crm-client-select').value !== 'all'
-    ? document.getElementById('crm-client-select').value
-    : (activeClient ? activeClient.account : 'geral')));
-
-  const STAGES = getStages(act);
-  const stageLabel = STAGES.find(s => s.id === newStage)?.label || newStage;
-  const history = existing ? (existing.history || []) : [];
-  if (!existing) {
-    history.push({ stage: stageLabel, at: new Date().toLocaleString('pt-BR') });
-  } else if (existing.stage !== newStage) {
-    history.push({ stage: stageLabel, at: new Date().toLocaleString('pt-BR') });
-  }
-
-  const leads = allLeads.filter(l => l.id !== id);
-  const newLead = {
-    id, name,
-    phone: document.getElementById('lead-phone').value.trim(),
-    email: document.getElementById('lead-email').value.trim(),
-    plantao: document.getElementById('lead-plantao').value,
-    valor: document.getElementById('lead-valor').value.trim(),
-    origem: document.getElementById('lead-origem').value.trim(),
-    redeSocial: document.getElementById('lead-rede-social').value,
-    obs: document.getElementById('lead-obs').value.trim(),
-    motivo: document.getElementById('lead-motivo').value.trim(),
-    proximaAcao: document.getElementById('lead-proxima-acao').value.trim(),
-    proximaData: document.getElementById('lead-proxima-data').value,
-    stage: newStage,
-    act, history,
-    createdAt: createdAtFromDateInput(document.getElementById('lead-created-at') ? document.getElementById('lead-created-at').value : '', existing ? existing.createdAt : null),
-    updatedAt: new Date().toISOString(),
-    _docId: existing ? (existing._docId || null) : null
-  };
-  if (_leadsCache) {
-    const idx = _leadsCache.findIndex(l => l.id === id);
-    if (idx !== -1) _leadsCache[idx] = newLead; else _leadsCache.push(newLead);
-  }
-  saveLeadToDb(newLead);
-  closeLeadModal();
-  renderKanban();
-}
-
-async function deleteLead(id) {
-  if (!await showConfirm('Esta ação não pode ser desfeita.', 'Remover lead?', 'Remover')) return;
-  await deleteLeadFromDb(id);
-  renderKanban();
-}
-
-
-function normalizeWhatsAppPhone(phone) {
-  let digits = String(phone || '').replace(/\D/g, '');
-  if (!digits) return '';
-  if (digits.startsWith('00')) digits = digits.slice(2);
-  if (!digits.startsWith('55')) digits = '55' + digits;
-  return digits;
-}
-
-function buildFirstWhatsAppMessage(lead) {
-  const firstName = String(lead.name || '').trim().split(/\s+/)[0] || 'tudo bem';
-  const rede = String(lead.redeSocial || '').trim();
-  const source = rede ? ` Vi que você veio pelo ${rede}.` : '';
-  return `Olá ${firstName}, tudo bem? Recebemos seu cadastro e vou te ajudar com as informações por aqui.${source}`;
-}
-
-function openFirstWhatsAppMessage(id) {
-  const leads = getLeads();
-  const lead = leads.find(l => l.id === id);
-  if (!lead) return;
-  const phone = normalizeWhatsAppPhone(lead.phone);
-  if (!phone) {
-    alert('Esse lead ainda não tem telefone cadastrado.');
-    return;
-  }
-  const message = buildFirstWhatsAppMessage(lead);
-  const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-
-  const alreadySentFirstMessage = !!lead.whatsappFirstMessageAt;
-  if (!alreadySentFirstMessage) {
-    lead.whatsappFirstMessageAt = new Date().toISOString();
-    if (!lead.history) lead.history = [];
-    lead.history.push({ stage: '1ª mensagem enviada', at: new Date().toLocaleString('pt-BR') });
-  }
-  if (_leadsCache) {
-    const cacheIdx = _leadsCache.findIndex(l => l.id === id);
-    if (cacheIdx !== -1) _leadsCache[cacheIdx] = { ..._leadsCache[cacheIdx], ...lead };
-  }
-  saveLeadToDb(lead);
-  renderKanban();
-  window.open(url, '_blank');
-}
-window.openFirstWhatsAppMessage = openFirstWhatsAppMessage;
-
-function showHistory(id) {
-  const lead = getLeads().find(l => l.id === id);
-  if (!lead) return;
-  const history = lead.history || [];
-  const content = document.getElementById('history-content');
-  if (!history.length) {
-    content.innerHTML = '<div style="font-size:13px;color:var(--muted);text-align:center;padding:20px 0;">Nenhuma movimentação registrada</div>';
-  } else {
-    content.innerHTML = history.map((h, i) => `
-      <div style="display:flex;align-items:flex-start;gap:10px;">
-        <div style="display:flex;flex-direction:column;align-items:center;gap:0;">
-          <div style="width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:4px;"></div>
-          ${i < history.length - 1 ? '<div style="width:1px;flex:1;background:var(--border2);margin:3px 0;min-height:20px;"></div>' : ''}
-        </div>
-        <div>
-          <div style="font-size:13px;font-weight:500;color:var(--text);">${h.stage}</div>
-          <div style="font-size:11px;color:var(--muted);font-family:JetBrains Mono,monospace;">${h.at}</div>
-        </div>
-      </div>`).join('');
-  }
-  document.getElementById('history-modal').classList.add('open');
-}
-
-
-function openMoveModal(id) {
-  const lead = getLeads().find(l => l.id === id);
-  if (!lead) return;
-  const STAGES = getStages(lead.act);
-  document.getElementById('move-lead-id').value = id;
-  document.getElementById('move-lead-name').textContent = lead.name;
-
-  const stageColors = {
-    'novo': '#60a5fa', 'conversando': '#fbbf24', 'nresp': '#f87171',
-    'agendou': '#a78bfa', 'compareceu': '#34d399', 'ncompareceu': '#f87171',
-    'fechou': '#34d399', 'contato': '#fbbf24', 'proposta': '#a78bfa',
-    'fechado': '#34d399', 'perdido': '#f87171', 'nfechou': '#34d399'
-  };
-
-  const opts = document.getElementById('move-stage-options');
-  opts.innerHTML = STAGES.map(s => `
-    <button class="move-stage-btn ${lead.stage === s.id ? 'current' : ''}" onclick="moveLeadTo('${id}','${s.id}')">
-      <div class="move-stage-dot" style="background:${stageColors[s.id] || 'var(--accent)'}"></div>
-      ${s.label}
-      ${lead.stage === s.id ? '<span style="margin-left:auto;font-size:11px;color:var(--accent2);">atual</span>' : ''}
-    </button>`).join('');
-
-  document.getElementById('move-modal').classList.add('open');
-}
-
-function moveLeadTo(id, stageId) {
-  const leads = getLeads();
-  const idx = leads.findIndex(l => l.id === id);
-  if (idx !== -1 && leads[idx].stage !== stageId) {
-    const STAGES = getStages(leads[idx].act);
-    const stageLabel = STAGES.find(s => s.id === stageId)?.label || stageId;
-    leads[idx].stage = stageId;
-    if (!leads[idx].history) leads[idx].history = [];
-    leads[idx].history.push({ stage: stageLabel, at: new Date().toLocaleString('pt-BR') });
-    saveLeadToDb(leads[idx]);
-  }
-  document.getElementById('move-modal').classList.remove('open');
-  renderKanban();
-}
-
-
-function setMobileNav(view) {
-  ['report','crm','ajuda','conta','integracoes','cfg'].forEach(v => {
-    const el = document.getElementById('mnav-' + v);
-    if (el) el.classList.toggle('active', v === view);
-  });
-  const isReport = view === 'report';
-  const mf = document.getElementById('mobile-filters');
-  if (mf) mf.style.display = isReport ? 'flex' : 'none';
-}
-
-function loadDataMobile() {
-  const from = document.getElementById('mobile-date-from').value;
-  const to = document.getElementById('mobile-date-to').value;
-  if (from) document.getElementById('date-from').value = from;
-  if (to) document.getElementById('date-to').value = to;
-  loadData();
-}
-
-function updateMobileHeader() {
-  const t = document.getElementById('mobile-title');
-  const s = document.getElementById('mobile-sub');
-  if (isAdmin) {
-    // Admin: mostrar select de cliente
-    const mobileSel = document.getElementById('mobile-client-select');
-    if (mobileSel) {
-      mobileSel.style.display = 'block';
-      if (!mobileSel.children.length || mobileSel.children.length === 1) {
-        mobileSel.innerHTML = '<option value="">Selecione um cliente</option>' +
-          getSidebarClientEntries().map(([act, name]) =>
-            `<option value="${escapeHtml(act)}">${escapeHtml(name)}</option>`
-          ).join('');
-      }
-      if (activeClient && activeClient.account) {
-        mobileSel.value = activeClient.account;
-        if (t) t.textContent = activeClient.name;
-        if (s) s.textContent = activeClient.account;
-      } else {
-        if (t) t.textContent = 'Admin';
-        if (s) s.textContent = 'Selecione um cliente';
-      }
-    }
-  } else {
-    if (!activeClient) return;
-    if (t) t.textContent = activeClient.name;
-    if (s) s.textContent = activeClient.account;
-  }
-}
-
-// Sync mobile dates with desktop
-window.addEventListener('DOMContentLoaded', () => {
-  const mFrom = document.getElementById('mobile-date-from');
-  const mTo = document.getElementById('mobile-date-to');
-  const dFrom = document.getElementById('date-from');
-  const dTo = document.getElementById('date-to');
-  if (mFrom && dFrom) mFrom.value = dFrom.value;
-  if (mTo && dTo) mTo.value = dTo.value;
-});
-
-
-let crmChart = null;
-let crmChartType = 'bar';
-
-const STAGE_COLORS = {
-  'novo':        '#60a5fa',
-  'conversando': '#fbbf24',
-  'nresp':       '#f87171',
-  'agendou':     '#a78bfa',
-  'compareceu':  '#34d399',
-  'ncompareceu': '#ef4444',
-  'fechou':      '#34d399',
-  'contato':     '#fbbf24',
-  'proposta':    '#a78bfa',
-  'fechado':     '#34d399',
-  'perdido':     '#f87171',
-};
-
-function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, ch => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  }[ch]));
-}
-
-function escapeJsString(value) {
-  return String(value ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, ' ');
-}
-
-function onlyDigits(value) {
-  return String(value || '').replace(/\D/g, '');
-}
-
-function limitText(value, max = 600) {
-  const text = String(value ?? '').trim();
-  return text.length > max ? text.slice(0, max) + '...' : text;
-}
-
-function formatLeadObservationText(text, max = 420) {
-  let value = String(text || '').trim();
-  if (!value) return '';
-  value = value
-    .replace(/_{2,}/g, ' ')
-    .replace(/_/g, ' ')
-    .replace(/\s+/g, ' ')
-    .replace(/\s+([?.!,;:])/g, '$1')
-    .trim();
-  value = value.replace(/\.\s+(?=[A-Za-zÀ-ÿ0-9])/g, '.\n');
-  return limitText(value, max);
-}
-
-function renderLeadObservationHtml(text) {
-  const formatted = formatLeadObservationText(text);
-  if (!formatted) return '';
-  return `<div class="card-obs"><div class="card-obs-label">💬 Observações</div><div class="card-obs-text">${escapeHtml(formatted)}</div></div>`;
-}
-
-function buildCrmChart(leads, stages) {
-  const ctx = document.getElementById('crm-chart');
-  if (!ctx) return;
-
-  const labels = stages.map(s => s.label);
-  const values = stages.map(s => leads.filter(l => l.stage === s.id).length);
-  const colors = stages.map(s => STAGE_COLORS[s.id] || '#7c6dfa');
-  const bgColors = colors.map(col => col + '99');
-
-  if (crmChart) crmChart.destroy();
-
-  const isBar = crmChartType === 'bar';
-
-  crmChart = new Chart(ctx, {
-    type: crmChartType,
-    data: {
-      labels,
-      datasets: [{
-        label: 'Leads',
-        data: values,
-        backgroundColor: isBar ? bgColors : colors,
-        borderColor: colors,
-        borderWidth: isBar ? 0 : 2,
-        borderRadius: isBar ? 8 : 0,
-        hoverOffset: isBar ? 0 : 8,
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          display: !isBar,
-          position: 'right',
-          labels: {
-            color: '#8888aa',
-            font: { family: 'Inter', size: 11 },
-            boxWidth: 10, boxHeight: 10,
-            padding: 12,
-          }
-        },
-        tooltip: {
-          backgroundColor: '#1e1e35',
-          borderColor: 'rgba(120,120,255,0.2)',
-          borderWidth: 1,
-          titleColor: '#8888aa',
-          bodyColor: '#e8e8f0',
-          titleFont: { family: 'Inter', size: 11 },
-          bodyFont: { family: 'JetBrains Mono', size: 13 },
-          padding: 12,
-          callbacks: {
-            label: ctx => {
-              const total = ctx.dataset.data.reduce((a,b) => a+b, 0);
-              const pct = total ? Math.round(ctx.parsed * 100 / total) : 0;
-              return isBar
-                ? '  ' + ctx.parsed.y + ' leads'
-                : '  ' + ctx.parsed + ' leads (' + pct + '%)';
-            }
-          }
-        }
-      },
-      scales: isBar ? {
-        x: {
-          grid: { color: 'rgba(120,120,255,0.06)', drawBorder: false },
-          ticks: { color: '#5a5a7a', font: { family: 'Inter', size: 10 }, maxRotation: 30 },
-          border: { display: false }
-        },
-        y: {
-          grid: { color: 'rgba(120,120,255,0.06)', drawBorder: false },
-          ticks: { color: '#5a5a7a', font: { family: 'JetBrains Mono', size: 11 }, stepSize: 1 },
-          border: { display: false },
-          beginAtZero: true,
-        }
-      } : {}
-    }
-  });
-}
-
-function switchCrmChart(type) {
-  crmChartType = type;
-  document.getElementById('crm-chart-bar').classList.toggle('active', type === 'bar');
-  document.getElementById('crm-chart-doughnut').classList.toggle('active', type === 'doughnut');
-  // rebuild with current data
-  const sel = document.getElementById('crm-client-select');
-  const filterAct = isAdmin ? (sel.value === 'all' ? null : sel.value) : crmClientFilter;
-  let leads = getLeads();
-  if (filterAct) leads = leads.filter(l => leadMatchesClient(l, filterAct));
-  try { leads = filterLeadsByCrmMonth(leads); } catch(e) { console.warn('Filtro mensal do CRM ignorado:', e); }
-  const STAGES = getStages(filterAct || (activeClient ? activeClient.account : ''));
-  buildCrmChart(leads, STAGES);
-}
-
-
-window.addEventListener('fbready', async () => {
-  await loadCustomPasswords();
-  await loadExtraClients();
-  getLeadsAsync().then(() => {
-    if (document.getElementById('crm-view') && document.getElementById('crm-view').style.display === 'block') {
-      renderKanban();
-    }
-  });
-});
-
-
-const SESSION_KEY = 'catapulta_session_v1';
-const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 dias em ms
-
-async function getSessionSignature(user, pass, expiresAt) {
-  const payload = `${user}|${expiresAt}|${pass || ''}|huven-crm-v2`;
-  if (window.crypto && crypto.subtle && window.TextEncoder) {
-    const bytes = new TextEncoder().encode(payload);
-    const hash = await crypto.subtle.digest('SHA-256', bytes);
-    return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
-  }
-  return btoa(unescape(encodeURIComponent(payload))).slice(0, 64);
-}
-
-async function saveSession(user, pass) {
-  const expiresAt = Date.now() + SESSION_DURATION;
-  const session = {
-    v: 2,
-    user,
-    expiresAt,
-    sig: await getSessionSignature(user, pass, expiresAt)
-  };
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-}
-
-async function getSession() {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    const session = JSON.parse(raw);
-    if (!session || session.v !== 2 || !session.user || !session.expiresAt || !session.sig) {
-      localStorage.removeItem(SESSION_KEY);
-      return null;
-    }
-    if (Date.now() > session.expiresAt) {
-      localStorage.removeItem(SESSION_KEY);
-      return null;
-    }
-    const effectivePass = getEffectivePassword(session.user);
-    const expected = await getSessionSignature(session.user, effectivePass, session.expiresAt);
-    if (!effectivePass || expected !== session.sig) {
-      localStorage.removeItem(SESSION_KEY);
-      return null;
-    }
-    return session;
-  } catch(e) {
-    localStorage.removeItem(SESSION_KEY);
-    return null;
-  }
-}
-
-function clearSession() {
-  localStorage.removeItem(SESSION_KEY);
-}
-
-async function restoreSession() {
-  if (!window._fbReady) {
-    await new Promise(resolve => window.addEventListener('fbready', resolve, { once: true }));
-  }
-  await loadCustomPasswords();
-  await loadExtraClients();
-  const session = await getSession();
-  if (!session) {
-    document.getElementById('login-overlay').style.display = 'flex';
-    return false;
-  }
-  const user = session.user;
-  const cred = CREDENTIALS[user];
-  if (!cred) return false;
-
-  document.getElementById('login-overlay').style.display = 'none';
-  const accountId = cred.act ? (cred.act.startsWith('act_') ? cred.act : 'act_' + cred.act) : null;
-  const clientName = accountId ? (CLIENT_NAMES[accountId] || user) : 'Admin';
-
-  if (accountId) {
-    activeClient = { name: clientName, account: accountId };
-    document.getElementById('page-title').textContent = clientName;
-    document.getElementById('page-meta').textContent = accountId;
-  } else {
-    document.getElementById('page-title').textContent = 'Admin';
-    document.getElementById('page-meta').textContent = 'Huven';
-  }
-
-  isAdmin = (user === 'admin');
-  setupCrmForClient();
-  renderSidebar();
-  ensureAdminClientSidebar();
-  updateMobileHeader();
-  updateSidebarForUser();
-  const mobileNav = document.getElementById('mobile-nav');
-  if (mobileNav) mobileNav.style.display = 'flex';
-  const mobileFilters = document.getElementById('mobile-filters');
-  if (mobileFilters && isAdmin === false) mobileFilters.style.display = 'flex';
-  updateSidebarForUser();
-  return true;
-}
-
-// Restore session - runs after all JS is parsed
-document.addEventListener('DOMContentLoaded', function() {
-  if (!IS_CLIENT_LINK) {
-    setTimeout(restoreSession, 80);
-    let sidebarRepairTries = 0;
-    const sidebarRepairTimer = setInterval(() => {
-      sidebarRepairTries += 1;
-      ensureAdminClientSidebar();
-      const list = document.getElementById('client-list');
-      if ((list && list.children.length > 0) || sidebarRepairTries >= 20) {
-        clearInterval(sidebarRepairTimer);
-      }
-    }, 250);
-  }
-});
-
-async function doLogout() {
-  if (!await showConfirm('Você será desconectado do sistema.', 'Sair', 'Sair', true)) return;
-  clearSession();
-  if (window._fb) await window._fb.logoutUser();
-  location.reload();
-}
-
-function updateSidebarForUser() {
-  const configBtn = document.getElementById('btn-config');
-  if (configBtn) configBtn.style.display = isAdmin ? 'flex' : 'none';
-  const camposBtn = document.getElementById('btn-cfg-campos');
-  if (camposBtn) camposBtn.style.display = isAdmin ? 'inline-flex' : 'none';
-  const limparBtn2 = document.getElementById('btn-limpar-crm');
-  if (limparBtn2) limparBtn2.style.display = isAdmin ? 'inline-flex' : 'none';
-  const logoutBtn = document.getElementById('btn-logout');
-  if (logoutBtn) logoutBtn.style.display = 'flex';
-  const footer = document.getElementById('sidebar-footer');
-  if (footer) footer.style.display = 'block';
-}
-
-
-// Passwords stored in Firebase
-let _customPasswords = {};
-
-async function loadExtraClients() {
-  if (!window._fbReady) return;
-  try {
-    const extras = await window._fb.getExtraClients();
-    extras.forEach(c => {
-      CREDENTIALS[c.login] = { pass: c.pass, act: c.act };
-      CLIENT_NAMES[c.act] = c.name;
-      if (c.layout === 'clinica' && !CLINICA_ACTS.includes(c.act)) {
-        CLINICA_ACTS.push(c.act);
-      }
-    });
-    // Repopular dropdown com clientes extras
-    if (isAdmin) {
-      const sel = document.getElementById('crm-client-select');
-      if (sel) {
-        sel.innerHTML = '<option value="all">Todos os clientes</option>' +
-          getSidebarClientEntries().map(([act, name]) => `<option value="${escapeHtml(act)}">${escapeHtml(name)}</option>`).join('');
-      }
-    }
-    renderSidebar();
-  } catch(e) { console.warn('loadExtraClients erro:', e); }
-}
-
-async function loadCustomPasswords() {
-  if (!window._fbReady) return;
-  try {
-    const passwords = await window._fb.getPasswords();
-    passwords.forEach(p => { _customPasswords[p.user] = p.pass; });
-  } catch(e) { console.warn('Could not load passwords', e); }
-}
-
-function getEffectivePassword(user) {
-  return _customPasswords[user] || CREDENTIALS[user]?.pass || '';
-}
-
-async function changePassword() {
-  const session = await getSession();
-  if (!session) return;
-  const user = session.user;
-
-  const current = document.getElementById('pw-current').value;
-  const newPw = document.getElementById('pw-new').value;
-  const confirm = document.getElementById('pw-confirm').value;
-  const errorEl = document.getElementById('pw-error');
-  const successEl = document.getElementById('pw-success');
-  const btn = document.querySelector('#conta-view .btn-save');
-
-  errorEl.style.display = 'none';
-  successEl.style.display = 'none';
-
-  const effectivePw = getEffectivePassword(user);
-  if (current !== effectivePw) {
-    errorEl.textContent = 'Senha atual incorreta.';
-    errorEl.style.display = 'block';
-    return;
-  }
-  if (newPw.length < 6) {
-    errorEl.textContent = 'A nova senha precisa ter pelo menos 6 caracteres.';
-    errorEl.style.display = 'block';
-    return;
-  }
-  if (newPw !== confirm) {
-    errorEl.textContent = 'As senhas não coincidem.';
-    errorEl.style.display = 'block';
-    return;
-  }
-
-  btn.textContent = 'Salvando...';
-  btn.disabled = true;
-  try {
-    await window._fb.savePassword(user, newPw);
-    _customPasswords[user] = newPw;
-    successEl.style.display = 'block';
-    document.getElementById('pw-current').value = '';
-    document.getElementById('pw-new').value = '';
-    document.getElementById('pw-confirm').value = '';
-  } catch(e) {
-    errorEl.textContent = 'Erro ao salvar. Tente novamente.';
-    errorEl.style.display = 'block';
-  }
-  btn.textContent = 'Salvar nova senha';
-  btn.disabled = false;
-}
-
-
-function getCurrentCrmActForSheets() {
-  const sel = document.getElementById('crm-client-select');
-  if (sel && sel.value && sel.value !== 'all') return sel.value;
-  if (crmClientFilter) return crmClientFilter;
-  if (activeClient && activeClient.account) return activeClient.account;
-  const keys = Object.keys(CLIENT_NAMES || {});
-  return keys[0] || '';
-}
-
-function openIntegrationsFromNav() {
-  switchView('crm');
-  ['report','crm','ajuda','conta','contatos','integracoes'].forEach(v => {
-    const el = document.getElementById('nav-' + v);
-    if (el) el.classList.toggle('active', v === 'integracoes');
-  });
-  if (typeof setMobileNav === 'function') setMobileNav('integracoes');
-  setTimeout(openSheetsIntegrationModal, 80);
-}
-function openSheetsIntegrationModal() {
-  const modal = document.getElementById('sheets-integration-modal');
-  if (!modal) return;
-  const act = getCurrentCrmActForSheets();
-  const clientName = CLIENT_NAMES[act] || (activeClient ? activeClient.name : '') || act;
-  document.getElementById('sheets-act').value = clientName ? clientName + ' | ' + act : act;
-  const saved = getSheetsIntegrationConfig(act);
-  document.getElementById('sheets-worker-url').value = saved.url || '';
-  document.getElementById('sheets-worker-secret').value = saved.secret || '';
-  document.getElementById('sheets-script-output').value = '';
-  modal.style.display = 'flex';
-  modal.classList.add('open');
-}
-
-function closeSheetsIntegrationModal() {
-  const modal = document.getElementById('sheets-integration-modal');
-  if (!modal) return;
-  modal.classList.remove('open');
-  modal.style.display = 'none';
-}
-
-function getSheetsIntegrationConfig(act) {
-  try {
-    const all = JSON.parse(localStorage.getItem('huven_sheets_integrations') || '{}');
-    return all[act] || {};
-  } catch(e) { return {}; }
-}
-
-function saveSheetsIntegrationConfig(act, data) {
-  try {
-    const all = JSON.parse(localStorage.getItem('huven_sheets_integrations') || '{}');
-    all[act] = data;
-    localStorage.setItem('huven_sheets_integrations', JSON.stringify(all));
-  } catch(e) {}
-}
-
-function generateSheetsIntegrationScript() {
-  const act = getCurrentCrmActForSheets();
-  const url = document.getElementById('sheets-worker-url').value.trim();
-  const secret = document.getElementById('sheets-worker-secret').value.trim();
-  if (!act) { showToast('Selecione um cliente antes de gerar a integração.', 'warning'); return; }
-  if (!url || !secret) { showToast('Preencha a URL do Worker e o segredo.', 'warning'); return; }
-  saveSheetsIntegrationConfig(act, { url, secret });
-  const script = buildSheetsAppsScript(url, secret, act);
-  document.getElementById('sheets-script-output').value = script;
-  showToast('Código da planilha gerado.', 'success');
-}
-
-function copySheetsIntegrationScript() {
-  const output = document.getElementById('sheets-script-output');
-  if (!output.value.trim()) generateSheetsIntegrationScript();
-  output.select();
-  output.setSelectionRange(0, output.value.length);
-  try {
-    navigator.clipboard.writeText(output.value);
-    showToast('Código copiado.', 'success');
-  } catch(e) {
-    document.execCommand('copy');
-    showToast('Código copiado.', 'success');
-  }
-}
-
-function buildSheetsAppsScript(workerUrl, secret, act) {
-  return [
-    "const HUVENT_CRM_WORKER_URL = " + JSON.stringify(workerUrl) + ";",
-    "const HUVENT_CRM_SECRET = " + JSON.stringify(secret) + ";",
-    "const HUVENT_CRM_ACT = " + JSON.stringify(act) + ";",
-    "const HUVENT_STATUS_COLUMN = 'CRM_SYNC';",
-    "const HUVENT_FORM_ANSWER_START_COLUMN = 13; // Coluna M",
-    "const HUVENT_FORM_ANSWER_END_COLUMN = 16; // Coluna P",
-    "const HUVENT_SHEET_NAME = 'Captação imóveis';",
-    "",
-    "function syncNovosLeadsParaCrm() {",
-    "  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(HUVENT_SHEET_NAME);",
-    "  if (!sheet) throw new Error('Aba não encontrada: ' + HUVENT_SHEET_NAME);",
-    "  const values = sheet.getDataRange().getValues();",
-    "  if (values.length < 2) return;",
-    "",
-    "  const headers = values[0].map(h => String(h || '').trim());",
-    "  let statusIndex = headers.indexOf(HUVENT_STATUS_COLUMN);",
-    "  if (statusIndex === -1) {",
-    "    statusIndex = headers.length;",
-    "    sheet.getRange(1, statusIndex + 1).setValue(HUVENT_STATUS_COLUMN);",
-    "    headers.push(HUVENT_STATUS_COLUMN);",
-    "  }",
-    "",
-    "  const rowsToSend = [];",
-    "  const rowNumbers = [];",
-    "  for (let r = 1; r < values.length; r++) {",
-    "    const status = String(values[r][statusIndex] || '').trim();",
-    "    if (status === 'ENVIADO') continue;",
-    "    const row = { act: HUVENT_CRM_ACT };",
-    "    headers.forEach((header, i) => {",
-    "      if (header && header !== HUVENT_STATUS_COLUMN) row[header] = values[r][i];",
-    "    });",
-    "    row.__huven_form_answers = getRespostasDoFormulario(headers, values[r]);",
-    "    rowsToSend.push(row);",
-    "    rowNumbers.push(r + 1);",
-    "  }",
-    "  if (!rowsToSend.length) return;",
-    "",
-    "  const response = UrlFetchApp.fetch(HUVENT_CRM_WORKER_URL, {",
-    "    method: 'post',",
-    "    contentType: 'application/json',",
-    "    headers: { 'x-huven-secret': HUVENT_CRM_SECRET },",
-    "    payload: JSON.stringify({ rows: rowsToSend }),",
-    "    muteHttpExceptions: true",
-    "  });",
-    "",
-    "  const code = response.getResponseCode();",
-    "  const text = response.getContentText();",
-    "  if (code < 200 || code >= 300) throw new Error('Erro ao enviar leads ao CRM: ' + code + ' - ' + text);",
-    "  rowNumbers.forEach(rowNumber => sheet.getRange(rowNumber, statusIndex + 1).setValue('ENVIADO'));",
-    "}",
-    "",
-    "function getRespostasDoFormulario(headers, rowValues) {",
-    "  const answers = [];",
-    "  for (let column = HUVENT_FORM_ANSWER_START_COLUMN; column <= HUVENT_FORM_ANSWER_END_COLUMN; column++) {",
-    "    const index = column - 1;",
-    "    const question = String(headers[index] || '').trim();",
-    "    const answer = String(rowValues[index] || '').trim();",
-    "    if (question && answer) answers.push({ question, answer });",
-    "  }",
-    "  return answers;",
-    "}",
-    "",
-    "function criarGatilhoDeSincronizacao() {",
-    "  ScriptApp.newTrigger('syncNovosLeadsParaCrm').timeBased().everyMinutes(5).create();",
-    "}"
-  ].join("\n");
-}
-
-function onCrmClientChange() {
-  const sel = document.getElementById('crm-client-select');
-  const act = sel.value;
-  crmClientFilter = act === 'all' ? null : act;
-
-  // Update title
-  const title = document.getElementById('crm-title');
-  const subtitle = document.getElementById('crm-subtitle');
-  if (act === 'all') {
-    if (title) title.textContent = 'CRM de Leads';
-    if (subtitle) subtitle.textContent = 'Todos os clientes';
-  } else {
-    const name = CLIENT_NAMES[act] || act;
-    if (title) title.textContent = name;
-    if (subtitle) subtitle.textContent = 'CRM de leads';
-    // Sync sidebar
-    activeClient = { name, account: act };
-    renderSidebar();
-  }
-  renderKanban();
-}
-
-</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-  import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, doc, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyBPdMSML950207trHI7i6hhdNpNjim_dLs",
@@ -2987,18 +1047,109 @@ function onCrmClientChange() {
     appId: "1:487634114917:web:2396633f717bc6da78e98c"
   };
 
+  // O cliente digita só o login (ex: "petland"); no Firebase Auth ele vira um e-mail interno.
+  const LOGIN_EMAIL_DOMAIN = 'crm.huven.com.br';
+  const ADMIN_API_URL = 'https://huven-crm-admin.gabrieloliveira7043.workers.dev';
+
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
   const auth = getAuth(app);
 
+  let currentProfile = null;
+
+  function loginToEmail(login) {
+    return String(login || '').trim().toLowerCase() + '@' + LOGIN_EMAIL_DOMAIN;
+  }
+
+  function normalizeAct(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    return raw.startsWith('act_') ? raw : ('act_' + raw.replace(/^act[_\s-]*/i, ''));
+  }
+
+  // Admin enxerga todos os leads; cliente só consulta os da própria conta (as regras do Firestore exigem esse filtro).
+  function leadsQuery() {
+    if (!currentProfile) throw new Error('Não autenticado');
+    if (currentProfile.role === 'admin') return collection(db, 'leads');
+    return query(collection(db, 'leads'), where('act', '==', currentProfile.act));
+  }
+
+  function mapLeads(snap) {
+    return snap.docs.map(d => normalizeImportedLeadFields({ ...d.data(), _docId: d.id }));
+  }
+
+  async function findUidByLogin(login) {
+    const snap = await getDocs(query(collection(db, 'users'), where('login', '==', login)));
+    return snap.empty ? null : snap.docs[0].id;
+  }
+
+  async function callAdminApi(path, body) {
+    if (!auth.currentUser) throw new Error('Não autenticado');
+    const token = await auth.currentUser.getIdToken();
+    const res = await fetch(ADMIN_API_URL + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) throw new Error(data.error || ('Erro ' + res.status));
+    return data;
+  }
+
+  let authReadyResolve;
+  const authReady = new Promise(resolve => { authReadyResolve = resolve; });
+  onAuthStateChanged(auth, user => {
+    if (!user) currentProfile = null;
+    authReadyResolve(user);
+  });
+
   window._fb = {
+    async login(login, password) {
+      const cred = await signInWithEmailAndPassword(auth, loginToEmail(login), password);
+      return await this.loadProfile(cred.user);
+    },
+    async loadProfile(user) {
+      const snap = await getDoc(doc(db, 'users', user.uid));
+      if (!snap.exists()) {
+        currentProfile = null;
+        await signOut(auth);
+        const err = new Error('Perfil não encontrado');
+        err.code = 'huven/no-profile';
+        throw err;
+      }
+      const data = snap.data();
+      currentProfile = { uid: user.uid, ...data, act: data.act ? normalizeAct(data.act) : null };
+      return currentProfile;
+    },
+    // Resolve com o perfil de quem já estava logado neste navegador, ou null.
+    async restoreProfile() {
+      const user = await authReady;
+      if (!user) return null;
+      try { return await this.loadProfile(user); } catch (e) { console.warn('Sessão inválida:', e); return null; }
+    },
+    getProfile() { return currentProfile; },
+    async getIdToken() {
+      return auth.currentUser ? await auth.currentUser.getIdToken() : null;
+    },
+    async logoutUser() {
+      currentProfile = null;
+      return await signOut(auth);
+    },
+    async changeOwnPassword(currentPassword, newPassword) {
+      const user = auth.currentUser;
+      if (!user) throw new Error('Não autenticado');
+      await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, currentPassword));
+      await updatePassword(user, newPassword);
+    },
+
     async getLeads() {
-      const snap = await getDocs(collection(db, 'leads'));
-      return snap.docs.map(d => normalizeImportedLeadFields({ ...d.data(), _docId: d.id }));
+      if (!currentProfile) return [];
+      return mapLeads(await getDocs(leadsQuery()));
     },
     listenLeads(callback) {
-      return onSnapshot(collection(db, 'leads'), snap => {
-        const leads = snap.docs.map(d => normalizeImportedLeadFields({ ...d.data(), _docId: d.id }));
+      if (!currentProfile) return null;
+      return onSnapshot(leadsQuery(), snap => {
+        const leads = mapLeads(snap);
         const changed = snap.docChanges().map(change => ({
           type: change.type,
           lead: normalizeImportedLeadFields({ ...change.doc.data(), _docId: change.doc.id })
@@ -3020,418 +1171,48 @@ function onCrmClientChange() {
     async deleteLead(docId) {
       await deleteDoc(doc(db, 'leads', docId));
     },
-    async getPasswords() {
-      const snap = await getDocs(collection(db, 'passwords'));
-      return snap.docs.map(d => ({ user: d.id, pass: d.data().pass }));
-    },
-    async loginUser(email, password) {
-      return await signInWithEmailAndPassword(auth, email, password);
-    },
-    async logoutUser() {
-      return await signOut(auth);
-    },
-    async savePassword(user, pass) {
-      await updateDoc(doc(db, 'passwords', user), { pass }).catch(async () => {
-        await addDoc(collection(db, 'passwords'), { pass });
-      });
-      const { setDoc } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
-      await setDoc(doc(db, 'passwords', user), { pass });
-    },
+
     async getExtraClients() {
-      const { setDoc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+      if (!currentProfile) return [];
       try {
         const snap = await getDocs(collection(db, 'extra_clients'));
         return snap.docs.map(d => ({ login: d.id, ...d.data() }));
       } catch(e) { return []; }
     },
+    // Só admin. Cria o login no Firebase Auth usando uma instância separada, para o admin não ser deslogado.
     async saveExtraClient(login, name, act, pass, layout) {
-      const { setDoc } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
-      await setDoc(doc(db, 'extra_clients', login), { name, act, pass, layout: layout || 'default' });
-      await setDoc(doc(db, 'passwords', login), { pass });
+      act = normalizeAct(act);
+      let uid = await findUidByLogin(login);
+      if (!uid) {
+        const secondary = initializeApp(firebaseConfig, 'huven-admin-' + Date.now());
+        try {
+          const secondaryAuth = getAuth(secondary);
+          const cred = await createUserWithEmailAndPassword(secondaryAuth, loginToEmail(login), pass);
+          uid = cred.user.uid;
+          await signOut(secondaryAuth);
+        } finally {
+          await deleteApp(secondary);
+        }
+      } else if (pass) {
+        await callAdminApi('/set-password', { login, password: pass });
+      }
+      await setDoc(doc(db, 'users', uid), { login, act, role: 'client', name, layout: layout || 'default' });
+      await setDoc(doc(db, 'extra_clients', login), { name, act, layout: layout || 'default', uid });
     },
-    async updatePassword(user, pass) {
-      const { setDoc } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
-      await setDoc(doc(db, 'passwords', user), { pass });
+    async adminSetPassword(login, password) {
+      await callAdminApi('/set-password', { login, password });
     },
     async deleteExtraClient(login) {
+      const uid = await findUidByLogin(login);
+      if (uid) {
+        try { await callAdminApi('/delete-user', { login }); } catch (e) { console.warn('Não foi possível apagar o login no Auth:', e); }
+        await deleteDoc(doc(db, 'users', uid));
+      }
       await deleteDoc(doc(db, 'extra_clients', login));
-      await deleteDoc(doc(db, 'passwords', login));
     }
   };
   window._fbReady = true;
   window.dispatchEvent(new Event('fbready'));
-
-window.addEventListener('fbready', () => {
-  loadCustomPasswords();
-  loadExtraClients();
-  getLeadsAsync().then(() => {
-    if (document.getElementById('crm-view') && document.getElementById('crm-view').style.display === 'block') {
-      renderKanban();
-    }
-  });
-});
-
-
-const SESSION_KEY = 'catapulta_session_v1';
-const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 dias em ms
-
-async function getSessionSignature(user, pass, expiresAt) {
-  const payload = `${user}|${expiresAt}|${pass || ''}|huven-crm-v2`;
-  if (window.crypto && crypto.subtle && window.TextEncoder) {
-    const bytes = new TextEncoder().encode(payload);
-    const hash = await crypto.subtle.digest('SHA-256', bytes);
-    return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
-  }
-  return btoa(unescape(encodeURIComponent(payload))).slice(0, 64);
-}
-
-async function saveSession(user, pass) {
-  const expiresAt = Date.now() + SESSION_DURATION;
-  const session = {
-    v: 2,
-    user,
-    expiresAt,
-    sig: await getSessionSignature(user, pass, expiresAt)
-  };
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-}
-
-async function getSession() {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    const session = JSON.parse(raw);
-    if (!session || session.v !== 2 || !session.user || !session.expiresAt || !session.sig) {
-      localStorage.removeItem(SESSION_KEY);
-      return null;
-    }
-    if (Date.now() > session.expiresAt) {
-      localStorage.removeItem(SESSION_KEY);
-      return null;
-    }
-    const effectivePass = getEffectivePassword(session.user);
-    const expected = await getSessionSignature(session.user, effectivePass, session.expiresAt);
-    if (!effectivePass || expected !== session.sig) {
-      localStorage.removeItem(SESSION_KEY);
-      return null;
-    }
-    return session;
-  } catch(e) {
-    localStorage.removeItem(SESSION_KEY);
-    return null;
-  }
-}
-
-function clearSession() {
-  localStorage.removeItem(SESSION_KEY);
-}
-
-async function restoreSession() {
-  if (!window._fbReady) {
-    await new Promise(resolve => window.addEventListener('fbready', resolve, { once: true }));
-  }
-  await loadCustomPasswords();
-  await loadExtraClients();
-  const session = await getSession();
-  if (!session) {
-    document.getElementById('login-overlay').style.display = 'flex';
-    return false;
-  }
-  const user = session.user;
-  const cred = CREDENTIALS[user];
-  if (!cred) return false;
-
-  document.getElementById('login-overlay').style.display = 'none';
-  const accountId = cred.act ? (cred.act.startsWith('act_') ? cred.act : 'act_' + cred.act) : null;
-  const clientName = accountId ? (CLIENT_NAMES[accountId] || user) : 'Admin';
-
-  if (accountId) {
-    activeClient = { name: clientName, account: accountId };
-    document.getElementById('page-title').textContent = clientName;
-    document.getElementById('page-meta').textContent = accountId;
-  } else {
-    document.getElementById('page-title').textContent = 'Admin';
-    document.getElementById('page-meta').textContent = 'Huven';
-  }
-
-  isAdmin = (user === 'admin');
-  setupCrmForClient();
-  renderSidebar();
-  ensureAdminClientSidebar();
-  updateMobileHeader();
-  updateSidebarForUser();
-  const mobileNav = document.getElementById('mobile-nav');
-  if (mobileNav) mobileNav.style.display = 'flex';
-  const mobileFilters = document.getElementById('mobile-filters');
-  if (mobileFilters && isAdmin === false) mobileFilters.style.display = 'flex';
-  updateSidebarForUser();
-  return true;
-}
-
-// Restore session - runs after all JS is parsed
-document.addEventListener('DOMContentLoaded', function() {
-  if (!IS_CLIENT_LINK) {
-    setTimeout(restoreSession, 80);
-  }
-});
-
-async function doLogout() {
-  if (!await showConfirm('Você será desconectado do sistema.', 'Sair', 'Sair', true)) return;
-  clearSession();
-  if (window._fb) await window._fb.logoutUser();
-  location.reload();
-}
-
-function updateSidebarForUser() {
-  const configBtn = document.getElementById('btn-config');
-  if (configBtn) configBtn.style.display = isAdmin ? 'flex' : 'none';
-  const camposBtn = document.getElementById('btn-cfg-campos');
-  if (camposBtn) camposBtn.style.display = isAdmin ? 'inline-flex' : 'none';
-  const limparBtn2 = document.getElementById('btn-limpar-crm');
-  if (limparBtn2) limparBtn2.style.display = isAdmin ? 'inline-flex' : 'none';
-  const logoutBtn = document.getElementById('btn-logout');
-  if (logoutBtn) logoutBtn.style.display = 'flex';
-  const footer = document.getElementById('sidebar-footer');
-  if (footer) footer.style.display = 'block';
-}
-
-
-// Passwords stored in Firebase
-let _customPasswords = {};
-
-async function loadCustomPasswords() {
-  if (!window._fbReady) return;
-  try {
-    const passwords = await window._fb.getPasswords();
-    passwords.forEach(p => { _customPasswords[p.user] = p.pass; });
-  } catch(e) { console.warn('Could not load passwords', e); }
-}
-
-function getEffectivePassword(user) {
-  return _customPasswords[user] || CREDENTIALS[user]?.pass || '';
-}
-
-async function changePassword() {
-  const session = await getSession();
-  if (!session) return;
-  const user = session.user;
-
-  const current = document.getElementById('pw-current').value;
-  const newPw = document.getElementById('pw-new').value;
-  const confirm = document.getElementById('pw-confirm').value;
-  const errorEl = document.getElementById('pw-error');
-  const successEl = document.getElementById('pw-success');
-  const btn = document.querySelector('#conta-view .btn-save');
-
-  errorEl.style.display = 'none';
-  successEl.style.display = 'none';
-
-  const effectivePw = getEffectivePassword(user);
-  if (current !== effectivePw) {
-    errorEl.textContent = 'Senha atual incorreta.';
-    errorEl.style.display = 'block';
-    return;
-  }
-  if (newPw.length < 6) {
-    errorEl.textContent = 'A nova senha precisa ter pelo menos 6 caracteres.';
-    errorEl.style.display = 'block';
-    return;
-  }
-  if (newPw !== confirm) {
-    errorEl.textContent = 'As senhas não coincidem.';
-    errorEl.style.display = 'block';
-    return;
-  }
-
-  btn.textContent = 'Salvando...';
-  btn.disabled = true;
-  try {
-    await window._fb.savePassword(user, newPw);
-    _customPasswords[user] = newPw;
-    successEl.style.display = 'block';
-    document.getElementById('pw-current').value = '';
-    document.getElementById('pw-new').value = '';
-    document.getElementById('pw-confirm').value = '';
-  } catch(e) {
-    errorEl.textContent = 'Erro ao salvar. Tente novamente.';
-    errorEl.style.display = 'block';
-  }
-  btn.textContent = 'Salvar nova senha';
-  btn.disabled = false;
-}
-
-
-function getCurrentCrmActForSheets() {
-  const sel = document.getElementById('crm-client-select');
-  if (sel && sel.value && sel.value !== 'all') return sel.value;
-  if (crmClientFilter) return crmClientFilter;
-  if (activeClient && activeClient.account) return activeClient.account;
-  const keys = Object.keys(CLIENT_NAMES || {});
-  return keys[0] || '';
-}
-
-function openIntegrationsFromNav() {
-  switchView('crm');
-  ['report','crm','ajuda','conta','contatos','integracoes'].forEach(v => {
-    const el = document.getElementById('nav-' + v);
-    if (el) el.classList.toggle('active', v === 'integracoes');
-  });
-  if (typeof setMobileNav === 'function') setMobileNav('integracoes');
-  setTimeout(openSheetsIntegrationModal, 80);
-}
-function openSheetsIntegrationModal() {
-  const modal = document.getElementById('sheets-integration-modal');
-  if (!modal) return;
-  const act = getCurrentCrmActForSheets();
-  const clientName = CLIENT_NAMES[act] || (activeClient ? activeClient.name : '') || act;
-  document.getElementById('sheets-act').value = clientName ? clientName + ' | ' + act : act;
-  const saved = getSheetsIntegrationConfig(act);
-  document.getElementById('sheets-worker-url').value = saved.url || '';
-  document.getElementById('sheets-worker-secret').value = saved.secret || '';
-  document.getElementById('sheets-script-output').value = '';
-  modal.style.display = 'flex';
-  modal.classList.add('open');
-}
-
-function closeSheetsIntegrationModal() {
-  const modal = document.getElementById('sheets-integration-modal');
-  if (!modal) return;
-  modal.classList.remove('open');
-  modal.style.display = 'none';
-}
-
-function getSheetsIntegrationConfig(act) {
-  try {
-    const all = JSON.parse(localStorage.getItem('huven_sheets_integrations') || '{}');
-    return all[act] || {};
-  } catch(e) { return {}; }
-}
-
-function saveSheetsIntegrationConfig(act, data) {
-  try {
-    const all = JSON.parse(localStorage.getItem('huven_sheets_integrations') || '{}');
-    all[act] = data;
-    localStorage.setItem('huven_sheets_integrations', JSON.stringify(all));
-  } catch(e) {}
-}
-
-function generateSheetsIntegrationScript() {
-  const act = getCurrentCrmActForSheets();
-  const url = document.getElementById('sheets-worker-url').value.trim();
-  const secret = document.getElementById('sheets-worker-secret').value.trim();
-  if (!act) { showToast('Selecione um cliente antes de gerar a integração.', 'warning'); return; }
-  if (!url || !secret) { showToast('Preencha a URL do Worker e o segredo.', 'warning'); return; }
-  saveSheetsIntegrationConfig(act, { url, secret });
-  const script = buildSheetsAppsScript(url, secret, act);
-  document.getElementById('sheets-script-output').value = script;
-  showToast('Código da planilha gerado.', 'success');
-}
-
-function copySheetsIntegrationScript() {
-  const output = document.getElementById('sheets-script-output');
-  if (!output.value.trim()) generateSheetsIntegrationScript();
-  output.select();
-  output.setSelectionRange(0, output.value.length);
-  try {
-    navigator.clipboard.writeText(output.value);
-    showToast('Código copiado.', 'success');
-  } catch(e) {
-    document.execCommand('copy');
-    showToast('Código copiado.', 'success');
-  }
-}
-
-function buildSheetsAppsScript(workerUrl, secret, act) {
-  return [
-    "const HUVENT_CRM_WORKER_URL = " + JSON.stringify(workerUrl) + ";",
-    "const HUVENT_CRM_SECRET = " + JSON.stringify(secret) + ";",
-    "const HUVENT_CRM_ACT = " + JSON.stringify(act) + ";",
-    "const HUVENT_STATUS_COLUMN = 'CRM_SYNC';",
-    "const HUVENT_FORM_ANSWER_START_COLUMN = 13; // Coluna M",
-    "const HUVENT_FORM_ANSWER_END_COLUMN = 16; // Coluna P",
-    "const HUVENT_SHEET_NAME = 'Captação imóveis';",
-    "",
-    "function syncNovosLeadsParaCrm() {",
-    "  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(HUVENT_SHEET_NAME);",
-    "  if (!sheet) throw new Error('Aba não encontrada: ' + HUVENT_SHEET_NAME);",
-    "  const values = sheet.getDataRange().getValues();",
-    "  if (values.length < 2) return;",
-    "",
-    "  const headers = values[0].map(h => String(h || '').trim());",
-    "  let statusIndex = headers.indexOf(HUVENT_STATUS_COLUMN);",
-    "  if (statusIndex === -1) {",
-    "    statusIndex = headers.length;",
-    "    sheet.getRange(1, statusIndex + 1).setValue(HUVENT_STATUS_COLUMN);",
-    "    headers.push(HUVENT_STATUS_COLUMN);",
-    "  }",
-    "",
-    "  const rowsToSend = [];",
-    "  const rowNumbers = [];",
-    "  for (let r = 1; r < values.length; r++) {",
-    "    const status = String(values[r][statusIndex] || '').trim();",
-    "    if (status === 'ENVIADO') continue;",
-    "    const row = { act: HUVENT_CRM_ACT };",
-    "    headers.forEach((header, i) => {",
-    "      if (header && header !== HUVENT_STATUS_COLUMN) row[header] = values[r][i];",
-    "    });",
-    "    row.__huven_form_answers = getRespostasDoFormulario(headers, values[r]);",
-    "    rowsToSend.push(row);",
-    "    rowNumbers.push(r + 1);",
-    "  }",
-    "  if (!rowsToSend.length) return;",
-    "",
-    "  const response = UrlFetchApp.fetch(HUVENT_CRM_WORKER_URL, {",
-    "    method: 'post',",
-    "    contentType: 'application/json',",
-    "    headers: { 'x-huven-secret': HUVENT_CRM_SECRET },",
-    "    payload: JSON.stringify({ rows: rowsToSend }),",
-    "    muteHttpExceptions: true",
-    "  });",
-    "",
-    "  const code = response.getResponseCode();",
-    "  const text = response.getContentText();",
-    "  if (code < 200 || code >= 300) throw new Error('Erro ao enviar leads ao CRM: ' + code + ' - ' + text);",
-    "  rowNumbers.forEach(rowNumber => sheet.getRange(rowNumber, statusIndex + 1).setValue('ENVIADO'));",
-    "}",
-    "",
-    "function getRespostasDoFormulario(headers, rowValues) {",
-    "  const answers = [];",
-    "  for (let column = HUVENT_FORM_ANSWER_START_COLUMN; column <= HUVENT_FORM_ANSWER_END_COLUMN; column++) {",
-    "    const index = column - 1;",
-    "    const question = String(headers[index] || '').trim();",
-    "    const answer = String(rowValues[index] || '').trim();",
-    "    if (question && answer) answers.push({ question, answer });",
-    "  }",
-    "  return answers;",
-    "}",
-    "",
-    "function criarGatilhoDeSincronizacao() {",
-    "  ScriptApp.newTrigger('syncNovosLeadsParaCrm').timeBased().everyMinutes(5).create();",
-    "}"
-  ].join("\n");
-}
-
-function onCrmClientChange() {
-  const sel = document.getElementById('crm-client-select');
-  const act = sel.value;
-  crmClientFilter = act === 'all' ? null : act;
-
-  // Update title
-  const title = document.getElementById('crm-title');
-  const subtitle = document.getElementById('crm-subtitle');
-  if (act === 'all') {
-    if (title) title.textContent = 'CRM de Leads';
-    if (subtitle) subtitle.textContent = 'Todos os clientes';
-  } else {
-    const name = CLIENT_NAMES[act] || act;
-    if (title) title.textContent = name;
-    if (subtitle) subtitle.textContent = 'CRM de leads';
-    // Sync sidebar
-    activeClient = { name, account: act };
-    renderSidebar();
-  }
-  renderKanban();
-}
-
 </script>
 </head>
 <body>
@@ -4376,6 +2157,12 @@ async function saveClient() {
     feedback.textContent = 'Ad Account ID deve começar com act_';
     return;
   }
+  if (senha.length < 6) {
+    feedback.style.display = 'block';
+    feedback.style.color = '#f87171';
+    feedback.textContent = 'A senha precisa ter pelo menos 6 caracteres.';
+    return;
+  }
 
   btn.textContent = 'Salvando...';
   btn.disabled = true;
@@ -4384,7 +2171,7 @@ async function saveClient() {
   try {
     await window._fb.saveExtraClient(login, name, account, senha, layout);
     // Atualizar dinamicamente
-    CREDENTIALS[login] = { pass: senha, act: account };
+    CREDENTIALS[login] = { pass: null, act: account };
     CLIENT_NAMES[account] = name;
     if (layout === 'clinica' && !CLINICA_ACTS.includes(account)) {
       CLINICA_ACTS.push(account);
@@ -4490,8 +2277,7 @@ function ensureAdminClientSidebar() {
   const list = document.getElementById('client-list');
   if (!list) return;
   const title = document.getElementById('page-title')?.textContent.trim().toLowerCase();
-  const sessionRaw = localStorage.getItem(typeof SESSION_KEY !== 'undefined' ? SESSION_KEY : 'catapulta_session_v1') || '';
-  const adminVisible = isAdmin || title === 'admin' || sessionRaw.includes('"user":"admin"');
+  const adminVisible = isAdmin || title === 'admin';
   if (!adminVisible || list.children.length > 0) return;
   const entries = getSidebarClientEntries();
   list.innerHTML = entries.map(([act, name]) => `
@@ -4787,8 +2573,9 @@ document.getElementById('date-from').value = `${firstDay.getFullYear()}-${pad(fi
 document.getElementById('date-to').value = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
 
 const urlParams = new URLSearchParams(window.location.search);
-const IS_CLIENT_LINK = !!urlParams.get('act');
-const actFromUrl = urlParams.get('act');
+// Links com ?act= abriam o relatório sem login; agora todo acesso passa pelo login.
+const IS_CLIENT_LINK = false;
+const actFromUrl = null;
 if (IS_CLIENT_LINK) { localStorage.removeItem(STORAGE_KEY); document.getElementById('login-overlay').style.display = 'none'; }
 if (actFromUrl) {
   const accountId = actFromUrl.startsWith('act_') ? actFromUrl : 'act_' + actFromUrl;
@@ -5900,35 +3687,48 @@ function togglePassVisibility() {
 async function doLogin() {
   const user = document.getElementById('login-user').value.trim().toLowerCase();
   const pass = document.getElementById('login-pass').value;
-  const cred = CREDENTIALS[user];
-
-  if (!cred) {
-    document.getElementById('login-error').style.display = 'block';
+  const errorEl = document.getElementById('login-error');
+  const showLoginError = (message) => {
+    errorEl.textContent = message;
+    errorEl.style.display = 'block';
     document.getElementById('login-pass').value = '';
+  };
+
+  if (!user || !pass) {
+    showLoginError('Usuário ou senha incorretos.');
     return;
   }
 
   const loginBtn = document.querySelector('#login-overlay .login-btn');
   if (loginBtn) { loginBtn.textContent = 'Entrando...'; loginBtn.disabled = true; }
 
-  // Esperar Firebase estar pronto para carregar senhas
   if (!window._fbReady) {
     await new Promise(resolve => window.addEventListener('fbready', resolve, { once: true }));
   }
-  await loadCustomPasswords();
-  await loadExtraClients();
 
-  const effectivePass = getEffectivePassword(user);
-  if (!effectivePass || effectivePass !== pass) {
-    document.getElementById('login-error').style.display = 'block';
-    document.getElementById('login-pass').value = '';
+  let profile;
+  try {
+    profile = await window._fb.login(user, pass);
+  } catch (e) {
+    const code = e && e.code;
+    console.warn('Login falhou:', code || e);
+    showLoginError(
+      code === 'auth/too-many-requests' ? 'Muitas tentativas. Aguarde alguns minutos e tente de novo.'
+      : code === 'auth/network-request-failed' ? 'Sem conexão. Verifique a internet e tente de novo.'
+      : code === 'huven/no-profile' ? 'Login sem acesso configurado. Fale com a Huven.'
+      : 'Usuário ou senha incorretos.'
+    );
     if (loginBtn) { loginBtn.textContent = 'Entrar'; loginBtn.disabled = false; }
     return;
   }
 
+  applyProfileLocally(profile);
+  isAdmin = profile.role === 'admin';
+  await loadExtraClients();
+
   if (loginBtn) { loginBtn.textContent = 'Entrar'; loginBtn.disabled = false; }
   document.getElementById('login-overlay').style.display = 'none';
-  const accountId = cred.act;
+  const accountId = isAdmin ? null : profile.act;
   const clientName = CLIENT_NAMES[accountId] || user;
   if (accountId) {
     activeClient = { name: clientName, account: accountId };
@@ -5940,18 +3740,18 @@ async function doLogin() {
   }
   document.getElementById('welcome-state').style.display = 'none';
   updateMobileHeader();
-  isAdmin = (user === 'admin');
   setupCrmForClient();
   renderSidebar();
   ensureAdminClientSidebar();
   updateMobileHeader();
+  updateSidebarForUser();
   if (window.innerWidth <= 768) {
     const mobileNav = document.getElementById('mobile-nav');
     if (mobileNav) mobileNav.style.display = 'flex';
     const mobileFilters = document.getElementById('mobile-filters');
     if (mobileFilters) mobileFilters.style.display = 'flex';
   }
-  await saveSession(user, pass);
+  refreshLeadsAfterLogin();
 }
 
 document.addEventListener('keydown', e => {
@@ -6666,7 +4466,7 @@ function filterHelpCards(query) {
   if (empty) empty.style.display = visible ? 'none' : 'block';
 }
 
-async function renderAdminLogins() {
+﻿async function renderAdminLogins() {
   const section = document.getElementById('admin-logins-section');
   const list = document.getElementById('admin-logins-list');
   if (!section || !list) return;
@@ -6675,7 +4475,7 @@ async function renderAdminLogins() {
 
   // Clientes fixos
   const fixed = Object.entries(CREDENTIALS).filter(([u]) => u !== 'admin').map(([login, cred]) => ({
-    login, name: CLIENT_NAMES[cred.act] || login, pass: getEffectivePassword(login), tipo: 'fixo'
+    login, name: CLIENT_NAMES[cred.act] || login
   }));
 
   // Clientes extras do Firebase (sem duplicar os fixos)
@@ -6683,47 +4483,45 @@ async function renderAdminLogins() {
   try {
     const raw = await window._fb.getExtraClients();
     extras = raw
-      .filter(c => !CREDENTIALS[c.login] || Object.keys(CREDENTIALS).indexOf(c.login) === -1 || !fixed.find(f => f.login === c.login))
-      .map(c => ({ login: c.login, name: c.name, pass: getEffectivePassword(c.login) || c.pass, tipo: 'extra' }));
+      .filter(c => !fixed.find(f => f.login === c.login))
+      .map(c => ({ login: c.login, name: c.name }));
   } catch(e) {}
 
   const todos = [...fixed, ...extras];
   if (!todos.length) { list.innerHTML = '<div style="font-size:12px;color:var(--muted);">Nenhum cliente.</div>'; return; }
 
+  // As senhas ficam só no Firebase Auth e não podem ser lidas; aqui o admin só define uma nova.
   list.innerHTML = todos.map(c => `
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
       <div style="flex:1;min-width:120px;">
-        <div style="font-size:13px;font-weight:600;color:var(--text);">${c.name}</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text);">${escapeHtml(c.name)}</div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;">
         <span style="font-size:11px;color:var(--muted);">Login:</span>
-        <input id="login-user-${c.login}" class="field-input mono" style="width:120px;padding:4px 8px;font-size:12px;" value="${c.login}" ${c.tipo === 'fixo' ? 'disabled title="Login fixo"' : ''}>
+        <input class="field-input mono" style="width:120px;padding:4px 8px;font-size:12px;" value="${escapeHtml(c.login)}" disabled>
       </div>
       <div style="display:flex;align-items:center;gap:6px;">
-        <span style="font-size:11px;color:var(--muted);">Senha:</span>
-        <input id="login-pass-${c.login}" class="field-input mono" style="width:130px;padding:4px 8px;font-size:12px;" value="${c.pass}" type="text">
+        <span style="font-size:11px;color:var(--muted);">Nova senha:</span>
+        <input id="login-pass-${escapeHtml(c.login)}" class="field-input mono" style="width:130px;padding:4px 8px;font-size:12px;" placeholder="mín. 6 caracteres" type="text" autocomplete="off">
       </div>
-      <button onclick="saveClientCredential('${c.login}','${c.tipo}')" style="background:var(--accent-glow);border:1px solid var(--accent);color:var(--accent2);border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;white-space:nowrap;">Salvar</button>
-      <span id="login-feedback-${c.login}" style="font-size:11px;display:none;"></span>
+      <button onclick="saveClientCredential('${escapeJsString(c.login)}')" style="background:var(--accent-glow);border:1px solid var(--accent);color:var(--accent2);border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;white-space:nowrap;">Trocar senha</button>
+      <span id="login-feedback-${escapeHtml(c.login)}" style="font-size:11px;display:none;"></span>
     </div>`).join('');
 }
 
-async function saveClientCredential(login, tipo) {
-  const newPass = document.getElementById('login-pass-' + login)?.value.trim();
+async function saveClientCredential(login) {
+  const input = document.getElementById('login-pass-' + login);
+  const newPass = input?.value.trim();
   const fb = document.getElementById('login-feedback-' + login);
-  if (!newPass) { if(fb){fb.style.display='inline';fb.style.color='#f87171';fb.textContent='Senha vazia.';} return; }
+  const feedback = (color, text) => { if (fb) { fb.style.display = 'inline'; fb.style.color = color; fb.textContent = text; } };
+  if (!newPass || newPass.length < 6) { feedback('#f87171', 'Mínimo 6 caracteres.'); return; }
   try {
-    await window._fb.updatePassword(login, newPass);
-    if (tipo === 'extra') {
-      const extras = await window._fb.getExtraClients();
-      const ex = extras.find(e => e.login === login);
-      if (ex) await window._fb.saveExtraClient(login, ex.name, ex.act, newPass, ex.layout);
-    }
-    if (CREDENTIALS[login]) CREDENTIALS[login].pass = newPass;
-    _customPasswords[login] = newPass;
-    if (fb) { fb.style.display='inline'; fb.style.color='#34d399'; fb.textContent='Salvo!'; setTimeout(()=>{fb.style.display='none';},2000); }
+    await window._fb.adminSetPassword(login, newPass);
+    if (input) input.value = '';
+    feedback('#34d399', 'Senha trocada!');
+    setTimeout(() => { if (fb) fb.style.display = 'none'; }, 2500);
   } catch(e) {
-    if (fb) { fb.style.display='inline'; fb.style.color='#f87171'; fb.textContent='Erro: '+e.message; }
+    feedback('#f87171', 'Erro: ' + e.message);
   }
 }
 
@@ -8236,89 +6034,41 @@ window.openNotificationsCenter = openNotificationsCenter;
 window.closeNotificationsCenter = closeNotificationsCenter;
 window.clearNotificationsCenter = clearNotificationsCenter;
 window.clearUnreadLeadNotifications = clearUnreadLeadNotifications;
-window.addEventListener('fbready', async () => {
-  await loadCustomPasswords();
-  await loadExtraClients();
+// Sessão antiga (senha comparada no navegador) não é mais usada; o Firebase Auth guarda o login.
+try { localStorage.removeItem('catapulta_session_v1'); } catch(e) {}
+
+function applyProfileLocally(profile) {
+  if (!profile || !profile.act) return;
+  CREDENTIALS[profile.login] = { pass: null, act: profile.act };
+  if (profile.name) CLIENT_NAMES[profile.act] = profile.name;
+  if (profile.layout === 'clinica' && !CLINICA_ACTS.includes(profile.act)) CLINICA_ACTS.push(profile.act);
+}
+
+function refreshLeadsAfterLogin() {
   startLeadNotifier();
   getLeadsAsync().then(() => {
     if (document.getElementById('crm-view') && document.getElementById('crm-view').style.display === 'block') {
       renderKanban();
     }
   });
-});
-
-
-const SESSION_KEY = 'catapulta_session_v1';
-const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 dias em ms
-
-async function getSessionSignature(user, pass, expiresAt) {
-  const payload = `${user}|${expiresAt}|${pass || ''}|huven-crm-v2`;
-  if (window.crypto && crypto.subtle && window.TextEncoder) {
-    const bytes = new TextEncoder().encode(payload);
-    const hash = await crypto.subtle.digest('SHA-256', bytes);
-    return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
-  }
-  return btoa(unescape(encodeURIComponent(payload))).slice(0, 64);
-}
-
-async function saveSession(user, pass) {
-  const expiresAt = Date.now() + SESSION_DURATION;
-  const session = {
-    v: 2,
-    user,
-    expiresAt,
-    sig: await getSessionSignature(user, pass, expiresAt)
-  };
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-}
-
-async function getSession() {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    const session = JSON.parse(raw);
-    if (!session || session.v !== 2 || !session.user || !session.expiresAt || !session.sig) {
-      localStorage.removeItem(SESSION_KEY);
-      return null;
-    }
-    if (Date.now() > session.expiresAt) {
-      localStorage.removeItem(SESSION_KEY);
-      return null;
-    }
-    const effectivePass = getEffectivePassword(session.user);
-    const expected = await getSessionSignature(session.user, effectivePass, session.expiresAt);
-    if (!effectivePass || expected !== session.sig) {
-      localStorage.removeItem(SESSION_KEY);
-      return null;
-    }
-    return session;
-  } catch(e) {
-    localStorage.removeItem(SESSION_KEY);
-    return null;
-  }
-}
-
-function clearSession() {
-  localStorage.removeItem(SESSION_KEY);
 }
 
 async function restoreSession() {
   if (!window._fbReady) {
     await new Promise(resolve => window.addEventListener('fbready', resolve, { once: true }));
   }
-  await loadCustomPasswords();
-  await loadExtraClients();
-  const session = await getSession();
-  if (!session) {
+  const profile = await window._fb.restoreProfile();
+  if (!profile) {
     document.getElementById('login-overlay').style.display = 'flex';
     return false;
   }
-  const user = session.user;
-  const cred = CREDENTIALS[user];
-  if (!cred) return false;
+  applyProfileLocally(profile);
+  isAdmin = profile.role === 'admin';
+  await loadExtraClients();
 
   document.getElementById('login-overlay').style.display = 'none';
-  const accountId = cred.act ? (cred.act.startsWith('act_') ? cred.act : 'act_' + cred.act) : null;
-  const clientName = accountId ? (CLIENT_NAMES[accountId] || user) : 'Admin';
+  const accountId = isAdmin ? null : profile.act;
+  const clientName = accountId ? (CLIENT_NAMES[accountId] || profile.login) : 'Admin';
 
   if (accountId) {
     activeClient = { name: clientName, account: accountId };
@@ -8329,7 +6079,6 @@ async function restoreSession() {
     document.getElementById('page-meta').textContent = 'Huven';
   }
 
-  isAdmin = (user === 'admin');
   setupCrmForClient();
   renderSidebar();
   ensureAdminClientSidebar();
@@ -8340,7 +6089,7 @@ async function restoreSession() {
   const mobileFilters = document.getElementById('mobile-filters');
   if (mobileFilters && isAdmin === false) mobileFilters.style.display = 'flex';
   updateSidebarForUser();
-  startLeadNotifier();
+  refreshLeadsAfterLogin();
   return true;
 }
 
@@ -8362,7 +6111,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function doLogout() {
   if (!await showConfirm('Você será desconectado do sistema.', 'Sair', 'Sair', true)) return;
-  clearSession();
   if (window._fb) await window._fb.logoutUser();
   location.reload();
 }
@@ -8410,15 +6158,12 @@ function onMobileClientChange() {
 }
 
 
-// Passwords stored in Firebase
-let _customPasswords = {};
-
 async function loadExtraClients() {
   if (!window._fbReady) return;
   try {
     const extras = await window._fb.getExtraClients();
     extras.forEach(c => {
-      CREDENTIALS[c.login] = { pass: c.pass, act: c.act };
+      CREDENTIALS[c.login] = { pass: null, act: c.act };
       CLIENT_NAMES[c.act] = c.name;
       if (c.layout === 'clinica' && !CLINICA_ACTS.includes(c.act)) {
         CLINICA_ACTS.push(c.act);
@@ -8438,22 +6183,8 @@ async function loadExtraClients() {
   } catch(e) { console.warn('loadExtraClients erro:', e); }
 }
 
-async function loadCustomPasswords() {
-  if (!window._fbReady) return;
-  try {
-    const passwords = await window._fb.getPasswords();
-    passwords.forEach(p => { _customPasswords[p.user] = p.pass; });
-  } catch(e) { console.warn('Could not load passwords', e); }
-}
-
-function getEffectivePassword(user) {
-  return _customPasswords[user] || CREDENTIALS[user]?.pass || '';
-}
-
 async function changePassword() {
-  const session = await getSession();
-  if (!session) return;
-  const user = session.user;
+  if (!window._fb || !window._fb.getProfile()) return;
 
   const current = document.getElementById('pw-current').value;
   const newPw = document.getElementById('pw-new').value;
@@ -8465,12 +6196,6 @@ async function changePassword() {
   errorEl.style.display = 'none';
   successEl.style.display = 'none';
 
-  const effectivePw = getEffectivePassword(user);
-  if (current !== effectivePw) {
-    errorEl.textContent = 'Senha atual incorreta.';
-    errorEl.style.display = 'block';
-    return;
-  }
   if (newPw.length < 6) {
     errorEl.textContent = 'A nova senha precisa ter pelo menos 6 caracteres.';
     errorEl.style.display = 'block';
@@ -8485,14 +6210,18 @@ async function changePassword() {
   btn.textContent = 'Salvando...';
   btn.disabled = true;
   try {
-    await window._fb.savePassword(user, newPw);
-    _customPasswords[user] = newPw;
+    await window._fb.changeOwnPassword(current, newPw);
     successEl.style.display = 'block';
     document.getElementById('pw-current').value = '';
     document.getElementById('pw-new').value = '';
     document.getElementById('pw-confirm').value = '';
   } catch(e) {
-    errorEl.textContent = 'Erro ao salvar. Tente novamente.';
+    const code = e && e.code;
+    errorEl.textContent = (code === 'auth/wrong-password' || code === 'auth/invalid-credential')
+      ? 'Senha atual incorreta.'
+      : code === 'auth/too-many-requests'
+        ? 'Muitas tentativas. Aguarde alguns minutos.'
+        : 'Erro ao salvar. Tente novamente.';
     errorEl.style.display = 'block';
   }
   btn.textContent = 'Salvar nova senha';
