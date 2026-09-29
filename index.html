@@ -1327,6 +1327,13 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
     async deleteGroupSchedule(id) {
       await deleteDoc(doc(db, 'group_schedules', id));
     },
+    async deleteGroupSchedules(ids) {
+      for (let i = 0; i < ids.length; i += 400) {
+        const batch = writeBatch(db);
+        ids.slice(i, i + 400).forEach(id => batch.delete(doc(db, 'group_schedules', id)));
+        await batch.commit();
+      }
+    },
     // Base de contatos importados do WhatsApp: whatsapp_contacts/{act}__{n}, até 2.000 contatos por documento.
     async getWhatsAppContacts(act) {
       act = normalizeAct(act);
@@ -5652,11 +5659,49 @@ function cadenceDayLabel(date) {
   return diff === 0 ? `Hoje · ${base}` : diff === 1 ? `Amanhã · ${base}` : diff === -1 ? `Ontem · ${base}` : base.charAt(0).toUpperCase() + base.slice(1);
 }
 
+// Série = envios programados juntos. Os novos têm "seriesId"; os antigos são agrupados por grupo + conteúdo + horário.
+function cadenceSeriesKey(i) {
+  if (i.seriesId) return 's:' + i.seriesId;
+  const when = new Date(i.sendAt);
+  return ['g', i.groupId, i.type || 'text', i.text || '', (i.media && i.media.url) || '', when.getHours(), when.getMinutes()].join('|');
+}
+
+const _cadenceSelected = new Set();
+
 function renderCadenceList() {
   const list = document.getElementById('cadence-list');
   if (!list) return;
   const upcoming = _cadenceItems.filter(i => i.status === 'scheduled').sort((a, b) => String(a.sendAt).localeCompare(String(b.sendAt)));
   const history = _cadenceItems.filter(i => i.status !== 'scheduled').sort((a, b) => String(b.sendAt).localeCompare(String(a.sendAt))).slice(0, 100);
+  const existing = new Set(_cadenceItems.map(i => i.id));
+  [..._cadenceSelected].forEach(id => { if (!existing.has(id)) _cadenceSelected.delete(id); });
+
+  // Séries com mais de um envio agendado.
+  const seriesMap = new Map();
+  upcoming.forEach(i => {
+    const key = cadenceSeriesKey(i);
+    if (!seriesMap.has(key)) seriesMap.set(key, []);
+    seriesMap.get(key).push(i);
+  });
+  const series = [...seriesMap.entries()].filter(([, items]) => items.length > 1);
+  const fmtDate = d => new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  const seriesHtml = series.length ? `
+    <div style="font-size:13px;font-weight:600;color:var(--text);margin:4px 0 8px;">Séries programadas</div>
+    ${series.map(([key, items]) => {
+      const first = items[0];
+      const groups = [...new Set(items.map(i => i.groupName || i.groupId))];
+      const time = new Date(first.sendAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      const preview = first.text ? escapeHtml(first.text.length > 90 ? first.text.slice(0, 90) + '…' : first.text) : CADENCE_TYPES[first.type] || 'Texto';
+      return `
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px;">
+        <div style="flex:1;min-width:200px;">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:3px;">${escapeHtml(groups.join(', '))} · ${time} · ${items.length} envio(s) de ${fmtDate(items[0].sendAt)} a ${fmtDate(items[items.length - 1].sendAt)}</div>
+          <div style="font-size:13px;color:var(--text);">${preview}</div>
+        </div>
+        <button style="${wbtn}background:transparent;" onclick="selectCadenceSeries('${escapeJsString(key)}')">Selecionar</button>
+        <button style="${wbtn}background:transparent;color:#f87171;border-color:#f87171;" onclick="deleteCadenceSeries('${escapeJsString(key)}')">Excluir todos (${items.length})</button>
+      </div>`;
+    }).join('')}` : '';
 
   const itemHtml = i => {
     const [label, color] = CADENCE_STATUS[i.status] || [i.status, 'var(--muted)'];
@@ -5668,7 +5713,8 @@ function renderCadenceList() {
       ? `<button style="${wbtn}" onclick="duplicateCadenceItem('${id}')">Duplicar</button><button style="${wbtn}background:transparent;" onclick="cancelCadenceItem('${id}')">Cancelar</button>`
       : `<button style="${wbtn}" onclick="duplicateCadenceItem('${id}')">Duplicar</button><button style="${wbtn}background:transparent;color:#f87171;border-color:#f87171;" onclick="deleteCadenceItem('${id}')">Excluir</button>`;
     return `
-      <div style="display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px;">
+      <div style="display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1px solid ${_cadenceSelected.has(i.id) ? 'var(--accent)' : 'var(--border)'};border-radius:8px;padding:12px 14px;margin-bottom:8px;">
+        <input type="checkbox" style="margin-top:4px;cursor:pointer;" ${_cadenceSelected.has(i.id) ? 'checked' : ''} onchange="toggleCadenceSelected('${id}', this.checked)">
         <div style="font-size:15px;font-weight:600;color:var(--text);min-width:52px;">${when.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div>
         <div style="flex:1;min-width:0;">
           <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">${escapeHtml(i.groupName || i.groupId)} · ${CADENCE_TYPES[i.type] || 'Texto'}${i.mentionAll ? ' · marca todos' : ''}${i.media && i.media.fileName ? ' · ' + escapeHtml(i.media.fileName) : ''}</div>
@@ -5693,7 +5739,19 @@ function renderCadenceList() {
     return days.map(d => `<div style="font-size:13px;font-weight:600;color:var(--text);margin:16px 0 8px;">${escapeHtml(cadenceDayLabel(d.date))}</div>${d.items.map(itemHtml).join('')}`).join('');
   };
 
-  list.innerHTML = (upcoming.length
+  const selectable = upcoming.length + (_cadenceShowHistory ? history.length : 0);
+  const bulkBar = selectable ? `
+    <div style="position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg, #0f1115);padding:8px 0;margin:8px 0 4px;border-bottom:1px solid var(--border);">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);cursor:pointer;">
+        <input type="checkbox" ${_cadenceSelected.size && _cadenceSelected.size === upcoming.length + (_cadenceShowHistory ? history.length : 0) ? 'checked' : ''} onchange="selectAllCadence(this.checked)"> Selecionar todos
+      </label>
+      <span style="font-size:12px;color:var(--muted);">${_cadenceSelected.size} selecionado(s)</span>
+      ${_cadenceSelected.size ? `
+        <button style="${wbtn}background:transparent;color:#f87171;border-color:#f87171;" onclick="deleteSelectedCadence()">Excluir selecionados (${_cadenceSelected.size})</button>
+        <button style="${wbtn}background:transparent;" onclick="_cadenceSelected.clear();renderCadenceList()">Limpar seleção</button>` : ''}
+    </div>` : '';
+
+  list.innerHTML = seriesHtml + bulkBar + (upcoming.length
       ? groupByDay(upcoming)
       : '<div style="font-size:13px;color:var(--muted);">Nenhum envio programado. Clique em "Programar envio".</div>')
     + (history.length ? `
@@ -5701,6 +5759,45 @@ function renderCadenceList() {
         <button style="${wbtn}background:transparent;" onclick="_cadenceShowHistory=!_cadenceShowHistory;renderCadenceList()">${_cadenceShowHistory ? 'Esconder' : 'Ver'} histórico (${history.length})</button>
         ${_cadenceShowHistory ? groupByDay(history) : ''}
       </div>` : '');
+}
+
+function toggleCadenceSelected(id, checked) {
+  if (checked) _cadenceSelected.add(id); else _cadenceSelected.delete(id);
+  renderCadenceList();
+}
+
+function selectAllCadence(checked) {
+  _cadenceSelected.clear();
+  if (checked) {
+    _cadenceItems.filter(i => i.status === 'scheduled' || _cadenceShowHistory).forEach(i => _cadenceSelected.add(i.id));
+  }
+  renderCadenceList();
+}
+
+function selectCadenceSeries(key) {
+  _cadenceItems.filter(i => i.status === 'scheduled' && cadenceSeriesKey(i) === key).forEach(i => _cadenceSelected.add(i.id));
+  renderCadenceList();
+}
+
+async function deleteCadenceIds(ids, label) {
+  if (!ids.length) return;
+  if (!await showConfirm(`${ids.length} envio(s) serão excluídos${label ? ' ' + label : ''}. Os que ainda não saíram não serão mais enviados.`, 'Excluir envios', 'Excluir', true)) return;
+  try {
+    await window._fb.deleteGroupSchedules(ids);
+    ids.forEach(id => _cadenceSelected.delete(id));
+    showToast(`${ids.length} envio(s) excluído(s).`, 'success');
+  } catch (e) {
+    showToast('Erro: ' + e.message, 'warning');
+  }
+}
+
+function deleteCadenceSeries(key) {
+  const ids = _cadenceItems.filter(i => i.status === 'scheduled' && cadenceSeriesKey(i) === key).map(i => i.id);
+  deleteCadenceIds(ids, 'desta série');
+}
+
+function deleteSelectedCadence() {
+  deleteCadenceIds([..._cadenceSelected], '');
 }
 
 async function cancelCadenceItem(id) {
@@ -5910,7 +6007,9 @@ async function saveCadence() {
   if (type !== 'text' && !_cadenceDraft.media) { setFb('#f87171', 'Envie o arquivo.'); return; }
   if (document.getElementById('cad-repeat').value !== 'none' && !document.getElementById('cad-until').value) { setFb('#f87171', 'Escolha até quando repetir.'); return; }
   const items = [];
+  const seriesId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
   dates.forEach(d => groups.forEach(g => items.push({
+    seriesId,
     act: _cadenceDraft.act,
     groupId: g.id,
     groupName: g.name,
