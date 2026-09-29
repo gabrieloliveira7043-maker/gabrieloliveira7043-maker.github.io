@@ -1055,6 +1055,8 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
 .chat-input { display:flex; gap:8px; align-items:flex-end; padding:10px 12px; border-top:1px solid var(--border); }
 .chat-input textarea { flex:1; resize:none; max-height:140px; min-height:40px; }
 .chat-back { display:none; }
+.contatos-bulk { position:sticky; top:0; }
+@media (max-width: 768px) { .contatos-bulk { position:static; } }
 @media (max-width: 768px) {
   #chat-view { padding:8px !important; }
   .chat-wrap { height:calc(100vh - 90px); }
@@ -1231,6 +1233,39 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
     },
     async deleteLead(docId) {
       await deleteDoc(doc(db, 'leads', docId));
+    },
+    // Grava vários leads de uma vez: novos (sem _docId) são criados; os outros recebem só os campos informados.
+    async saveLeadsBatch(items) {
+      const ids = [];
+      for (let i = 0; i < items.length; i += 400) {
+        const batch = writeBatch(db);
+        items.slice(i, i + 400).forEach(item => {
+          if (item._docId) {
+            const { _docId, ...data } = item;
+            batch.update(doc(db, 'leads', _docId), data);
+            ids.push(_docId);
+          } else {
+            const ref = doc(collection(db, 'leads'));
+            batch.set(ref, item);
+            ids.push(ref.id);
+          }
+        });
+        await batch.commit();
+      }
+      return ids;
+    },
+    // Etiquetas do cliente: contact_tags/{act} = { act, tags: [{ id, name, color }] }.
+    async getContactTags(act) {
+      const snap = await getDoc(doc(db, 'contact_tags', normalizeAct(act)));
+      return snap.exists() ? (snap.data().tags || []) : [];
+    },
+    async saveContactTags(act, tags) {
+      act = normalizeAct(act);
+      await setDoc(doc(db, 'contact_tags', act), { act, tags, updatedAt: new Date().toISOString() });
+    },
+    async getInboxChat(act, chatKey) {
+      const snap = await getDoc(doc(db, 'inbox', normalizeAct(act), 'chats', chatKey));
+      return snap.exists() ? { id: snap.id, ...snap.data() } : null;
     },
 
     async getExtraClients() {
@@ -2200,14 +2235,27 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
   
     <!-- Contatos View -->
     <div id="contatos-view" style="display:none; padding:28px 32px; overflow-x:hidden; box-sizing:border-box;">
-      <div style="max-width:700px;">
-        <div style="font-size:18px; font-weight:600; color:var(--text); margin-bottom:6px;">Contatos</div>
-        <div style="font-size:13px; color:var(--muted); margin-bottom:20px;">Busque leads pelo nome, e-mail ou telefone.</div>
+      <div style="max-width:820px;">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+          <div>
+            <div style="font-size:18px; font-weight:600; color:var(--text); margin-bottom:6px;">Contatos</div>
+            <div style="font-size:13px; color:var(--muted);">Busque, etiquete e mande contatos para o funil.</div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <select id="contatos-client-select" class="field-input" style="display:none; width:auto; padding:8px 10px; font-size:13px;" onchange="onContatosClientChange()"></select>
+            <button class="chat-pill" onclick="openTagManager()">🏷️ Etiquetas</button>
+          </div>
+        </div>
         <div style="display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:var(--r2); padding:10px 14px; margin-bottom:14px;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           <input type="text" id="contatos-search" placeholder="Buscar por nome, e-mail ou telefone..." oninput="renderContatos()" style="border:none; background:none; outline:none; font-size:13px; color:var(--text); width:100%; font-family:inherit;">
         </div>
-        <div style="font-size:12px; color:var(--muted); margin-bottom:12px;" id="contatos-count"></div>
+        <div id="contatos-tag-filter" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;"></div>
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text); cursor:pointer;"><input type="checkbox" id="contatos-select-all" onchange="toggleAllContatos(this.checked)"> Selecionar todos</label>
+          <span style="font-size:12px; color:var(--muted);" id="contatos-count"></span>
+        </div>
+        <div id="contatos-bulk" class="contatos-bulk" style="display:none; z-index:5; background:var(--surface2); border:1px solid var(--border2); border-radius:var(--r2); padding:10px 12px; margin-bottom:12px; gap:8px; align-items:center; flex-wrap:wrap;"></div>
         <div id="contatos-list"></div>
         <div id="contatos-empty" style="display:none; text-align:center; padding:2rem; font-size:13px; color:var(--muted);">Nenhum contato encontrado</div>
       </div>
@@ -4725,104 +4773,516 @@ async function deleteLeadFromDb(id) {
   _leadsCache = (_leadsCache || []).filter(l => l.id !== id);
 }
 
-function renderContatos() {
-  const q = (document.getElementById('contatos-search')?.value || '').toLowerCase();
+// ===== CONTATOS: leads + base importada do WhatsApp, etiquetas e envio para o funil =====
+const TAG_COLORS = ['#60a5fa', '#34d399', '#fbbf24', '#f87171', '#a78bfa', '#f472b6', '#22d3ee', '#fb923c', '#94a3b8'];
+const _contactTagsCache = {};          // act -> [{ id, name, color }]
+const _contatosSelected = new Set();   // "L:<id do lead>" ou "C:<telefone>"
+const _contatosTagFilter = new Set();
+let _contatosShown = 300;
+let _contatosFiltered = [];
+let _contatosEntries = [];
+
+function contatosAct() {
+  if (!isAdmin) return activeClient && activeClient.account ? normalizeActValue(activeClient.account) : '';
+  const sel = document.getElementById('contatos-client-select');
+  return sel && sel.value ? sel.value : '';
+}
+
+function populateContatosClientSelect() {
+  const sel = document.getElementById('contatos-client-select');
+  if (!sel) return;
+  if (!isAdmin) { sel.style.display = 'none'; return; }
+  if (sel.dataset.ready === '1') return;
+  const crmSel = document.getElementById('crm-client-select');
+  const current = crmSel && crmSel.value && crmSel.value !== 'all' ? normalizeActValue(crmSel.value) : '';
+  const entries = Object.entries(CREDENTIALS)
+    .filter(([login, cred]) => login !== 'admin' && cred && cred.act)
+    .map(([, cred]) => [cred.act, getClientDisplayName(cred.act)])
+    .sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
+  sel.innerHTML = '<option value="">Todos os clientes</option>' + entries.map(([act, name]) => `<option value="${escapeHtml(act)}">${escapeHtml(name)}</option>`).join('');
+  sel.value = entries.some(([act]) => act === current) ? current : '';
+  sel.style.display = 'block';
+  sel.dataset.ready = '1';
+}
+
+function onContatosClientChange() {
+  _contatosSelected.clear();
+  _contatosTagFilter.clear();
+  _contatosShown = 300;
+  renderContatos();
+}
+
+async function loadContactTags(act, force) {
+  if (!act) return [];
+  if (!force && _contactTagsCache[act]) return _contactTagsCache[act];
+  try {
+    _contactTagsCache[act] = await window._fb.getContactTags(act);
+  } catch (e) {
+    console.warn('Etiquetas indisponíveis:', e);
+    _contactTagsCache[act] = _contactTagsCache[act] || [];
+  }
+  return _contactTagsCache[act];
+}
+
+function ensureImportedContacts(act, onLoaded) {
+  if (!act || _crmContactsCache[act] !== undefined) return;
+  _crmContactsCache[act] = [];
+  window._fb.getWhatsAppContacts(act)
+    .then(list => { _crmContactsCache[act] = list; if (list.length && onLoaded) onLoaded(); })
+    .catch(e => console.warn('Base de contatos indisponível:', e));
+}
+
+// Lista do cliente: leads + contatos importados que ainda não viraram lead.
+function buildContactEntries(act) {
   let leads = getLeads();
-
-  // Filtrar por cliente do usuário logado (não admin vê só os seus)
-  if (!isAdmin && activeClient && activeClient.account) {
-    leads = leads.filter(l => leadMatchesClient(l, activeClient.account));
-  } else if (isAdmin) {
-    // Admin: filtrar pelo cliente selecionado no dropdown
-    const sel = document.getElementById('crm-client-select');
-    if (sel && sel.value && sel.value !== 'all') {
-      leads = leads.filter(l => leadMatchesClient(l, sel.value));
-    }
+  if (act) leads = leads.filter(l => leadMatchesClient(l, act));
+  const out = leads.map(l => ({
+    key: 'L:' + l.id, kind: 'lead', name: l.name || '', phone: l.phone || '', email: l.email || '',
+    stage: l.stage, act: normalizeActValue(l.act), tags: Array.isArray(l.tags) ? l.tags : [], lead: l
+  }));
+  const imported = act ? _crmContactsCache[act] : null;
+  if (Array.isArray(imported) && imported.length) {
+    const leadPhones = new Set(leads.map(l => chatPhoneKey(l.phone)).filter(Boolean));
+    const seen = new Set();
+    imported.forEach(c => {
+      const k = chatPhoneKey(c.phone);
+      if (!k || leadPhones.has(k) || seen.has(k)) return;
+      seen.add(k);
+      out.push({ key: 'C:' + k, kind: 'contact', name: c.name || 'Contato do WhatsApp', phone: c.phone, email: '', stage: '__wa_contact__', act, tags: Array.isArray(c.tags) ? c.tags : [], contact: c });
+    });
   }
+  return out;
+}
 
-  // Contatos importados do WhatsApp (base separada: não são leads e não aparecem no kanban).
-  const contactsAct = !isAdmin
-    ? (activeClient && activeClient.account)
-    : ((document.getElementById('crm-client-select') || {}).value || '');
-  if (contactsAct && contactsAct !== 'all') {
-    const imported = _crmContactsCache[contactsAct];
-    if (imported === undefined) {
-      _crmContactsCache[contactsAct] = [];
-      window._fb.getWhatsAppContacts(contactsAct)
-        .then(list => { _crmContactsCache[contactsAct] = list; if (list.length) renderContatos(); })
-        .catch(e => console.warn('Base de contatos indisponível:', e));
-    } else if (imported.length) {
-      const leadPhones = new Set(leads.map(l => String(l.phone || '').replace(/\D/g, '')).filter(Boolean));
-      leads = leads.concat(imported
-        .filter(c => !leadPhones.has(String(c.phone || '').replace(/\D/g, '')))
-        .map(c => ({ name: c.name || 'Contato do WhatsApp', phone: c.phone, stage: '__wa_contact__', act: contactsAct })));
-    }
+function filterContactEntries(entries, tagFilter, q) {
+  const term = String(q || '').trim().toLowerCase();
+  const digits = term.replace(/\D/g, '');
+  return entries.filter(e => {
+    if (tagFilter.size && !e.tags.some(t => tagFilter.has(t))) return false;
+    if (!term) return true;
+    return e.name.toLowerCase().includes(term) || e.email.toLowerCase().includes(term)
+      || (digits.length >= 3 && String(e.phone).replace(/\D/g, '').includes(digits));
+  });
+}
+
+function tagChipHtml(tag, extra = '') {
+  const c = tag.color || '#94a3b8';
+  return `<span class="chat-tag" style="background:${c}22;color:${c};border:1px solid ${c}55;${extra}">${escapeHtml(tag.name)}</span>`;
+}
+
+function tagFilterChipsHtml(tags, active, toggleFn) {
+  return tags.map(t => {
+    const on = active.has(t.id);
+    const c = t.color || '#94a3b8';
+    return `<button class="chat-pill" style="border-color:${c};${on ? `background:${c}33;` : ''}" onclick="${toggleFn}('${escapeJsString(t.id)}')">${on ? '✓ ' : ''}${escapeHtml(t.name)}</button>`;
+  }).join('');
+}
+
+function toggleContatosTagFilter(id) {
+  if (_contatosTagFilter.has(id)) _contatosTagFilter.delete(id); else _contatosTagFilter.add(id);
+  _contatosShown = 300;
+  renderContatos();
+}
+
+const CONTACT_STAGE_COLORS = {
+  'novo': { bg: 'rgba(96,165,250,0.15)', color: '#60a5fa' },
+  'contato': { bg: 'rgba(251,191,36,0.15)', color: '#fbbf24' },
+  'conversando': { bg: 'rgba(251,191,36,0.15)', color: '#fbbf24' },
+  'proposta': { bg: 'rgba(167,139,250,0.15)', color: '#a78bfa' },
+  'agendou': { bg: 'rgba(167,139,250,0.15)', color: '#a78bfa' },
+  'compareceu': { bg: 'rgba(52,211,153,0.15)', color: '#34d399' },
+  'fechado': { bg: 'rgba(52,211,153,0.15)', color: '#34d399' },
+  'fechou': { bg: 'rgba(52,211,153,0.15)', color: '#34d399' },
+  'perdido': { bg: 'rgba(248,113,113,0.15)', color: '#f87171' },
+  'nresp': { bg: 'rgba(248,113,113,0.15)', color: '#f87171' },
+  'ncompareceu': { bg: 'rgba(248,113,113,0.15)', color: '#f87171' }
+};
+
+function renderContatos() {
+  populateContatosClientSelect();
+  const act = contatosAct();
+  ensureImportedContacts(act, renderContatos);
+  if (act && !_contactTagsCache[act]) loadContactTags(act).then(() => renderContatos());
+  const tags = act ? (_contactTagsCache[act] || []) : [];
+  const tagById = Object.fromEntries(tags.map(t => [t.id, t]));
+  const q = document.getElementById('contatos-search')?.value || '';
+
+  _contatosEntries = buildContactEntries(act);
+  const validKeys = new Set(_contatosEntries.map(e => e.key));
+  [..._contatosSelected].forEach(k => { if (!validKeys.has(k)) _contatosSelected.delete(k); });
+  [..._contatosTagFilter].forEach(id => { if (!tagById[id]) _contatosTagFilter.delete(id); });
+  _contatosFiltered = filterContactEntries(_contatosEntries, _contatosTagFilter, q);
+
+  const tagBar = document.getElementById('contatos-tag-filter');
+  if (tagBar) {
+    tagBar.innerHTML = !act
+      ? (isAdmin ? '<span style="font-size:12px;color:var(--muted);">Escolha um cliente no topo para usar etiquetas e mandar contatos para o funil.</span>' : '')
+      : tags.length
+        ? `<span style="font-size:12px;color:var(--muted);align-self:center;">Filtrar por etiqueta:</span>${tagFilterChipsHtml(tags, _contatosTagFilter, 'toggleContatosTagFilter')}`
+        : '<span style="font-size:12px;color:var(--muted);">Nenhuma etiqueta criada ainda. Clique em "🏷️ Etiquetas" para criar.</span>';
   }
-
-  const filtered = q ? leads.filter(l =>
-    (l.name||'').toLowerCase().includes(q) ||
-    (l.email||'').toLowerCase().includes(q) ||
-    (l.phone||'').includes(q)
-  ) : leads;
 
   const list = document.getElementById('contatos-list');
   const empty = document.getElementById('contatos-empty');
   const count = document.getElementById('contatos-count');
+  const all = document.getElementById('contatos-select-all');
   if (!list) return;
-  if (count) count.textContent = filtered.length + ' contato' + (filtered.length !== 1 ? 's' : '');
-  if (filtered.length === 0) {
+  if (all) {
+    all.disabled = !act;
+    all.checked = !!act && _contatosFiltered.length > 0 && _contatosFiltered.every(e => _contatosSelected.has(e.key));
+  }
+  if (count) count.textContent = `${_contatosFiltered.length} contato${_contatosFiltered.length !== 1 ? 's' : ''}${_contatosSelected.size ? ` · ${_contatosSelected.size} selecionado(s)` : ''}`;
+  renderContatosBulkBar();
+  if (!_contatosFiltered.length) {
     list.innerHTML = '';
     if (empty) empty.style.display = 'block';
     return;
   }
   if (empty) empty.style.display = 'none';
 
-  // Construir mapa de stages incluindo custom stages de todos os clientes
-  const STAGE_LABELS = {};
-  const allStages = [...(typeof STAGES_DEFAULT !== 'undefined' ? STAGES_DEFAULT : []), ...(typeof STAGES_CLINICA !== 'undefined' ? STAGES_CLINICA : [])];
-  allStages.forEach(s => STAGE_LABELS[s.id] = s.label);
-  STAGE_LABELS.__wa_contact__ = 'Contato do WhatsApp';
-  // Adicionar custom stages de todos os clientes presentes nos leads
-  const actsPresentes = [...new Set(filtered.map(l => l.act).filter(Boolean))];
-  actsPresentes.forEach(act => {
-    const stages = getStages(act);
-    stages.forEach(s => { if (!STAGE_LABELS[s.id]) STAGE_LABELS[s.id] = s.label; });
-  });
+  const STAGE_LABELS = { __wa_contact__: 'Contato do WhatsApp' };
+  [...new Set(_contatosFiltered.map(e => e.act).filter(Boolean))].forEach(a => getStages(a).forEach(s => { if (!STAGE_LABELS[s.id]) STAGE_LABELS[s.id] = s.label; }));
+  const waIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.855L0 24l6.292-1.508A11.947 11.947 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.848 0-3.579-.498-5.073-1.367l-.361-.214-3.737.895.952-3.638-.235-.374A9.953 9.953 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>';
 
-  const STAGE_COLORS = {
-    'novo':        {bg:'rgba(96,165,250,0.15)',color:'#60a5fa'},
-    'contato':     {bg:'rgba(251,191,36,0.15)',color:'#fbbf24'},
-    'conversando': {bg:'rgba(251,191,36,0.15)',color:'#fbbf24'},
-    'proposta':    {bg:'rgba(167,139,250,0.15)',color:'#a78bfa'},
-    'agendou':     {bg:'rgba(167,139,250,0.15)',color:'#a78bfa'},
-    'compareceu':  {bg:'rgba(52,211,153,0.15)',color:'#34d399'},
-    'fechado':     {bg:'rgba(52,211,153,0.15)',color:'#34d399'},
-    'fechou':      {bg:'rgba(52,211,153,0.15)',color:'#34d399'},
-    'perdido':     {bg:'rgba(248,113,113,0.15)',color:'#f87171'},
-    'nresp':       {bg:'rgba(248,113,113,0.15)',color:'#f87171'},
-    'ncompareceu': {bg:'rgba(248,113,113,0.15)',color:'#f87171'},
-  };
-
-  list.innerHTML = filtered.map(l => {
-    const initials = (l.name||'?').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
-    const stageLabel = STAGE_LABELS[l.stage] || l.stage || '—';
-    const stageColor = STAGE_COLORS[l.stage] || {bg:'rgba(124,109,250,0.12)',color:'var(--accent2)'};
-    const phone = (l.phone||'').replace(/\D/g,'');
-    const waLink = phone ? `onclick="window.open('https://wa.me/55'+('${phone}'),'_blank')"` : '';
-    return `<div style="display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);margin-bottom:8px;" onmouseover="this.style.borderColor='var(--border2)'" onmouseout="this.style.borderColor='var(--border)'">
-      <div style="width:38px;height:38px;border-radius:50%;background:${stageColor.bg};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:${stageColor.color};flex-shrink:0;">${initials}</div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:14px;font-weight:500;color:var(--text);margin-bottom:2px;">${l.name||'—'}</div>
-        <div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${l.phone||''} ${l.email ? '· '+l.email : ''}</div>
+  list.innerHTML = _contatosFiltered.slice(0, _contatosShown).map(e => {
+    const initials = (e.name || '?').split(' ').filter(Boolean).map(w => w[0]).join('').substring(0, 2).toUpperCase();
+    const stageLabel = STAGE_LABELS[e.stage] || e.stage || '—';
+    const stageColor = CONTACT_STAGE_COLORS[e.stage] || { bg: 'rgba(124,109,250,0.12)', color: 'var(--accent2)' };
+    const key = escapeJsString(e.key);
+    const selected = _contatosSelected.has(e.key);
+    const canChat = e.phone || (e.lead && e.lead.whatsappJid);
+    const chips = e.tags.map(id => tagById[id]).filter(Boolean).map(t => tagChipHtml(t)).join(' ');
+    return `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px 12px;padding:12px 16px;background:var(--surface);border:1px solid ${selected ? 'var(--accent)' : 'var(--border)'};border-radius:var(--r2);margin-bottom:8px;">
+      ${act ? `<input type="checkbox" style="cursor:pointer;flex-shrink:0;" ${selected ? 'checked' : ''} onchange="toggleContatoSelected('${key}', this.checked)">` : ''}
+      <div style="width:38px;height:38px;border-radius:50%;background:${stageColor.bg};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:${stageColor.color};flex-shrink:0;">${escapeHtml(initials)}</div>
+      <div style="flex:1 1 160px;min-width:0;">
+        <div style="font-size:14px;font-weight:500;color:var(--text);margin-bottom:2px;">${escapeHtml(e.name || '—')}</div>
+        <div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(e.phone || '')}${e.email ? ' · ' + escapeHtml(e.email) : ''}</div>
+        ${chips ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;">${chips}</div>` : ''}
       </div>
-      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-        <span style="font-size:11px;padding:3px 10px;border-radius:20px;background:${stageColor.bg};color:${stageColor.color};font-weight:500;">${stageLabel}</span>
-        ${phone ? `<button ${waLink} style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;background:rgba(37,211,102,0.12);border:1px solid rgba(37,211,102,0.3);color:#25d366;">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.855L0 24l6.292-1.508A11.947 11.947 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.848 0-3.579-.498-5.073-1.367l-.361-.214-3.737.895.952-3.638-.235-.374A9.953 9.953 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
-          WA</button>` : ''}
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto;">
+        <span style="font-size:11px;padding:3px 10px;border-radius:20px;background:${stageColor.bg};color:${stageColor.color};font-weight:500;">${escapeHtml(stageLabel)}</span>
+        ${canChat ? `<button onclick="openContatoChat('${key}')" title="Abrir no Chat do CRM" style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;background:rgba(37,211,102,0.12);border:1px solid rgba(37,211,102,0.3);color:#25d366;">${waIcon} Chat</button>` : ''}
       </div>
     </div>`;
-  }).join('');
+  }).join('') + (_contatosFiltered.length > _contatosShown
+    ? `<div style="text-align:center;padding:8px;"><button class="chat-pill" onclick="_contatosShown += 300; renderContatos();">Mostrar mais (${_contatosFiltered.length - _contatosShown} restantes)</button></div>` : '');
+}
+
+function renderContatosBulkBar() {
+  const bar = document.getElementById('contatos-bulk');
+  if (!bar) return;
+  const n = _contatosSelected.size;
+  if (!n || !contatosAct()) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
+  bar.style.display = 'flex';
+  bar.innerHTML = `<span style="font-size:13px;font-weight:600;color:var(--text);margin-right:4px;">${n} selecionado(s)</span>
+    <button class="chat-pill active" onclick="openBulkTag('add')">🏷️ Etiquetar</button>
+    <button class="chat-pill" onclick="openBulkTag('remove')">Tirar etiqueta</button>
+    <button class="chat-pill active" onclick="openSendToFunnel()">➜ Enviar para o funil</button>
+    <button class="chat-pill" onclick="_contatosSelected.clear(); renderContatos();">Limpar seleção</button>`;
+}
+
+function toggleContatoSelected(key, checked) {
+  if (checked) _contatosSelected.add(key); else _contatosSelected.delete(key);
+  renderContatos();
+}
+
+function toggleAllContatos(checked) {
+  _contatosFiltered.forEach(e => { if (checked) _contatosSelected.add(e.key); else _contatosSelected.delete(e.key); });
+  renderContatos();
+}
+
+function openContatoChat(key) {
+  const e = _contatosEntries.find(x => x.key === key);
+  if (!e) return;
+  openChatWith({ act: e.act, phone: e.phone, jid: e.lead ? e.lead.whatsappJid : '', name: e.name });
+}
+
+// ----- Janela simples (etiquetas e envio para o funil) -----
+function openHuvenModal(title, html, width) {
+  closeHuvenModal();
+  const el = document.createElement('div');
+  el.id = 'huven-modal';
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  el.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border2);border-radius:var(--r2);padding:20px;width:100%;max-width:${width || 460}px;max-height:85vh;overflow:auto;box-sizing:border-box;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div style="font-size:15px;font-weight:600;color:var(--text);">${escapeHtml(title)}</div>
+      <button class="btn-close-panel" onclick="closeHuvenModal()">×</button>
+    </div>
+    <div id="huven-modal-body">${html}</div></div>`;
+  el.addEventListener('click', ev => { if (ev.target === el) closeHuvenModal(); });
+  document.body.appendChild(el);
+}
+
+function closeHuvenModal() {
+  const el = document.getElementById('huven-modal');
+  if (el) el.remove();
+}
+
+function colorSwatchesHtml(selected, fn) {
+  return TAG_COLORS.map(c => `<button title="${c}" onclick="${fn}('${c}')" style="width:18px;height:18px;border-radius:50%;background:${c};border:2px solid ${c === selected ? 'var(--text)' : 'transparent'};cursor:pointer;padding:0;"></button>`).join('');
+}
+
+// ----- Gerenciar etiquetas -----
+let _tagManagerAct = '';
+let _tagNewColor = TAG_COLORS[0];
+let _tagEditColor = {};
+
+async function openTagManager() {
+  const act = contatosAct();
+  if (!act) { showToast('Escolha o cliente primeiro.', 'warning'); return; }
+  _tagManagerAct = act;
+  openHuvenModal('Etiquetas', '<div style="font-size:12px;color:var(--muted);">Carregando...</div>');
+  await loadContactTags(act, true);
+  renderTagManager();
+}
+
+function renderTagManager() {
+  const body = document.getElementById('huven-modal-body');
+  if (!body) return;
+  const tags = _contactTagsCache[_tagManagerAct] || [];
+  body.innerHTML = `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Crie etiquetas com nome e cor. Para etiquetar, marque os contatos na lista e clique em "Etiquetar".</div>
+    ${tags.length ? tags.map(t => `
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--border);">
+        <input class="field-input" value="${escapeHtml(t.name)}" maxlength="30" style="flex:1;min-width:120px;padding:6px 8px;font-size:13px;" onchange="renameContactTag('${escapeJsString(t.id)}', this.value)">
+        <div style="display:flex;gap:4px;">${colorSwatchesHtml(t.color, `(c => recolorContactTag('${escapeJsString(t.id)}', c))`)}</div>
+        <button class="chat-pill" style="color:#f87171;border-color:#f87171;" onclick="deleteContactTag('${escapeJsString(t.id)}')">Excluir</button>
+      </div>`).join('') : '<div style="font-size:13px;color:var(--muted);padding:6px 0;">Nenhuma etiqueta ainda.</div>'}
+    <div style="font-size:13px;font-weight:600;color:var(--text);margin:14px 0 6px;">Nova etiqueta</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <input class="field-input" id="tag-new-name" maxlength="30" placeholder="Ex.: Cliente VIP" style="flex:1;min-width:140px;padding:6px 8px;font-size:13px;" onkeydown="if(event.key==='Enter') createContactTagFromInput()">
+      <div style="display:flex;gap:4px;">${colorSwatchesHtml(_tagNewColor, "(c => { _tagNewColor = c; renderTagManager(); })")}</div>
+      <button class="chat-pill active" onclick="createContactTagFromInput()">Criar</button>
+    </div>`;
+}
+
+async function saveTagsFor(act, tags) {
+  await window._fb.saveContactTags(act, tags);
+  _contactTagsCache[act] = tags;
+}
+
+async function createContactTag(act, name, color) {
+  name = String(name || '').trim().slice(0, 30);
+  if (!name) { showToast('Dê um nome para a etiqueta.', 'warning'); return null; }
+  const tags = (await loadContactTags(act)).slice();
+  if (tags.some(t => t.name.toLowerCase() === name.toLowerCase())) { showToast('Já existe uma etiqueta com esse nome.', 'warning'); return null; }
+  const tag = { id: 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, color: color || TAG_COLORS[0] };
+  tags.push(tag);
+  await saveTagsFor(act, tags);
+  return tag;
+}
+
+async function createContactTagFromInput() {
+  const input = document.getElementById('tag-new-name');
+  try {
+    const tag = await createContactTag(_tagManagerAct, input ? input.value : '', _tagNewColor);
+    if (!tag) return;
+    _tagNewColor = TAG_COLORS[(TAG_COLORS.indexOf(_tagNewColor) + 1) % TAG_COLORS.length];
+    renderTagManager();
+    renderContatos();
+  } catch (e) { showToast('Erro: ' + e.message, 'warning'); }
+}
+
+async function renameContactTag(id, name) {
+  name = String(name || '').trim().slice(0, 30);
+  if (!name) { renderTagManager(); return; }
+  const tags = (_contactTagsCache[_tagManagerAct] || []).map(t => t.id === id ? { ...t, name } : t);
+  try { await saveTagsFor(_tagManagerAct, tags); renderContatos(); } catch (e) { showToast('Erro: ' + e.message, 'warning'); }
+}
+
+async function recolorContactTag(id, color) {
+  const tags = (_contactTagsCache[_tagManagerAct] || []).map(t => t.id === id ? { ...t, color } : t);
+  try { await saveTagsFor(_tagManagerAct, tags); renderTagManager(); renderContatos(); } catch (e) { showToast('Erro: ' + e.message, 'warning'); }
+}
+
+async function deleteContactTag(id) {
+  const act = _tagManagerAct;
+  const tag = (_contactTagsCache[act] || []).find(t => t.id === id);
+  if (!tag) return;
+  closeHuvenModal();
+  const ok = await showConfirm(`A etiqueta "${tag.name}" some de todos os contatos.`, 'Excluir etiqueta', 'Excluir', true);
+  if (ok) {
+    try {
+      await saveTagsFor(act, (_contactTagsCache[act] || []).filter(t => t.id !== id));
+      renderContatos();
+    } catch (e) { showToast('Erro: ' + e.message, 'warning'); }
+  }
+  openHuvenModal('Etiquetas', '');
+  renderTagManager();
+}
+
+// ----- Etiquetar em bloco -----
+let _bulkTagMode = 'add';
+const _bulkTagPicked = new Set();
+
+async function openBulkTag(mode) {
+  const act = contatosAct();
+  if (!act || !_contatosSelected.size) return;
+  _bulkTagMode = mode;
+  _bulkTagPicked.clear();
+  _tagManagerAct = act;
+  await loadContactTags(act);
+  openHuvenModal(mode === 'add' ? `Etiquetar ${_contatosSelected.size} contato(s)` : `Tirar etiqueta de ${_contatosSelected.size} contato(s)`, '');
+  renderBulkTag();
+}
+
+function renderBulkTag() {
+  const body = document.getElementById('huven-modal-body');
+  if (!body) return;
+  const tags = _contactTagsCache[_tagManagerAct] || [];
+  body.innerHTML = `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">${_bulkTagMode === 'add' ? 'Escolha as etiquetas que os contatos vão receber.' : 'Escolha as etiquetas que vão sair dos contatos.'}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">${tags.length ? tagFilterChipsHtml(tags, _bulkTagPicked, 'toggleBulkTagPick') : '<span style="font-size:13px;color:var(--muted);">Nenhuma etiqueta ainda.</span>'}</div>
+    ${_bulkTagMode === 'add' ? `
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+      <input class="field-input" id="tag-new-name" maxlength="30" placeholder="Criar nova etiqueta" style="flex:1;min-width:140px;padding:6px 8px;font-size:13px;">
+      <div style="display:flex;gap:4px;">${colorSwatchesHtml(_tagNewColor, "(c => { _tagNewColor = c; renderBulkTag(); })")}</div>
+      <button class="chat-pill" onclick="createTagInBulk()">Criar</button>
+    </div>` : ''}
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button class="btn-save" style="width:auto;padding:9px 16px;" onclick="applyBulkTag()">${_bulkTagMode === 'add' ? 'Etiquetar' : 'Tirar etiqueta'}</button>
+      <span id="bulk-tag-fb" style="font-size:12px;color:var(--muted);"></span>
+    </div>`;
+}
+
+function toggleBulkTagPick(id) {
+  if (_bulkTagPicked.has(id)) _bulkTagPicked.delete(id); else _bulkTagPicked.add(id);
+  renderBulkTag();
+}
+
+async function createTagInBulk() {
+  const input = document.getElementById('tag-new-name');
+  try {
+    const tag = await createContactTag(_tagManagerAct, input ? input.value : '', _tagNewColor);
+    if (!tag) return;
+    _bulkTagPicked.add(tag.id);
+    _tagNewColor = TAG_COLORS[(TAG_COLORS.indexOf(_tagNewColor) + 1) % TAG_COLORS.length];
+    renderBulkTag();
+    renderContatos();
+  } catch (e) { showToast('Erro: ' + e.message, 'warning'); }
+}
+
+async function applyBulkTag() {
+  const act = _tagManagerAct;
+  if (!_bulkTagPicked.size) { showToast('Escolha pelo menos uma etiqueta.', 'warning'); return; }
+  const fb = document.getElementById('bulk-tag-fb');
+  if (fb) fb.textContent = 'Salvando...';
+  const picked = [..._bulkTagPicked];
+  const change = tags => {
+    const set = new Set(tags || []);
+    picked.forEach(id => { if (_bulkTagMode === 'add') set.add(id); else set.delete(id); });
+    return [...set];
+  };
+  const selected = _contatosEntries.filter(e => _contatosSelected.has(e.key));
+  const leadUpdates = [];
+  let contactsChanged = false;
+  const now = new Date().toISOString();
+  selected.forEach(e => {
+    const next = change(e.tags);
+    if (next.length === e.tags.length && next.every(t => e.tags.includes(t))) return;
+    if (e.kind === 'lead' && e.lead._docId) {
+      leadUpdates.push({ _docId: e.lead._docId, tags: next, updatedAt: now });
+      e.lead.tags = next;
+    } else if (e.kind === 'contact') {
+      e.contact.tags = next;
+      contactsChanged = true;
+    }
+  });
+  try {
+    if (leadUpdates.length) {
+      await window._fb.saveLeadsBatch(leadUpdates);
+      leadUpdates.forEach(u => { const l = (_leadsCache || []).find(x => x._docId === u._docId); if (l) l.tags = u.tags; });
+    }
+    if (contactsChanged) await window._fb.saveWhatsAppContacts(act, _crmContactsCache[act] || []);
+    closeHuvenModal();
+    showToast(`${leadUpdates.length + selected.filter(e => e.kind === 'contact').length} contato(s) atualizado(s).`, 'success');
+    renderContatos();
+  } catch (e) {
+    if (fb) { fb.style.color = '#f87171'; fb.textContent = 'Erro: ' + e.message; }
+  }
+}
+
+// ----- Enviar para o funil (mês e coluna escolhidos) -----
+function openSendToFunnel() {
+  const act = contatosAct();
+  if (!act || !_contatosSelected.size) return;
+  const selected = _contatosEntries.filter(e => _contatosSelected.has(e.key));
+  const newOnes = selected.filter(e => e.kind === 'contact').length;
+  const leadsIn = selected.length - newOnes;
+  const stages = getStages(act) || [];
+  openHuvenModal(`Enviar ${selected.length} contato(s) para o funil`, `
+    <label class="field-label">Mês no kanban</label>
+    <input type="month" class="field-input" id="funnel-month" value="${getCurrentMonthKey()}" style="margin-bottom:10px;">
+    <label class="field-label">Coluna</label>
+    <select class="field-input" id="funnel-stage" style="margin-bottom:12px;">
+      ${stages.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.label)}</option>`).join('')}
+    </select>
+    <div style="font-size:12px;color:var(--text);line-height:1.6;margin-bottom:10px;">
+      ${newOnes ? `• ${newOnes} contato(s) da base viram lead nesse mês e coluna.<br>` : ''}
+      ${leadsIn ? `• ${leadsIn} já são leads: mudam para a coluna escolhida.<br>` : ''}
+    </div>
+    ${leadsIn ? `<label style="display:flex;gap:6px;align-items:flex-start;font-size:12px;color:var(--text);margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="funnel-move-month"> Também passar os leads que já existem para o mês escolhido (muda a data de entrada deles)</label>` : ''}
+    ${newOnes ? `<label style="display:flex;gap:6px;align-items:flex-start;font-size:12px;color:var(--text);margin-bottom:12px;cursor:pointer;"><input type="checkbox" id="funnel-first-msg"> Enviar a 1ª mensagem automática do WhatsApp para os novos leads (só se a coluna for "Novo lead" e o envio automático estiver ligado)</label>` : ''}
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button class="btn-save" style="width:auto;padding:9px 16px;" onclick="applySendToFunnel()">Enviar para o funil</button>
+      <span id="funnel-fb" style="font-size:12px;color:var(--muted);"></span>
+    </div>`);
+}
+
+async function applySendToFunnel() {
+  const act = contatosAct();
+  const month = document.getElementById('funnel-month').value;
+  const stage = document.getElementById('funnel-stage').value;
+  const moveMonth = !!document.getElementById('funnel-move-month')?.checked;
+  const firstMsg = !!document.getElementById('funnel-first-msg')?.checked;
+  const fb = document.getElementById('funnel-fb');
+  if (!/^\d{4}-\d{2}$/.test(month)) { fb.style.color = '#f87171'; fb.textContent = 'Escolha o mês.'; return; }
+  const [y, m] = month.split('-').map(Number);
+  const nowIso = new Date().toISOString();
+  const createdAt = month === getCurrentMonthKey() ? nowIso : new Date(y, m - 1, 1, 12, 0, 0).toISOString();
+  const stageLabel = (getStages(act).find(s => s.id === stage) || {}).label || stage;
+  const historyItem = { stage: stageLabel, at: new Date().toLocaleString('pt-BR') };
+  const selected = _contatosEntries.filter(e => _contatosSelected.has(e.key));
+  const items = [];
+  selected.forEach((e, i) => {
+    if (e.kind === 'contact') {
+      const lead = {
+        id: Date.now().toString() + '_' + i,
+        name: e.name, phone: String(e.phone || ''), email: '',
+        stage, act, tags: e.tags || [],
+        origem: 'Base de contatos', source: 'contatos',
+        history: [historyItem],
+        createdAt, updatedAt: nowIso
+      };
+      if (!firstMsg) lead.importado = true;
+      items.push(lead);
+    } else if (e.lead._docId) {
+      const upd = { _docId: e.lead._docId, updatedAt: nowIso };
+      if (e.lead.stage !== stage) { upd.stage = stage; upd.history = [...(e.lead.history || []), historyItem]; }
+      if (moveMonth) upd.createdAt = createdAt;
+      if (Object.keys(upd).length > 2) items.push(upd);
+    }
+  });
+  if (!items.length) { fb.textContent = 'Nada para mudar: os leads já estão nessa coluna.'; return; }
+  fb.style.color = 'var(--muted)'; fb.textContent = 'Salvando...';
+  try {
+    const ids = await window._fb.saveLeadsBatch(items);
+    items.forEach((item, i) => {
+      if (item._docId) {
+        const lead = (_leadsCache || []).find(l => l._docId === item._docId);
+        if (lead) { const { _docId, ...data } = item; Object.assign(lead, data); }
+      } else if (_leadsCache && !_leadsCache.some(l => l.id === item.id || l._docId === ids[i])) {
+        _leadsCache.push({ ...item, _docId: ids[i] });
+      }
+    });
+    closeHuvenModal();
+    _contatosSelected.clear();
+    showToast(`${items.length} contato(s) no funil em ${formatCrmMonthLabel(month)} · ${stageLabel}.`, 'success');
+    renderContatos();
+  } catch (e) {
+    fb.style.color = '#f87171'; fb.textContent = 'Erro: ' + e.message;
+  }
 }
 
 function renderAtendimento() {
@@ -4859,7 +5319,7 @@ function renderAtendimento() {
         <div style="font-size:13px;font-weight:500;color:var(--text);">${l.name||'—'}</div>
         <div style="font-size:12px;color:var(--muted);">${l.phone}</div>
       </div>
-      <button onclick="window.open('https://wa.me/55'+('${phone}'),'_blank')" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;background:rgba(37,211,102,0.12);border:1px solid rgba(37,211,102,0.3);color:#25d366;">
+      <button onclick="openLeadChat('${escapeJsString(l.id)}')" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;background:rgba(37,211,102,0.12);border:1px solid rgba(37,211,102,0.3);color:#25d366;">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.855L0 24l6.292-1.508A11.947 11.947 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.848 0-3.579-.498-5.073-1.367l-.361-.214-3.737.895.952-3.638-.235-.374A9.953 9.953 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
         Abrir conversa
       </button>
@@ -5112,6 +5572,7 @@ function renderCampaignList(campaigns) {
     if (c.status === 'paused') actions.push(btn('Retomar', 'startCampaign'));
     if (c.status === 'running' || c.status === 'paused') actions.push(btn('Cancelar', 'cancelCampaign', 'background:transparent;'));
     actions.push(btn('Detalhes', 'openCampaignDetail', 'background:transparent;'));
+    actions.push(btn('Reutilizar', 'reuseCampaign', 'background:transparent;'));
     if (c.status !== 'running') actions.push(btn('Excluir', 'deleteCampaignConfirm', 'background:transparent;color:#f87171;border-color:#f87171;'));
     const mediaLabel = c.media && c.media.type ? ' · ' + CAMPAIGN_MEDIA_LABELS[c.media.type] : '';
     return `
@@ -5286,7 +5747,17 @@ function onCampaignStartModeChange() {
   if (btn) btn.textContent = scheduled ? 'Salvar e programar' : 'Salvar e iniciar';
 }
 
-function openCampaignEditor() {
+// Reaproveita uma campanha: abre o editor com as mesmas mensagens, arquivo, regras e contatos.
+function reuseCampaign(id) {
+  const c = _campaignsCache.find(x => x.id === id);
+  if (!c) return;
+  openCampaignEditor(c);
+  const editor = document.getElementById('campaign-editor');
+  if (editor) editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function openCampaignEditor(copyFrom) {
+  if (copyFrom && !copyFrom.act) copyFrom = null; // chamado pelo botão "Nova campanha" (recebe o evento)
   const act = campaignAct();
   if (!act) { showToast('Escolha o cliente primeiro.', 'warning'); return; }
   const editor = document.getElementById('campaign-editor');
@@ -5294,14 +5765,15 @@ function openCampaignEditor() {
   const months = [...new Set(getLeads().filter(l => leadMatchesClient(l, act)).map(leadMonthKey).filter(Boolean))].sort().reverse();
   const hint = 'font-size:11px;color:var(--muted);margin:4px 0 10px;line-height:1.5;';
   const section = 'font-size:13px;font-weight:600;color:var(--text);margin:18px 0 6px;';
-  _campaignDraft = { act, source: 'crm', recipients: [], label: '', media: null };
+  _campaignDraft = { act, source: 'crm', recipients: [], label: '', media: null, copyFrom: copyFrom || null };
   editor.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-      <div style="font-size:15px;font-weight:600;color:var(--text);">Nova campanha</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text);">${copyFrom ? 'Reutilizar campanha' : 'Nova campanha'}</div>
       <button class="btn-close-panel" onclick="closeCampaignEditor()">×</button>
     </div>
     <label class="field-label">Nome da campanha</label>
-    <input class="field-input" id="camp-name" placeholder="Ex.: Promoção de outubro" style="margin-bottom:6px;">
+    <input class="field-input" id="camp-name" placeholder="Ex.: Promoção de outubro" style="margin-bottom:6px;" value="${copyFrom ? escapeHtml((copyFrom.name || 'Campanha') + ' (nova)') : ''}">
+    ${copyFrom ? `<div style="${hint}">Baseada em "${escapeHtml(copyFrom.name || 'Campanha')}". Mude o que quiser: mensagens (adicione ou apague variações), arquivo, contatos e regras.</div>` : ''}
 
     <div style="${section}">Conteúdo</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
@@ -5312,11 +5784,11 @@ function openCampaignEditor() {
       <div id="camp-media-status" style="${hint}"></div>
     </div>
     <div id="camp-text-hint" style="${hint}">Cadastre variações: cada contato recebe uma sorteada. Use {primeiro_nome} e {nome}; se o contato não tiver nome, o marcador some.</div>
-    ${whatsappVariationsHtml('camp', [])}
+    ${whatsappVariationsHtml('camp', copyFrom && Array.isArray(copyFrom.templates) ? copyFrom.templates : [])}
 
     <div style="${section}">Para quem enviar</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-      ${[['crm', 'Leads do CRM'], ['sheet', 'Planilha'], ['contacts', 'Contatos do WhatsApp'], ['groups', 'Grupos do WhatsApp']].map(([k, l]) =>
+      ${[...(copyFrom ? [['previous', 'Mesmos contatos da campanha']] : []), ['crm', 'Leads do CRM'], ['pick', 'Escolher contatos / etiquetas'], ['sheet', 'Planilha'], ['contacts', 'Contatos do WhatsApp'], ['groups', 'Grupos do WhatsApp']].map(([k, l]) =>
         `<button id="camp-src-${k}" style="${wbtn}" onclick="selectCampaignSource('${k}')">${l}</button>`).join('')}
     </div>
     <div id="camp-src-crm-box" class="camp-src-box">
@@ -5337,6 +5809,18 @@ function openCampaignEditor() {
           </select>
         </div>
       </div>
+    </div>
+    ${copyFrom ? `<div id="camp-src-previous-box" class="camp-src-box" style="display:none;">
+      <div style="${hint}">Os contatos que estavam em "${escapeHtml(copyFrom.name || 'Campanha')}". Quem pediu para sair continua sendo pulado.</div>
+      <select class="field-input" id="camp-prev-filter" onchange="loadPreviousCampaignRecipients()" style="width:auto;">
+        <option value="all">Todos os contatos da campanha</option>
+        <option value="sent">Só quem recebeu a mensagem</option>
+        <option value="notsent">Só quem não recebeu (pulados, com erro ou na fila)</option>
+      </select>
+    </div>` : ''}
+    <div id="camp-src-pick-box" class="camp-src-box" style="display:none;">
+      <div style="${hint}">Marque os contatos um a um, ou filtre por etiqueta e use "Selecionar todos". As etiquetas são criadas na tela Contatos.</div>
+      <div id="camp-pick"></div>
     </div>
     <div id="camp-src-sheet-box" class="camp-src-box" style="display:none;">
       <div style="${hint}">Planilha .xlsx ou .csv com uma coluna de nome e uma de telefone (com DDD). A primeira linha pode ter os títulos.</div>
@@ -5374,9 +5858,142 @@ function openCampaignEditor() {
     </div>`;
   editor.style.display = 'block';
   editor.querySelectorAll('#camp-daily,#camp-hourly,#camp-start,#camp-end,#camp-warmup').forEach(el => el.addEventListener('change', renderCampaignSummary));
-  selectCampaignMediaType('text');
-  selectCampaignSource('crm');
+  if (copyFrom) {
+    applyCampaignCopy(copyFrom);
+    selectCampaignSource('previous');
+  } else {
+    selectCampaignMediaType('text');
+    selectCampaignSource('crm');
+  }
 }
+
+// Preenche arquivo e regras de disparo a partir da campanha reaproveitada.
+function applyCampaignCopy(c) {
+  const media = c.media && c.media.type ? c.media : null;
+  selectCampaignMediaType(media ? media.type : 'text');
+  if (media) {
+    const status = document.getElementById('camp-media-status');
+    // Os arquivos ficam guardados por 30 dias.
+    const ageDays = (Date.now() - new Date(c.createdAt || 0).getTime()) / 86400000;
+    if (ageDays < 29) {
+      _campaignDraft.media = { ...media };
+      status.innerHTML = `<span style="color:#34d399;">✓ Usando o arquivo da campanha anterior (${escapeHtml(media.fileName || media.type)}). Envie outro se quiser trocar.</span>`;
+    } else {
+      status.innerHTML = '<span style="color:#fbbf24;">O arquivo da campanha anterior expirou (fica guardado por 30 dias). Envie o arquivo de novo.</span>';
+    }
+  }
+  const d = c.dispatch || {};
+  const set = (f, v) => { const el = document.getElementById('camp-' + f); if (el && v !== undefined && v !== null && v !== '') el.value = v; };
+  set('daily', d.dailyLimit); set('hourly', d.hourlyLimit); set('minint', d.minIntervalSec); set('maxint', d.maxIntervalSec);
+  set('typmin', d.typingMinSec); set('typmax', d.typingMaxSec); set('start', d.startHour); set('end', d.endHour);
+  if (d.checkNumber !== undefined) document.getElementById('camp-check').checked = !!d.checkNumber;
+  if (d.warmup !== undefined) document.getElementById('camp-warmup').checked = !!d.warmup;
+}
+
+async function loadPreviousCampaignRecipients() {
+  if (!_campaignDraft || !_campaignDraft.copyFrom || _campaignDraft.source !== 'previous') return;
+  const c = _campaignDraft.copyFrom;
+  const filter = (document.getElementById('camp-prev-filter') || {}).value || 'all';
+  const summary = document.getElementById('camp-summary');
+  summary.textContent = 'Carregando os contatos da campanha...';
+  try {
+    if (!_campaignDraft.prevRows) _campaignDraft.prevRows = await window._fb.getCampaignRecipients(c.id, 20000);
+    if (!_campaignDraft || _campaignDraft.source !== 'previous') return;
+    const rows = _campaignDraft.prevRows.filter(r => filter === 'all' || (filter === 'sent' ? r.status === 'sent' : r.status !== 'sent'));
+    const labels = { all: '', sent: ', só quem recebeu', notsent: ', só quem não recebeu' };
+    setCampaignRecipients(rows.map(r => ({ name: r.name, phone: r.phone, jid: r.jid })), `Contatos de "${c.name || 'Campanha'}"${labels[filter]}`);
+  } catch (e) {
+    summary.innerHTML = `<span style="color:#f87171;">${escapeHtml(e.message)}</span>`;
+  }
+}
+
+// ----- Escolher contatos (com etiquetas) -----
+function renderCampaignPicker() {
+  if (!_campaignDraft) return;
+  const act = _campaignDraft.act;
+  const box = document.getElementById('camp-pick');
+  if (!box) return;
+  if (!_campaignDraft.pick) _campaignDraft.pick = { selected: new Set(), tags: new Set(), q: '', shown: 200 };
+  if (!box.dataset.ready) {
+    box.dataset.ready = '1';
+    box.innerHTML = `
+      <input class="field-input" id="camp-pick-search" placeholder="Buscar nome ou telefone..." style="margin-bottom:8px;padding:8px 10px;font-size:13px;" oninput="_campaignDraft.pick.q = this.value; _campaignDraft.pick.shown = 200; renderCampaignPickerList();">
+      <div id="camp-pick-tags" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;"></div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);cursor:pointer;"><input type="checkbox" id="camp-pick-all" onchange="toggleAllCampaignPick(this.checked)"> Selecionar todos (do filtro)</label>
+        <span id="camp-pick-count" style="font-size:12px;color:var(--muted);"></span>
+      </div>
+      <div id="camp-pick-list" style="max-height:320px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:4px 10px;"></div>`;
+  }
+  ensureImportedContacts(act, renderCampaignPickerList);
+  if (!_contactTagsCache[act]) loadContactTags(act).then(renderCampaignPickerList);
+  renderCampaignPickerList();
+}
+
+function campaignPickEntries() {
+  return buildContactEntries(_campaignDraft.act)
+    .filter(e => (e.phone || (e.lead && e.lead.whatsappJid)) && !(e.lead && e.lead.whatsappOptOut));
+}
+
+function renderCampaignPickerList() {
+  if (!_campaignDraft || !_campaignDraft.pick || _campaignDraft.source !== 'pick') return;
+  const p = _campaignDraft.pick;
+  const tags = _contactTagsCache[_campaignDraft.act] || [];
+  const tagById = Object.fromEntries(tags.map(t => [t.id, t]));
+  const entries = campaignPickEntries();
+  const filtered = filterContactEntries(entries, p.tags, p.q);
+  _campaignDraft.pickEntries = entries;
+  _campaignDraft.pickFiltered = filtered;
+  const tagBox = document.getElementById('camp-pick-tags');
+  if (tagBox) tagBox.innerHTML = tags.length
+    ? `<span style="font-size:12px;color:var(--muted);align-self:center;">Etiquetas:</span>${tagFilterChipsHtml(tags, p.tags, 'toggleCampaignPickTag')}`
+    : '<span style="font-size:12px;color:var(--muted);">Nenhuma etiqueta criada (crie na tela Contatos).</span>';
+  const all = document.getElementById('camp-pick-all');
+  if (all) all.checked = filtered.length > 0 && filtered.every(e => p.selected.has(e.key));
+  const count = document.getElementById('camp-pick-count');
+  if (count) count.textContent = `${filtered.length} no filtro · ${p.selected.size} selecionado(s)`;
+  const list = document.getElementById('camp-pick-list');
+  if (list) list.innerHTML = filtered.length
+    ? filtered.slice(0, p.shown).map(e => {
+      const chips = e.tags.map(id => tagById[id]).filter(Boolean).map(t => tagChipHtml(t)).join(' ');
+      return `<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);padding:5px 0;cursor:pointer;border-bottom:1px solid var(--border);">
+        <input type="checkbox" ${p.selected.has(e.key) ? 'checked' : ''} onchange="toggleCampaignPick('${escapeJsString(e.key)}', this.checked)">
+        <span style="flex:1;min-width:0;">${escapeHtml(e.name || '—')} <span style="color:var(--muted);font-size:12px;">${escapeHtml(e.phone || 'nº oculto')}</span> ${chips}</span></label>`;
+    }).join('') + (filtered.length > p.shown ? `<div style="text-align:center;padding:6px;"><button class="chat-pill" onclick="_campaignDraft.pick.shown += 300; renderCampaignPickerList();">Mostrar mais (${filtered.length - p.shown})</button></div>` : '')
+    : '<div style="font-size:12px;color:var(--muted);padding:8px 0;">Nenhum contato neste filtro.</div>';
+  updateCampaignPickRecipients();
+}
+
+function toggleCampaignPickTag(id) {
+  const p = _campaignDraft.pick;
+  if (p.tags.has(id)) p.tags.delete(id); else p.tags.add(id);
+  p.shown = 200;
+  renderCampaignPickerList();
+}
+
+function toggleCampaignPick(key, checked) {
+  const p = _campaignDraft.pick;
+  if (checked) p.selected.add(key); else p.selected.delete(key);
+  renderCampaignPickerList();
+}
+
+function toggleAllCampaignPick(checked) {
+  const p = _campaignDraft.pick;
+  (_campaignDraft.pickFiltered || []).forEach(e => { if (checked) p.selected.add(e.key); else p.selected.delete(e.key); });
+  renderCampaignPickerList();
+}
+
+function updateCampaignPickRecipients() {
+  const p = _campaignDraft.pick;
+  const chosen = (_campaignDraft.pickEntries || []).filter(e => p.selected.has(e.key));
+  const tagNames = [...p.tags].map(id => ((_contactTagsCache[_campaignDraft.act] || []).find(t => t.id === id) || {}).name).filter(Boolean);
+  const filtered = _campaignDraft.pickFiltered || [];
+  const label = tagNames.length && chosen.length === filtered.length && filtered.every(e => p.selected.has(e.key))
+    ? `Etiquetas: ${tagNames.join(', ')}`
+    : `Contatos escolhidos (${chosen.length})`;
+  setCampaignRecipients(chosen.map(e => ({ name: e.name, phone: e.phone, jid: e.lead ? e.lead.whatsappJid : '' })), label);
+}
+
 
 function closeCampaignEditor() {
   const editor = document.getElementById('campaign-editor');
@@ -5430,13 +6047,15 @@ function selectCampaignSource(source) {
   _campaignDraft.source = source;
   _campaignDraft.recipients = [];
   _campaignDraft.label = '';
-  ['crm', 'sheet', 'contacts', 'groups'].forEach(k => {
+  ['previous', 'crm', 'pick', 'sheet', 'contacts', 'groups'].forEach(k => {
     const box = document.getElementById(`camp-src-${k}-box`);
     const btn = document.getElementById(`camp-src-${k}`);
     if (box) box.style.display = k === source ? 'block' : 'none';
     if (btn) btn.style.background = k === source ? 'var(--accent-glow)' : 'transparent';
   });
   if (source === 'crm') buildCampaignAudience();
+  else if (source === 'previous') loadPreviousCampaignRecipients();
+  else if (source === 'pick') renderCampaignPicker();
   else renderCampaignSummary();
 }
 
@@ -6387,6 +7006,7 @@ let _chatMsgLimit = 150;
 let _chatMedia = {};
 let _chatPendingMedia = null;
 let _chatSending = false;
+let _chatExtra = {}; // conversas abertas pelo card/contato que não estão entre as mais recentes
 
 const CHAT_FILTERS = [
   ['all', 'Todas'],
@@ -6480,7 +7100,7 @@ function renderChatView() {
 
 function onChatClientChange() {
   const act = chatAct();
-  if (_chatUnsub && _chatAct !== act) { _chatUnsub(); _chatUnsub = null; closeChat(); }
+  if (_chatUnsub && _chatAct !== act) { _chatUnsub(); _chatUnsub = null; _chatExtra = {}; closeChat(); }
   const list = document.getElementById('chat-list');
   if (!act) {
     _chatAct = null; _chatItems = [];
@@ -6493,7 +7113,7 @@ function onChatClientChange() {
     list.innerHTML = '<div class="chat-empty">Carregando conversas...</div>';
     _chatUnsub = window._fb.listenInboxChats(act, _chatLimit, (items, error) => {
       if (!items) { list.innerHTML = `<div class="chat-empty" style="color:var(--red);">Não foi possível carregar: ${escapeHtml(error && error.message || '')}</div>`; return; }
-      _chatItems = items;
+      _chatItems = items.concat(Object.values(_chatExtra).filter(x => !items.some(i => i.id === x.id)));
       renderChatList();
       renderChatHeader();
       const open = items.find(c => c.id === _chatOpenKey);
@@ -6765,7 +7385,7 @@ async function sendChatMessage() {
   }
 }
 
-function openNewChat() {
+function openNewChat(prefill) {
   if (!_chatAct) { showToast('Escolha o cliente primeiro.', 'warning'); return; }
   if (_chatMsgUnsub) { _chatMsgUnsub(); _chatMsgUnsub = null; }
   _chatOpenKey = null;
@@ -6782,7 +7402,46 @@ function openNewChat() {
       <button class="btn-save" id="chat-new-btn" style="width:auto;padding:10px 18px;" onclick="sendNewChat()">Enviar</button>
       <div id="chat-new-fb" style="font-size:12px;margin-top:8px;"></div>
     </div>`;
+  if (prefill) {
+    document.getElementById('chat-new-phone').value = prefill.phone || '';
+    document.getElementById('chat-new-name').value = prefill.name || '';
+    setTimeout(() => { const t = document.getElementById('chat-new-text'); if (t) t.focus(); }, 50);
+  }
   renderChatList();
+}
+
+// Abre a conversa de um lead/contato no Chat do CRM (ou começa uma nova com o número dele).
+async function openChatWith({ act, phone, jid, name }) {
+  act = normalizeActValue(act);
+  if (!act) { showToast('Este contato não tem cliente definido.', 'warning'); return; }
+  switchView('chat');
+  if (typeof setMobileNav === 'function') setMobileNav('chat');
+  if (isAdmin) {
+    const sel = document.getElementById('chat-client-select');
+    if (![...sel.options].some(o => o.value === act)) { showToast('Cliente deste contato não encontrado.', 'warning'); return; }
+    if (sel.value !== act) { sel.value = act; onChatClientChange(); }
+  } else if (normalizeActValue(chatAct()) !== act) {
+    showToast('Este contato é de outro cliente.', 'warning'); return;
+  }
+  const lidKey = jid && String(jid).endsWith('@lid') ? 'lid_' + String(jid).split('@')[0].replace(/[^w.-]/g, '') : '';
+  const key = phone ? chatPhoneKey(phone) : lidKey;
+  let chat = _chatItems.find(c => c.id === key || (jid && (c.lid === jid || c.jid === jid)));
+  if (!chat) {
+    for (const k of [key, lidKey].filter(Boolean)) {
+      try { chat = await window._fb.getInboxChat(act, k); } catch (e) { chat = null; }
+      if (chat) break;
+    }
+    if (chat) { _chatExtra[chat.id] = chat; if (!_chatItems.some(c => c.id === chat.id)) _chatItems.push(chat); }
+  }
+  if (chat) { openChat(chat.id); return; }
+  if (!phone) { showToast('O WhatsApp escondeu o número deste contato e ainda não há conversa com ele no Chat.', 'warning'); return; }
+  openNewChat({ phone, name });
+}
+
+function openLeadChat(id) {
+  const lead = getLeads().find(l => l.id === id);
+  if (!lead) return;
+  openChatWith({ act: lead.act, phone: lead.phone, jid: lead.whatsappJid, name: lead.name });
 }
 
 async function sendNewChat() {
@@ -7871,8 +8530,8 @@ function renderKanban() {
         <button class="card-btn" onclick="editLead('${safeLeadId}')">Editar</button>
         <button class="card-btn" onclick="openMoveModal('${safeLeadId}')">Mover</button>
         <button class="card-btn" onclick="showHistory('${safeLeadId}')">Hist.</button>
-        ${(waLink || (lead.whatsappJid && !lead.whatsappFirstMessageAt && lead.source !== 'whatsapp')) ? ((lead.whatsappFirstMessageAt || lead.source === 'whatsapp')
-          ? `<button class="card-btn card-btn-whatsapp" onclick="window.open('${waLink}','_blank')" title="Abrir WhatsApp"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.112.554 4.094 1.523 5.812L.057 23.997l6.305-1.654A11.954 11.954 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.012-1.376l-.36-.214-3.733.979 1-3.647-.235-.374A9.818 9.818 0 0 1 2.182 12C2.182 6.58 6.58 2.182 12 2.182S21.818 6.58 21.818 12 17.42 21.818 12 21.818z"/></svg></button>`
+        ${(waLink || lead.whatsappJid) ? ((lead.whatsappFirstMessageAt || lead.source === 'whatsapp')
+          ? `<button class="card-btn card-btn-whatsapp" onclick="openLeadChat('${safeLeadId}')" title="Abrir conversa no Chat do CRM"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.112.554 4.094 1.523 5.812L.057 23.997l6.305-1.654A11.954 11.954 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.012-1.376l-.36-.214-3.733.979 1-3.647-.235-.374A9.818 9.818 0 0 1 2.182 12C2.182 6.58 6.58 2.182 12 2.182S21.818 6.58 21.818 12 17.42 21.818 12 21.818z"/></svg></button>`
           : `<button class="card-btn card-btn-first-msg" onclick="openFirstWhatsAppMessage('${lead.id}')" title="Enviar primeira mensagem no WhatsApp"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.112.554 4.094 1.523 5.812L.057 23.997l6.305-1.654A11.954 11.954 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.012-1.376l-.36-.214-3.733.979 1-3.647-.235-.374A9.818 9.818 0 0 1 2.182 12C2.182 6.58 6.58 2.182 12 2.182S21.818 6.58 21.818 12 17.42 21.818 12 21.818z"/></svg><span>1ª msg</span></button>`)
         : ''}
         ${whatsappCardBadge(lead, !!waLink)}
