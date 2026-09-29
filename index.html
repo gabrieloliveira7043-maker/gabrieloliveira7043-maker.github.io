@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -2129,6 +2129,12 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
 <script>
 const STORAGE_KEY = 'meta_ads_clients_v2';
 const WORKER_URL = "https://meta-proxy.gabrieloliveira7043.workers.dev";
+
+// O Worker da Meta só responde a quem está logado, e cada cliente só à própria conta.
+async function metaFetch(url) {
+  const token = window._fb ? await window._fb.getIdToken() : null;
+  return fetch(url, token ? { headers: { 'Authorization': 'Bearer ' + token } } : undefined);
+}
 let activeClient = null;
 let isAdmin = false;
 
@@ -2370,7 +2376,7 @@ async function loadData() {
   const campaignsUrl = `${WORKER_URL}?account=${account}&from=${from}&to=${to}&fields=id,effective_status`;
 
   try {
-    const [insRes, campRes, adsRes] = await Promise.all([fetch(insightsUrl), fetch(campaignsUrl), fetch(adsUrl).catch(() => null)]);
+    const [insRes, campRes, adsRes] = await Promise.all([metaFetch(insightsUrl), metaFetch(campaignsUrl), metaFetch(adsUrl).catch(() => null)]);
     const [insJson, campJson, adsJson] = await Promise.all([insRes.json(), campRes.json(), adsRes ? adsRes.json() : Promise.resolve({ data: [] })]);
     showLoading(false);
 
@@ -2530,8 +2536,8 @@ async function extractTrafficData() {
   showLoading(true);
   try {
     const [campaignRes, adsRes] = await Promise.all([
-      fetch(`${WORKER_URL}?account=${account}&from=${from}&to=${to}&fields=${fields}`),
-      fetch(`${WORKER_URL}?account=${account}&from=${from}&to=${to}&fields=${adsFields}&level=ad`)
+      metaFetch(`${WORKER_URL}?account=${account}&from=${from}&to=${to}&fields=${fields}`),
+      metaFetch(`${WORKER_URL}?account=${account}&from=${from}&to=${to}&fields=${adsFields}&level=ad`)
     ]);
     const [campaignJson, adsJson] = await Promise.all([campaignRes.json(), adsRes.json()]);
     showLoading(false);
@@ -2809,7 +2815,7 @@ async function loadAdThumbnails(account, rows) {
   if (!ids.length) return {};
   const url = `${WORKER_URL}?account=${account}&ad_ids=${encodeURIComponent(ids.join(','))}&fields=creative{thumbnail_url,image_url},thumbnail_url,image_url`;
   try {
-    const res = await fetch(url);
+    const res = await metaFetch(url);
     const json = await res.json();
     const list = Array.isArray(json && json.data) ? json.data : [];
     return list.reduce((map, item) => {
@@ -2940,7 +2946,7 @@ function renderAdsTable(rows) {
 async function loadDailyData(account, from, to) {
   const url = `${WORKER_URL}?account=${account}&from=${from}&to=${to}&fields=spend,reach,actions&time_increment=1`;
   try {
-    const res = await fetch(url);
+    const res = await metaFetch(url);
     const json = await res.json();
     if (json.error || !json.data) return [];
     return json.data;
