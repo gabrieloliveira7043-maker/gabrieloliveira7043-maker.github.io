@@ -5322,7 +5322,6 @@ const WHATSAPP_DISPATCH_DEFAULTS = {
   typingMinSec: 3, typingMaxSec: 8, checkNumber: true, warmup: false, warmupStartedAt: ''
 };
 const WHATSAPP_MAX_VARIATIONS = 5;
-const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 function getWhatsAppTemplates(act) {
   const s = WHATSAPP_SETTINGS[act] || {};
@@ -5390,16 +5389,12 @@ function toggleWhatsAppSettings(login) {
   if (box.style.display !== 'none') { box.style.display = 'none'; return; }
 
   const s = WHATSAPP_SETTINGS[act] || {};
-  const d = { ...WHATSAPP_DISPATCH_DEFAULTS, ...(s.dispatch || {}) };
   const capture = s.leadCapture || {};
   const id = escapeHtml(login);
   const jsLogin = escapeJsString(login);
-  const days = (Array.isArray(d.days) ? d.days : WHATSAPP_DISPATCH_DEFAULTS.days).map(Number);
   const section = 'font-size:13px;font-weight:600;color:var(--text);margin:14px 0 6px;';
   const hint = 'font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.5;';
-  const num = (field, value, min, max) => `<input type="number" class="field-input" id="wa-${field}-${id}" value="${escapeHtml(String(value))}" min="${min}" max="${max}" style="width:80px;padding:4px 8px;font-size:12px;">`;
   const lbl = 'display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);flex-wrap:wrap;';
-  const rowLabel = 'display:inline-block;min-width:190px;color:var(--muted);';
 
   box.innerHTML = `
     <div style="border-top:1px solid var(--border);padding-top:4px;">
@@ -5412,38 +5407,12 @@ function toggleWhatsAppSettings(login) {
       <label style="${lbl}margin-bottom:8px;"><input type="checkbox" id="wa-capture-${id}" ${capture.enabled ? 'checked' : ''}> Criar lead automaticamente com a mensagem da campanha</label>
       <textarea class="field-input" id="wa-phrases-${id}" rows="3" style="resize:vertical;width:100%;box-sizing:border-box;font-size:13px;" placeholder="Quero mais informações sobre o seu serviço">${escapeHtml((capture.phrases || []).join('\n'))}</textarea>
 
-      <div style="${section}">Disparo seguro (contra bloqueio)</div>
-      <div style="${hint}">Os valores já vêm com o recomendado e valem para a primeira mensagem e para as campanhas deste número. A primeira mensagem sai a qualquer hora (a pessoa acabou de pedir contato); horário e dias valem só para as campanhas. Número novo ou que já foi bloqueado: ligue o aquecimento.</div>
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        <label style="${lbl}"><span style="${rowLabel}">Máximo por dia</span>${num('daily', d.dailyLimit, 1, 1000)} mensagens</label>
-        <label style="${lbl}"><span style="${rowLabel}">Máximo por hora</span>${num('hourly', d.hourlyLimit, 1, 60)} mensagens</label>
-        <label style="${lbl}"><span style="${rowLabel}">Intervalo entre envios</span>${num('minint', d.minIntervalSec, 15, 3600)} a ${num('maxint', d.maxIntervalSec, 15, 3600)} segundos (sorteado)</label>
-        <label style="${lbl}"><span style="${rowLabel}">"Digitando..." antes de enviar</span>${num('typmin', d.typingMinSec, 1, 20)} a ${num('typmax', d.typingMaxSec, 1, 20)} segundos</label>
-        <label style="${lbl}"><span style="${rowLabel}">Horário das campanhas</span>das ${num('start', d.startHour, 0, 23)} às ${num('end', d.endHour, 1, 24)} h (Brasília)</label>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--text);">
-        Dias das campanhas: ${WEEKDAY_LABELS.map((label, i) => `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="wa-day-${id}" value="${i}" ${days.includes(i) ? 'checked' : ''}>${label}</label>`).join('')}
-      </div>
-      <label style="${lbl}margin-top:10px;"><input type="checkbox" id="wa-check-${id}" ${d.checkNumber ? 'checked' : ''}> Conferir se o número tem WhatsApp antes de enviar</label>
-      <label style="${lbl}margin-top:6px;"><input type="checkbox" id="wa-warmup-${id}" ${d.warmup ? 'checked' : ''}> Número novo (aquecimento: 20/dia nos dias 1–3, 50/dia nos dias 4–7, 100/dia nos dias 8–14)</label>
-
       <div style="display:flex;align-items:center;gap:10px;margin-top:14px;">
         <button style="${wbtn}" onclick="saveAdminWhatsAppSettings('${jsLogin}')">Salvar configurações</button>
-        <button style="${wbtn}background:transparent;" onclick="resetWhatsAppDispatch('${jsLogin}')">Voltar ao recomendado</button>
         <span id="wa-settings-feedback-${id}" style="font-size:12px;"></span>
       </div>
     </div>`;
   box.style.display = 'block';
-}
-
-function resetWhatsAppDispatch(login) {
-  const id = login;
-  const d = WHATSAPP_DISPATCH_DEFAULTS;
-  const set = (field, value) => { const el = document.getElementById(`wa-${field}-${id}`); if (el) el.value = value; };
-  set('daily', d.dailyLimit); set('hourly', d.hourlyLimit); set('minint', d.minIntervalSec); set('maxint', d.maxIntervalSec);
-  set('typmin', d.typingMinSec); set('typmax', d.typingMaxSec); set('start', d.startHour); set('end', d.endHour);
-  document.querySelectorAll(`.wa-day-${CSS.escape(id)}`).forEach(cb => { cb.checked = d.days.includes(Number(cb.value)); });
-  const check = document.getElementById('wa-check-' + id); if (check) check.checked = true;
 }
 
 async function saveAdminWhatsAppSettings(login) {
@@ -5452,7 +5421,6 @@ async function saveAdminWhatsAppSettings(login) {
   const id = login;
   const fb = document.getElementById('wa-settings-feedback-' + id);
   const feedback = (color, text) => { if (fb) { fb.style.color = color; fb.textContent = text; } };
-  const val = field => Number(document.getElementById(`wa-${field}-${id}`)?.value);
 
   const templates = readWhatsAppVariations('wa-' + id);
   if (!templates.length) { feedback('#f87171', 'Escreva pelo menos uma mensagem.'); return; }
@@ -5460,28 +5428,8 @@ async function saveAdminWhatsAppSettings(login) {
   const captureEnabled = !!document.getElementById('wa-capture-' + id)?.checked;
   if (captureEnabled && !phrases.length) { feedback('#f87171', 'Informe pelo menos uma frase da campanha.'); return; }
 
-  const days = [...document.querySelectorAll(`.wa-day-${CSS.escape(id)}`)].filter(cb => cb.checked).map(cb => Number(cb.value));
-  const dispatch = {
-    dailyLimit: val('daily'), hourlyLimit: val('hourly'),
-    minIntervalSec: val('minint'), maxIntervalSec: val('maxint'),
-    typingMinSec: val('typmin'), typingMaxSec: val('typmax'),
-    startHour: val('start'), endHour: val('end'),
-    days, checkNumber: !!document.getElementById('wa-check-' + id)?.checked,
-    warmup: !!document.getElementById('wa-warmup-' + id)?.checked
-  };
-  const numbers = ['dailyLimit', 'hourlyLimit', 'minIntervalSec', 'maxIntervalSec', 'typingMinSec', 'typingMaxSec', 'startHour', 'endHour'];
-  if (numbers.some(k => !Number.isFinite(dispatch[k]) || dispatch[k] < 0)) { feedback('#f87171', 'Confira os números.'); return; }
-  if (dispatch.maxIntervalSec < dispatch.minIntervalSec || dispatch.typingMaxSec < dispatch.typingMinSec) { feedback('#f87171', 'O valor máximo precisa ser maior que o mínimo.'); return; }
-  if (dispatch.endHour <= dispatch.startHour) { feedback('#f87171', 'O horário final precisa ser depois do inicial.'); return; }
-  if (!days.length) { feedback('#f87171', 'Escolha pelo menos um dia.'); return; }
-  if (dispatch.minIntervalSec < 30 || dispatch.hourlyLimit > 30) {
-    if (!await showConfirm('Intervalos abaixo de 30 s ou mais de 30 mensagens por hora aumentam bastante o risco de o WhatsApp bloquear o número.', 'Configuração arriscada', 'Salvar assim mesmo', true)) return;
-  }
-
-  const previous = (WHATSAPP_SETTINGS[act] && WHATSAPP_SETTINGS[act].dispatch) || {};
-  dispatch.warmupStartedAt = dispatch.warmup ? (previous.warmup && previous.warmupStartedAt ? previous.warmupStartedAt : new Date().toISOString()) : '';
-
-  const data = { templates, template: templates[0], leadCapture: { enabled: captureEnabled, phrases }, dispatch };
+  // O ritmo de envio (limites, intervalo, horário) usa sempre os valores recomendados; não é editado aqui.
+  const data = { templates, template: templates[0], leadCapture: { enabled: captureEnabled, phrases } };
   try {
     await window._fb.saveWhatsAppSettings(act, data);
     WHATSAPP_SETTINGS[act] = { ...(WHATSAPP_SETTINGS[act] || {}), ...data };
