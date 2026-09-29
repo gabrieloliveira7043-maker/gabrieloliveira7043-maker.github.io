@@ -1035,7 +1035,7 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script type="module">
   import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, doc, query, where, onSnapshot, writeBatch, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, collection, addDoc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, doc, query, where, onSnapshot, writeBatch, limit, deleteField } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
   const firebaseConfig = {
@@ -1292,6 +1292,34 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
       }
       await deleteDoc(doc(db, 'campaigns', id));
     },
+    // Cadência: mensagens programadas em grupos (group_schedules). "dueAt" existe só enquanto está agendada.
+    listenGroupSchedules(act, callback) {
+      return onSnapshot(query(collection(db, 'group_schedules'), where('act', '==', normalizeAct(act))), snap => {
+        callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }, error => console.warn('Cadência indisponível:', error));
+    },
+    async createGroupSchedules(items) {
+      for (let i = 0; i < items.length; i += 400) {
+        const batch = writeBatch(db);
+        items.slice(i, i + 400).forEach(item => {
+          batch.set(doc(collection(db, 'group_schedules')), {
+            ...item,
+            act: normalizeAct(item.act),
+            status: 'scheduled',
+            dueAt: item.sendAt,
+            createdAt: new Date().toISOString(),
+            createdBy: currentProfile ? currentProfile.login : ''
+          });
+        });
+        await batch.commit();
+      }
+    },
+    async cancelGroupSchedule(id) {
+      await updateDoc(doc(db, 'group_schedules', id), { status: 'cancelled', dueAt: deleteField(), updatedAt: new Date().toISOString() });
+    },
+    async deleteGroupSchedule(id) {
+      await deleteDoc(doc(db, 'group_schedules', id));
+    },
     // Base de contatos importados do WhatsApp: whatsapp_contacts/{act}__{n}, até 2.000 contatos por documento.
     async getWhatsAppContacts(act) {
       act = normalizeAct(act);
@@ -1397,6 +1425,10 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
     Campanhas
   </div>
+  <div class="mobile-nav-item" id="mnav-cadencia" onclick="switchView('cadencia'); setMobileNav('cadencia')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 14v3l2 1"/></svg>
+    Cadência
+  </div>
   <div class="mobile-nav-item theme-toggle-mobile" id="mnav-theme" onclick="toggleHuvenTheme()">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
     Tema <span id="huven-theme-label-mobile">Claro</span>
@@ -1469,6 +1501,10 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
         <div class="nav-item" id="nav-campanhas" onclick="switchView('campanhas')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
           Campanhas
+        </div>
+        <div class="nav-item" id="nav-cadencia" onclick="switchView('cadencia')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 14v3l2 1"/></svg>
+          Cadência
         </div>
         <div class="nav-item" id="nav-contatos" onclick="if(window.abrirContatos) abrirContatos(); else switchView('contatos')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/><line x1="20" y1="8" x2="20" y2="14"/></svg>
@@ -2268,6 +2304,24 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
         </div>
         <div id="campaign-editor" style="display:none; background:var(--surface); border:1px solid var(--border); border-radius:var(--r2); padding:22px; margin-bottom:20px;"></div>
         <div id="campaign-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+      </div>
+    </div>
+
+    <!-- Cadência View -->
+    <div id="cadencia-view" style="display:none; padding:28px 32px;">
+      <div style="max-width:900px;">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:20px;">
+          <div>
+            <div style="font-size:18px; font-weight:600; color:var(--text); margin-bottom:6px;">Cadência</div>
+            <div style="font-size:13px; color:var(--muted);">Programe mensagens, imagens, vídeos e áudios para sair nos grupos do WhatsApp no dia e hora certos.</div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <select id="cadence-client-select" class="field-input" style="display:none; width:auto; padding:8px 10px; font-size:13px;" onchange="onCadenceClientChange()"></select>
+            <button class="btn-save" style="width:auto; padding:10px 18px;" onclick="openCadenceEditor()">+ Programar envio</button>
+          </div>
+        </div>
+        <div id="cadence-editor" style="display:none; background:var(--surface); border:1px solid var(--border); border-radius:var(--r2); padding:22px; margin-bottom:20px;"></div>
+        <div id="cadence-list"></div>
       </div>
     </div>
 
@@ -3920,12 +3974,12 @@ window.abrirContatos = function abrirContatos() {
     if(topbar) topbar.style.display = 'none';
     const contentEl = document.querySelector('.content');
     if(contentEl) contentEl.style.display = 'none';
-    ['crm-view','conta-view','whatsapp-view','campanhas-view'].forEach(id => {
+    ['crm-view','conta-view','whatsapp-view','campanhas-view','cadencia-view'].forEach(id => {
       const el = document.getElementById(id); if(el) el.style.display = 'none';
     });
     const v = document.getElementById('contatos-view');
     if(v) { v.style.cssText += ';display:block!important;visibility:visible!important;opacity:1!important;'; }
-    ['report','crm','ajuda','conta','whatsapp','campanhas','contatos','integracoes'].forEach(n => {
+    ['report','crm','ajuda','conta','whatsapp','campanhas','cadencia','contatos','integracoes'].forEach(n => {
       const el = document.getElementById('nav-'+n);
       if(el) el.classList.toggle('active', n==='contatos');
     });
@@ -4708,7 +4762,7 @@ function renderAtendimento() {
 }
 
 function switchView(view) {
-  ['report','crm','ajuda','conta','whatsapp','campanhas','contatos','integracoes'].forEach(v => {
+  ['report','crm','ajuda','conta','whatsapp','campanhas','cadencia','contatos','integracoes'].forEach(v => {
     const el = document.getElementById('nav-' + v);
     if (el) el.classList.toggle('active', v === view);
   });
@@ -4724,6 +4778,9 @@ function switchView(view) {
   const campanhasView = document.getElementById('campanhas-view');
   if (campanhasView) campanhasView.style.display = view === 'campanhas' ? 'block' : 'none';
   if (view === 'campanhas') renderCampaignsView();
+  const cadenciaView = document.getElementById('cadencia-view');
+  if (cadenciaView) cadenciaView.style.display = view === 'cadencia' ? 'block' : 'none';
+  if (view === 'cadencia') renderCadenceView();
   const contView = document.getElementById('contatos-view');
   if (contView) contView.style.display = view === 'contatos' ? 'block' : 'none';
   if (view === 'crm') {
@@ -5480,6 +5537,337 @@ async function saveCampaign(start) {
     if (start) await window._fb.updateCampaign(id, { status: 'running', startedAt: new Date().toISOString() });
     showToast(start ? 'Campanha criada e iniciada.' : 'Campanha salva como rascunho.', 'success');
     closeCampaignEditor();
+  } catch (e) {
+    setFb('#f87171', 'Erro: ' + e.message);
+  }
+}
+
+// ===== CADÊNCIA: MENSAGENS PROGRAMADAS EM GRUPOS =====
+const CADENCE_TYPES = { text: 'Texto', image: 'Imagem', video: 'Vídeo', audio: 'Áudio (voz)' };
+const CADENCE_STATUS = {
+  scheduled: ['Agendada', '#60a5fa'],
+  sent: ['Enviada', '#34d399'],
+  failed: ['Não enviada', '#f87171'],
+  cancelled: ['Cancelada', 'var(--muted)']
+};
+const CADENCE_MAX_ITEMS = 500;
+let _cadenceUnsubscribe = null;
+let _cadenceAct = null;
+let _cadenceItems = [];
+let _cadenceDraft = null;
+let _cadenceShowHistory = false;
+
+function cadenceAct() {
+  if (!isAdmin) return window._fb && window._fb.getProfile() ? window._fb.getProfile().act : null;
+  const sel = document.getElementById('cadence-client-select');
+  return sel && sel.value ? sel.value : null;
+}
+
+function renderCadenceView() {
+  const sel = document.getElementById('cadence-client-select');
+  if (isAdmin) {
+    const current = sel.value || (activeClient && activeClient.account) || '';
+    const entries = Object.entries(CREDENTIALS)
+      .filter(([login, cred]) => login !== 'admin' && cred && cred.act)
+      .map(([, cred]) => [cred.act, getClientDisplayName(cred.act)])
+      .sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
+    sel.innerHTML = '<option value="">Escolha o cliente</option>' + entries.map(([act, name]) => `<option value="${escapeHtml(act)}">${escapeHtml(name)}</option>`).join('');
+    sel.value = entries.some(([act]) => act === current) ? current : '';
+    sel.style.display = 'block';
+  } else if (sel) {
+    sel.style.display = 'none';
+  }
+  onCadenceClientChange();
+}
+
+function onCadenceClientChange() {
+  const act = cadenceAct();
+  closeCadenceEditor();
+  if (_cadenceUnsubscribe && _cadenceAct !== act) { _cadenceUnsubscribe(); _cadenceUnsubscribe = null; }
+  const list = document.getElementById('cadence-list');
+  if (!act) { list.innerHTML = '<div style="font-size:13px;color:var(--muted);">Escolha um cliente para ver e programar envios.</div>'; return; }
+  _cadenceAct = act;
+  if (!_cadenceUnsubscribe) {
+    list.innerHTML = '<div style="font-size:13px;color:var(--muted);">Carregando...</div>';
+    _cadenceUnsubscribe = window._fb.listenGroupSchedules(act, items => { _cadenceItems = items; renderCadenceList(); });
+  }
+}
+
+function cadenceDayLabel(date) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const d = new Date(date); d.setHours(0, 0, 0, 0);
+  const diff = Math.round((d - today) / 86400000);
+  const base = date.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+  return diff === 0 ? `Hoje · ${base}` : diff === 1 ? `Amanhã · ${base}` : diff === -1 ? `Ontem · ${base}` : base.charAt(0).toUpperCase() + base.slice(1);
+}
+
+function renderCadenceList() {
+  const list = document.getElementById('cadence-list');
+  if (!list) return;
+  const upcoming = _cadenceItems.filter(i => i.status === 'scheduled').sort((a, b) => String(a.sendAt).localeCompare(String(b.sendAt)));
+  const history = _cadenceItems.filter(i => i.status !== 'scheduled').sort((a, b) => String(b.sendAt).localeCompare(String(a.sendAt))).slice(0, 100);
+
+  const itemHtml = i => {
+    const [label, color] = CADENCE_STATUS[i.status] || [i.status, 'var(--muted)'];
+    const when = new Date(i.sendAt);
+    const late = i.status === 'scheduled' && when.getTime() < Date.now() - 90000;
+    const id = escapeJsString(i.id);
+    const preview = i.text ? escapeHtml(i.text.length > 140 ? i.text.slice(0, 140) + '…' : i.text) : '<span style="color:var(--muted);">(sem texto)</span>';
+    const actions = i.status === 'scheduled'
+      ? `<button style="${wbtn}" onclick="duplicateCadenceItem('${id}')">Duplicar</button><button style="${wbtn}background:transparent;" onclick="cancelCadenceItem('${id}')">Cancelar</button>`
+      : `<button style="${wbtn}" onclick="duplicateCadenceItem('${id}')">Duplicar</button><button style="${wbtn}background:transparent;color:#f87171;border-color:#f87171;" onclick="deleteCadenceItem('${id}')">Excluir</button>`;
+    return `
+      <div style="display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px;">
+        <div style="font-size:15px;font-weight:600;color:var(--text);min-width:52px;">${when.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">${escapeHtml(i.groupName || i.groupId)} · ${CADENCE_TYPES[i.type] || 'Texto'}${i.mentionAll ? ' · marca todos' : ''}${i.media && i.media.fileName ? ' · ' + escapeHtml(i.media.fileName) : ''}</div>
+          <div style="font-size:13px;color:var(--text);white-space:pre-wrap;word-break:break-word;">${preview}</div>
+          ${i.error ? `<div style="font-size:11px;color:#f87171;margin-top:4px;">${escapeHtml(i.error)}</div>` : ''}
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+          <span style="font-size:11px;font-weight:600;color:${late ? '#fbbf24' : color};white-space:nowrap;">● ${late ? 'Aguardando o servidor' : label}</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">${actions}</div>
+        </div>
+      </div>`;
+  };
+
+  const groupByDay = items => {
+    const days = [];
+    items.forEach(i => {
+      const key = new Date(i.sendAt).toDateString();
+      let day = days.find(d => d.key === key);
+      if (!day) { day = { key, date: new Date(i.sendAt), items: [] }; days.push(day); }
+      day.items.push(i);
+    });
+    return days.map(d => `<div style="font-size:13px;font-weight:600;color:var(--text);margin:16px 0 8px;">${escapeHtml(cadenceDayLabel(d.date))}</div>${d.items.map(itemHtml).join('')}`).join('');
+  };
+
+  list.innerHTML = (upcoming.length
+      ? groupByDay(upcoming)
+      : '<div style="font-size:13px;color:var(--muted);">Nenhum envio programado. Clique em "Programar envio".</div>')
+    + (history.length ? `
+      <div style="margin-top:24px;">
+        <button style="${wbtn}background:transparent;" onclick="_cadenceShowHistory=!_cadenceShowHistory;renderCadenceList()">${_cadenceShowHistory ? 'Esconder' : 'Ver'} histórico (${history.length})</button>
+        ${_cadenceShowHistory ? groupByDay(history) : ''}
+      </div>` : '');
+}
+
+async function cancelCadenceItem(id) {
+  if (!await showConfirm('Este envio não vai mais sair.', 'Cancelar envio', 'Cancelar envio', true)) return;
+  try { await window._fb.cancelGroupSchedule(id); showToast('Envio cancelado.', 'success'); }
+  catch (e) { showToast('Erro: ' + e.message, 'warning'); }
+}
+
+async function deleteCadenceItem(id) {
+  try { await window._fb.deleteGroupSchedule(id); }
+  catch (e) { showToast('Erro: ' + e.message, 'warning'); }
+}
+
+function duplicateCadenceItem(id) {
+  const item = _cadenceItems.find(i => i.id === id);
+  if (item) openCadenceEditor(item);
+}
+
+// ----- Programar envio -----
+
+function toLocalDateInput(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function toLocalTimeInput(d) { return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; }
+
+async function openCadenceEditor(copyFrom) {
+  const act = cadenceAct();
+  if (!act) { showToast('Escolha o cliente primeiro.', 'warning'); return; }
+  const editor = document.getElementById('cadence-editor');
+  const hint = 'font-size:11px;color:var(--muted);margin:4px 0 10px;line-height:1.5;';
+  const section = 'font-size:13px;font-weight:600;color:var(--text);margin:18px 0 6px;';
+  const tomorrow = new Date(Date.now() + 86400000);
+  const baseDate = copyFrom ? new Date(copyFrom.sendAt) : tomorrow;
+  if (copyFrom && baseDate < new Date()) baseDate.setTime(tomorrow.getTime());
+  _cadenceDraft = { act, type: copyFrom ? copyFrom.type || 'text' : 'text', media: copyFrom && copyFrom.media ? copyFrom.media : null, preselect: copyFrom ? [copyFrom.groupId] : [] };
+  editor.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div style="font-size:15px;font-weight:600;color:var(--text);">${copyFrom ? 'Duplicar envio' : 'Programar envio'}</div>
+      <button class="btn-close-panel" onclick="closeCadenceEditor()">×</button>
+    </div>
+
+    <div style="${section}margin-top:0;">Grupos</div>
+    <div style="${hint}">Marque um ou mais grupos: a mensagem sai em cada um deles.</div>
+    <input class="field-input" id="cad-group-search" placeholder="Buscar grupo..." oninput="filterCadenceGroups(this.value)" style="margin-bottom:6px;">
+    <div id="cad-groups" style="max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:6px 10px;">Carregando grupos...</div>
+
+    <div style="${section}">Quando</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+      <div><label class="field-label">Data</label><input type="date" class="field-input" id="cad-date" value="${toLocalDateInput(baseDate)}" onchange="renderCadencePreview()"></div>
+      <div><label class="field-label">Hora</label><input type="time" class="field-input" id="cad-time" value="${copyFrom ? toLocalTimeInput(baseDate) : '09:00'}" onchange="renderCadencePreview()"></div>
+      <div><label class="field-label">Repetir</label>
+        <select class="field-input" id="cad-repeat" onchange="renderCadencePreview()">
+          <option value="none">Não repetir</option>
+          <option value="daily">Todo dia</option>
+          <option value="weekdays">De segunda a sexta</option>
+          <option value="weekly">Toda semana (mesmo dia)</option>
+        </select></div>
+      <div id="cad-until-box" style="display:none;"><label class="field-label">Até</label><input type="date" class="field-input" id="cad-until" onchange="renderCadencePreview()"></div>
+    </div>
+
+    <div style="${section}">Conteúdo</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+      ${Object.entries(CADENCE_TYPES).map(([k, l]) => `<button id="cad-type-${k}" style="${wbtn}" onclick="selectCadenceType('${k}')">${l}</button>`).join('')}
+    </div>
+    <div id="cad-media-box" style="display:none;margin-bottom:8px;">
+      <input type="file" id="cad-media-file" class="field-input" onchange="uploadCadenceMedia(this)">
+      <div id="cad-media-status" style="${hint}"></div>
+    </div>
+    <textarea class="field-input" id="cad-text" rows="5" style="resize:vertical;width:100%;box-sizing:border-box;" placeholder="Texto da mensagem"></textarea>
+    <label id="cad-mention-box" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);margin-top:8px;cursor:pointer;">
+      <input type="checkbox" id="cad-mention" ${copyFrom && copyFrom.mentionAll ? 'checked' : ''}> Marcar todos do grupo (notifica cada participante)
+    </label>
+
+    <div id="cad-preview" style="margin-top:14px;padding:12px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text);"></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap;">
+      <button style="${wbtn}" onclick="saveCadence()">Programar</button>
+      <span id="cad-feedback" style="font-size:12px;"></span>
+    </div>`;
+  editor.style.display = 'block';
+  editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.getElementById('cad-text').value = copyFrom ? copyFrom.text || '' : '';
+  selectCadenceType(_cadenceDraft.type, true);
+  if (_cadenceDraft.media) {
+    document.getElementById('cad-media-status').innerHTML = `<span style="color:#34d399;">✓ ${escapeHtml(_cadenceDraft.media.fileName || 'arquivo')} (o mesmo do envio original)</span>`;
+  }
+  renderCadencePreview();
+  try {
+    const r = await window._fb.whatsapp('/whatsapp/groups', act);
+    const groups = (r.groups || []).sort((a, b) => a.subject.localeCompare(b.subject, 'pt-BR'));
+    const box = document.getElementById('cad-groups');
+    if (!box) return;
+    box.innerHTML = groups.length ? groups.map(g => `<label class="cad-group-row" data-name="${escapeHtml(g.subject.toLowerCase())}" style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);padding:4px 0;cursor:pointer;">
+        <input type="checkbox" class="cad-group" value="${escapeHtml(g.id)}" data-subject="${escapeHtml(g.subject)}" ${_cadenceDraft.preselect.includes(g.id) ? 'checked' : ''} onchange="renderCadencePreview()">
+        ${escapeHtml(g.subject)} <span style="color:var(--muted);font-size:11px;">(${g.size})</span></label>`).join('')
+      : '<div style="font-size:12px;color:var(--muted);">Nenhum grupo neste WhatsApp.</div>';
+    renderCadencePreview();
+  } catch (e) {
+    const box = document.getElementById('cad-groups');
+    if (box) box.innerHTML = `<div style="font-size:12px;color:#f87171;">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function closeCadenceEditor() {
+  const editor = document.getElementById('cadence-editor');
+  if (editor) { editor.style.display = 'none'; editor.innerHTML = ''; }
+  _cadenceDraft = null;
+}
+
+function filterCadenceGroups(term) {
+  const t = String(term || '').toLowerCase();
+  document.querySelectorAll('.cad-group-row').forEach(row => { row.style.display = !t || row.dataset.name.includes(t) ? 'flex' : 'none'; });
+}
+
+function selectCadenceType(type, keepMedia) {
+  if (!_cadenceDraft) return;
+  if (!keepMedia || _cadenceDraft.type !== type) _cadenceDraft.media = keepMedia ? _cadenceDraft.media : null;
+  _cadenceDraft.type = type;
+  Object.keys(CADENCE_TYPES).forEach(k => {
+    const b = document.getElementById('cad-type-' + k);
+    if (b) b.style.background = k === type ? 'var(--accent-glow)' : 'transparent';
+  });
+  const file = document.getElementById('cad-media-file');
+  document.getElementById('cad-media-box').style.display = type === 'text' ? 'none' : 'block';
+  document.getElementById('cad-mention-box').style.display = type === 'text' ? 'flex' : 'none';
+  file.value = '';
+  file.accept = type === 'image' ? 'image/jpeg,image/png,image/webp' : type === 'video' ? 'video/mp4' : 'audio/*';
+  if (!keepMedia) {
+    document.getElementById('cad-media-status').textContent = type === 'audio'
+      ? 'O áudio chega como mensagem de voz gravada na hora. O texto é opcional e vai logo depois.'
+      : type === 'text' ? '' : 'O texto vai como legenda (opcional). Até 24 MB.';
+  }
+  document.getElementById('cad-text').placeholder = type === 'text' ? 'Texto da mensagem' : 'Texto opcional';
+}
+
+async function uploadCadenceMedia(input) {
+  const file = input.files && input.files[0];
+  const status = document.getElementById('cad-media-status');
+  if (!file || !_cadenceDraft) return;
+  if (file.size > 24 * 1024 * 1024) { status.innerHTML = '<span style="color:#f87171;">Arquivo maior que 24 MB.</span>'; input.value = ''; return; }
+  status.textContent = 'Enviando arquivo...';
+  try {
+    const media = await window._fb.uploadCampaignMedia(_cadenceDraft.act, file);
+    if (media.type !== _cadenceDraft.type) throw new Error('O arquivo não é do tipo escolhido.');
+    _cadenceDraft.media = { type: media.type, url: media.url, mimetype: media.mimetype, fileName: media.fileName };
+    status.innerHTML = `<span style="color:#34d399;">✓ ${escapeHtml(media.fileName)} (${(media.size / 1024 / 1024).toFixed(1)} MB) pronto.</span>`;
+  } catch (e) {
+    _cadenceDraft.media = null;
+    input.value = '';
+    status.innerHTML = `<span style="color:#f87171;">Erro: ${escapeHtml(e.message)}</span>`;
+  }
+}
+
+// Datas/horas de cada envio, conforme a repetição escolhida.
+function cadenceOccurrences() {
+  const date = document.getElementById('cad-date').value;
+  const time = document.getElementById('cad-time').value;
+  const repeat = document.getElementById('cad-repeat').value;
+  const untilBox = document.getElementById('cad-until-box');
+  untilBox.style.display = repeat === 'none' ? 'none' : 'block';
+  if (!date || !time) return [];
+  const first = new Date(`${date}T${time}`);
+  if (isNaN(first.getTime())) return [];
+  if (repeat === 'none') return [first];
+  const untilValue = document.getElementById('cad-until').value;
+  if (!untilValue) return [first];
+  const until = new Date(`${untilValue}T23:59`);
+  const out = [];
+  for (let d = new Date(first); d <= until && out.length < CADENCE_MAX_ITEMS; d = new Date(d.getTime() + 86400000)) {
+    const dow = d.getDay();
+    if (repeat === 'daily' || (repeat === 'weekdays' && dow >= 1 && dow <= 5) || (repeat === 'weekly' && dow === first.getDay())) {
+      out.push(new Date(d));
+    }
+  }
+  return out;
+}
+
+function renderCadencePreview() {
+  const box = document.getElementById('cad-preview');
+  if (!box || !_cadenceDraft) return;
+  const groups = [...document.querySelectorAll('.cad-group:checked')];
+  const dates = cadenceOccurrences();
+  const total = groups.length * dates.length;
+  if (!groups.length || !dates.length) { box.innerHTML = '<span style="color:var(--muted);">Escolha os grupos, a data e a hora.</span>'; return; }
+  const past = dates.filter(d => d < new Date()).length;
+  const fmt = d => d.toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  box.innerHTML = `<b>${total} envio(s)</b>: ${dates.length} data(s) × ${groups.length} grupo(s).
+    <div style="color:var(--muted);font-size:12px;margin-top:4px;">${dates.slice(0, 6).map(fmt).join(' · ')}${dates.length > 6 ? ` · e mais ${dates.length - 6}` : ''}</div>
+    ${past ? `<div style="color:#f87171;font-size:12px;margin-top:4px;">${past} data(s) já passaram e não serão programadas.</div>` : ''}
+    ${total > CADENCE_MAX_ITEMS ? `<div style="color:#f87171;font-size:12px;margin-top:4px;">Máximo de ${CADENCE_MAX_ITEMS} envios por vez.</div>` : ''}`;
+}
+
+async function saveCadence() {
+  const fb = document.getElementById('cad-feedback');
+  const setFb = (color, text) => { fb.style.color = color; fb.textContent = text; };
+  const groups = [...document.querySelectorAll('.cad-group:checked')].map(cb => ({ id: cb.value, name: cb.getAttribute('data-subject') }));
+  const dates = cadenceOccurrences().filter(d => d > new Date());
+  const text = document.getElementById('cad-text').value.trim();
+  const type = _cadenceDraft.type;
+  if (!groups.length) { setFb('#f87171', 'Escolha pelo menos um grupo.'); return; }
+  if (!dates.length) { setFb('#f87171', 'Escolha uma data e hora no futuro.'); return; }
+  if (type === 'text' && !text) { setFb('#f87171', 'Escreva a mensagem.'); return; }
+  if (type !== 'text' && !_cadenceDraft.media) { setFb('#f87171', 'Envie o arquivo.'); return; }
+  if (document.getElementById('cad-repeat').value !== 'none' && !document.getElementById('cad-until').value) { setFb('#f87171', 'Escolha até quando repetir.'); return; }
+  const items = [];
+  dates.forEach(d => groups.forEach(g => items.push({
+    act: _cadenceDraft.act,
+    groupId: g.id,
+    groupName: g.name,
+    type,
+    text,
+    media: type === 'text' ? null : _cadenceDraft.media,
+    mentionAll: type === 'text' && !!document.getElementById('cad-mention').checked,
+    sendAt: d.toISOString()
+  })));
+  if (items.length > CADENCE_MAX_ITEMS) { setFb('#f87171', `São ${items.length} envios; o máximo é ${CADENCE_MAX_ITEMS} por vez.`); return; }
+  setFb('var(--muted)', 'Programando...');
+  try {
+    await window._fb.createGroupSchedules(items);
+    showToast(`${items.length} envio(s) programado(s).`, 'success');
+    closeCadenceEditor();
   } catch (e) {
     setFb('#f87171', 'Erro: ' + e.message);
   }
@@ -7000,7 +7388,7 @@ function moveLeadTo(id, stageId) {
 
 
 function setMobileNav(view) {
-  ['report','crm','ajuda','conta','whatsapp','campanhas','integracoes','cfg'].forEach(v => {
+  ['report','crm','ajuda','conta','whatsapp','campanhas','cadencia','integracoes','cfg'].forEach(v => {
     const el = document.getElementById('mnav-' + v);
     if (el) el.classList.toggle('active', v === view);
   });
