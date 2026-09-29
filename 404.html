@@ -6311,9 +6311,10 @@ function toggleWhatsAppSettings(login) {
       ${whatsappVariationsHtml('wa-' + id, getWhatsAppTemplates(act))}
 
       <div style="${section}">Captura de leads pelo WhatsApp</div>
-      <div style="${hint}">Quando alguém mandar uma mensagem com uma destas frases (uma por linha), o card é criado em "Novo lead" com o nome e o telefone. Maiúsculas e acentos não importam. Quem responder "sair" ou "parar" deixa de receber mensagens automáticas.</div>
+      <div style="${hint}">Quando alguém mandar uma mensagem que bata com uma das identificações abaixo, o card é criado com o nome e o telefone, na coluna escolhida. Maiúsculas e acentos não importam; vale a primeira identificação da lista que bater. Quem responder "sair" ou "parar" deixa de receber mensagens automáticas.</div>
       <label style="${lbl}margin-bottom:8px;"><input type="checkbox" id="wa-capture-${id}" ${capture.enabled ? 'checked' : ''}> Criar lead automaticamente com a mensagem da campanha</label>
-      <textarea class="field-input" id="wa-phrases-${id}" rows="3" style="resize:vertical;width:100%;box-sizing:border-box;font-size:13px;" placeholder="Quero mais informações sobre o seu serviço">${escapeHtml((capture.phrases || []).join('\n'))}</textarea>
+      <div id="wa-rules-${id}">${captureRulesFromSettings(capture).map(r => captureRuleRowHtml(act, r)).join('')}</div>
+      <button style="${wbtn}background:transparent;margin-top:4px;" onclick="addCaptureRule('${jsLogin}')">+ Adicionar identificação</button>
 
       <div style="display:flex;align-items:center;gap:10px;margin-top:14px;">
         <button style="${wbtn}" onclick="saveAdminWhatsAppSettings('${jsLogin}')">Salvar configurações</button>
@@ -6321,6 +6322,53 @@ function toggleWhatsAppSettings(login) {
       </div>
     </div>`;
   box.style.display = 'block';
+}
+
+// ----- Identificações de mensagem (captura de leads pelo WhatsApp) -----
+const CAPTURE_MATCH_LABELS = { contains: 'Contém a frase', starts: 'Começa com a frase', exact: 'É exatamente a frase' };
+
+function captureRulesFromSettings(capture) {
+  const rules = Array.isArray(capture.rules) && capture.rules.length
+    ? capture.rules
+    : (capture.phrases || []).map(phrase => ({ phrase, match: 'contains', stage: 'novo', origem: '' }));
+  return rules.length ? rules : [{ phrase: '', match: 'contains', stage: 'novo', origem: '' }];
+}
+
+function captureRuleRowHtml(act, rule) {
+  const stages = getStages(act) || [];
+  const input = 'padding:6px 8px;font-size:12px;';
+  return `
+    <div class="wa-rule" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:6px;">
+      <input class="field-input wa-rule-phrase" style="${input}flex:2;min-width:200px;" placeholder="Frase da mensagem (ex.: Quero mais informações)" value="${escapeHtml(rule.phrase || '')}">
+      <select class="field-input wa-rule-match" style="${input}width:auto;">
+        ${Object.entries(CAPTURE_MATCH_LABELS).map(([k, l]) => `<option value="${k}" ${(rule.match || 'contains') === k ? 'selected' : ''}>${l}</option>`).join('')}
+      </select>
+      <select class="field-input wa-rule-stage" style="${input}width:auto;" title="Coluna do kanban">
+        ${stages.map(s => `<option value="${escapeHtml(s.id)}" ${(rule.stage || 'novo') === s.id ? 'selected' : ''}>${escapeHtml(s.label)}</option>`).join('')}
+      </select>
+      <input class="field-input wa-rule-origem" style="${input}flex:1;min-width:150px;" placeholder="Campanha / origem (opcional)" value="${escapeHtml(rule.origem || '')}">
+      <button style="${wbtn}background:transparent;color:#f87171;border-color:#f87171;" onclick="this.closest('.wa-rule').remove()" title="Remover">✕</button>
+    </div>`;
+}
+
+function addCaptureRule(login) {
+  const act = CREDENTIALS[login] && CREDENTIALS[login].act;
+  const box = document.getElementById('wa-rules-' + login);
+  if (!act || !box) return;
+  box.insertAdjacentHTML('beforeend', captureRuleRowHtml(act, { phrase: '', match: 'contains', stage: 'novo', origem: '' }));
+  const inputs = box.querySelectorAll('.wa-rule-phrase');
+  inputs[inputs.length - 1].focus();
+}
+
+function readCaptureRules(login) {
+  const box = document.getElementById('wa-rules-' + login);
+  if (!box) return [];
+  return [...box.querySelectorAll('.wa-rule')].map(row => ({
+    phrase: row.querySelector('.wa-rule-phrase').value.trim(),
+    match: row.querySelector('.wa-rule-match').value,
+    stage: row.querySelector('.wa-rule-stage').value,
+    origem: row.querySelector('.wa-rule-origem').value.trim()
+  })).filter(r => r.phrase);
 }
 
 async function saveAdminWhatsAppSettings(login) {
@@ -6332,12 +6380,13 @@ async function saveAdminWhatsAppSettings(login) {
 
   const templates = readWhatsAppVariations('wa-' + id);
   if (!templates.length) { feedback('#f87171', 'Escreva pelo menos uma mensagem.'); return; }
-  const phrases = (document.getElementById('wa-phrases-' + id)?.value || '').split('\n').map(p => p.trim()).filter(Boolean);
+  const rules = readCaptureRules(id);
   const captureEnabled = !!document.getElementById('wa-capture-' + id)?.checked;
-  if (captureEnabled && !phrases.length) { feedback('#f87171', 'Informe pelo menos uma frase da campanha.'); return; }
+  if (captureEnabled && !rules.length) { feedback('#f87171', 'Informe pelo menos uma frase de identificação.'); return; }
 
   // O ritmo de envio (limites, intervalo, horário) usa sempre os valores recomendados; não é editado aqui.
-  const data = { templates, template: templates[0], leadCapture: { enabled: captureEnabled, phrases } };
+  // "phrases" continua sendo gravado para compatibilidade.
+  const data = { templates, template: templates[0], leadCapture: { enabled: captureEnabled, rules, phrases: rules.map(r => r.phrase) } };
   try {
     await window._fb.saveWhatsAppSettings(act, data);
     WHATSAPP_SETTINGS[act] = { ...(WHATSAPP_SETTINGS[act] || {}), ...data };
