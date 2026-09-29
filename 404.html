@@ -1031,11 +1031,44 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
   .help-card { padding:16px; }
   .help-demo { height:84px; }
 }
+/* Chat */
+.chat-wrap { display:flex; height:calc(100vh - 40px); border:1px solid var(--border); border-radius:var(--r2); overflow:hidden; background:var(--surface); }
+.chat-side { width:340px; min-width:280px; border-right:1px solid var(--border); padding:14px; display:flex; flex-direction:column; min-height:0; box-sizing:border-box; }
+.chat-list { flex:1; overflow-y:auto; margin:0 -14px; }
+.chat-row { display:flex; gap:10px; padding:10px 14px; cursor:pointer; border-bottom:1px solid var(--border); }
+.chat-row:hover { background:var(--surface2); }
+.chat-row.active { background:var(--accent-glow); }
+.chat-avatar { width:38px; height:38px; border-radius:50%; background:var(--surface3); color:var(--text); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:600; flex-shrink:0; }
+.chat-pill { background:transparent; border:1px solid var(--border2); color:var(--text); border-radius:14px; padding:4px 10px; font-size:12px; cursor:pointer; white-space:nowrap; }
+.chat-pill.active { background:var(--accent-glow); border-color:var(--accent); }
+.chat-tag { font-size:10.5px; border-radius:8px; padding:1px 7px; white-space:nowrap; }
+.chat-main { flex:1; display:flex; flex-direction:column; min-width:0; min-height:0; }
+.chat-empty { margin:auto; color:var(--muted2); font-size:13px; text-align:center; padding:20px; line-height:1.6; }
+.chat-head { display:flex; gap:10px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+.chat-msgs { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:6px; background:var(--bg); }
+.chat-bubble { max-width:70%; padding:8px 11px; border-radius:10px; font-size:13.5px; line-height:1.45; white-space:pre-wrap; word-break:break-word; color:var(--text); }
+.chat-bubble.in { align-self:flex-start; background:var(--surface2); border-top-left-radius:2px; }
+.chat-bubble.out { align-self:flex-end; background:rgba(37,211,102,0.18); border-top-right-radius:2px; }
+.chat-bubble img, .chat-bubble video { max-width:260px; max-height:300px; border-radius:6px; display:block; margin-bottom:4px; }
+.chat-meta { font-size:10.5px; color:var(--muted2); margin-top:3px; text-align:right; }
+.chat-day { align-self:center; font-size:11px; color:var(--muted2); background:var(--surface2); border-radius:8px; padding:3px 10px; margin:8px 0; }
+.chat-input { display:flex; gap:8px; align-items:flex-end; padding:10px 12px; border-top:1px solid var(--border); }
+.chat-input textarea { flex:1; resize:none; max-height:140px; min-height:40px; }
+.chat-back { display:none; }
+@media (max-width: 768px) {
+  #chat-view { padding:8px !important; }
+  .chat-wrap { height:calc(100vh - 90px); }
+  .chat-side { width:100%; min-width:0; border-right:none; }
+  .chat-wrap.open .chat-side { display:none; }
+  .chat-wrap:not(.open) .chat-main { display:none; }
+  .chat-back { display:inline-block; }
+  .chat-bubble { max-width:85%; }
+}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script type="module">
   import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, addDoc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, doc, query, where, onSnapshot, writeBatch, limit, deleteField } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, addDoc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, doc, query, where, onSnapshot, writeBatch, limit, orderBy, deleteField } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
   const firebaseConfig = {
@@ -1299,6 +1332,20 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
       }
       await deleteDoc(doc(db, 'campaigns', id));
     },
+    // Chat: conversas 1 a 1 gravadas pelo Worker (inbox/{act}/chats/{chave}/messages/{id}).
+    listenInboxChats(act, max, callback) {
+      return onSnapshot(query(collection(db, 'inbox', normalizeAct(act), 'chats'), orderBy('lastAt', 'desc'), limit(max)), snap => {
+        callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }, error => { console.warn('Chat indisponível:', error); callback(null, error); });
+    },
+    listenInboxMessages(act, chatKey, max, callback) {
+      return onSnapshot(query(collection(db, 'inbox', normalizeAct(act), 'chats', chatKey, 'messages'), orderBy('at', 'desc'), limit(max)), snap => {
+        callback(snap.docs.map(d => ({ id: d.id, ...d.data() })).reverse());
+      }, error => { console.warn('Mensagens indisponíveis:', error); callback(null, error); });
+    },
+    async updateInboxChat(act, chatKey, data) {
+      await updateDoc(doc(db, 'inbox', normalizeAct(act), 'chats', chatKey), data);
+    },
     // Cadência: mensagens programadas em grupos (group_schedules). "dueAt" existe só enquanto está agendada.
     listenGroupSchedules(act, callback) {
       return onSnapshot(query(collection(db, 'group_schedules'), where('act', '==', normalizeAct(act))), snap => {
@@ -1447,6 +1494,10 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
     Campanhas
   </div>
+  <div class="mobile-nav-item" id="mnav-chat" onclick="switchView('chat'); setMobileNav('chat')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg>
+    Chat
+  </div>
   <div class="mobile-nav-item" id="mnav-cadencia" onclick="switchView('cadencia'); setMobileNav('cadencia')">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 14v3l2 1"/></svg>
     Cadência
@@ -1523,6 +1574,10 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
         <div class="nav-item" id="nav-campanhas" onclick="switchView('campanhas')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
           Campanhas
+        </div>
+        <div class="nav-item" id="nav-chat" onclick="switchView('chat')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg>
+          Chat <span id="chat-nav-badge" style="display:none;margin-left:auto;background:var(--green);color:#000;font-size:10px;font-weight:700;border-radius:10px;padding:1px 6px;"></span>
         </div>
         <div class="nav-item" id="nav-cadencia" onclick="switchView('cadencia')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 14v3l2 1"/></svg>
@@ -2326,6 +2381,25 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
         </div>
         <div id="campaign-editor" style="display:none; background:var(--surface); border:1px solid var(--border); border-radius:var(--r2); padding:22px; margin-bottom:20px;"></div>
         <div id="campaign-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+      </div>
+    </div>
+
+    <!-- Chat View -->
+    <div id="chat-view" style="display:none; padding:20px 24px;">
+      <div class="chat-wrap" id="chat-wrap">
+        <div class="chat-side" id="chat-side">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+            <div style="font-size:18px;font-weight:600;color:var(--text);flex:1;">Chat</div>
+            <button class="chat-pill" onclick="openNewChat()" title="Começar conversa com um número">+ Nova</button>
+          </div>
+          <select id="chat-client-select" class="field-input" style="display:none;margin-bottom:8px;padding:8px 10px;font-size:13px;" onchange="onChatClientChange()"></select>
+          <input id="chat-search" class="field-input" placeholder="Buscar nome ou número..." oninput="renderChatList()" style="margin-bottom:8px;padding:8px 10px;font-size:13px;">
+          <div id="chat-filters" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;"></div>
+          <div id="chat-list" class="chat-list"></div>
+        </div>
+        <div class="chat-main" id="chat-main">
+          <div class="chat-empty">Escolha uma conversa.</div>
+        </div>
       </div>
     </div>
 
@@ -3996,12 +4070,12 @@ window.abrirContatos = function abrirContatos() {
     if(topbar) topbar.style.display = 'none';
     const contentEl = document.querySelector('.content');
     if(contentEl) contentEl.style.display = 'none';
-    ['crm-view','conta-view','whatsapp-view','campanhas-view','cadencia-view'].forEach(id => {
+    ['crm-view','conta-view','whatsapp-view','campanhas-view','chat-view','cadencia-view'].forEach(id => {
       const el = document.getElementById(id); if(el) el.style.display = 'none';
     });
     const v = document.getElementById('contatos-view');
     if(v) { v.style.cssText += ';display:block!important;visibility:visible!important;opacity:1!important;'; }
-    ['report','crm','ajuda','conta','whatsapp','campanhas','cadencia','contatos','integracoes'].forEach(n => {
+    ['report','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','contatos','integracoes'].forEach(n => {
       const el = document.getElementById('nav-'+n);
       if(el) el.classList.toggle('active', n==='contatos');
     });
@@ -4794,7 +4868,7 @@ function renderAtendimento() {
 }
 
 function switchView(view) {
-  ['report','crm','ajuda','conta','whatsapp','campanhas','cadencia','contatos','integracoes'].forEach(v => {
+  ['report','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','contatos','integracoes'].forEach(v => {
     const el = document.getElementById('nav-' + v);
     if (el) el.classList.toggle('active', v === view);
   });
@@ -4810,6 +4884,9 @@ function switchView(view) {
   const campanhasView = document.getElementById('campanhas-view');
   if (campanhasView) campanhasView.style.display = view === 'campanhas' ? 'block' : 'none';
   if (view === 'campanhas') renderCampaignsView();
+  const chatView = document.getElementById('chat-view');
+  if (chatView) chatView.style.display = view === 'chat' ? 'block' : 'none';
+  if (view === 'chat') renderChatView();
   const cadenciaView = document.getElementById('cadencia-view');
   if (cadenciaView) cadenciaView.style.display = view === 'cadencia' ? 'block' : 'none';
   if (view === 'cadencia') renderCadenceView();
@@ -6294,6 +6371,437 @@ async function createCadenceItems(items, setFb) {
     closeCadenceEditor();
   } catch (e) {
     setFb('#f87171', 'Erro: ' + e.message);
+  }
+}
+
+// ===== CHAT (conversas do WhatsApp) =====
+let _chatAct = null;
+let _chatUnsub = null;
+let _chatItems = [];
+let _chatLimit = 300;
+let _chatFilter = 'all';
+let _chatOpenKey = null;
+let _chatMsgUnsub = null;
+let _chatMsgs = [];
+let _chatMsgLimit = 150;
+let _chatMedia = {};
+let _chatPendingMedia = null;
+let _chatSending = false;
+
+const CHAT_FILTERS = [
+  ['all', 'Todas'],
+  ['unread', 'Não lidas'],
+  ['mine', 'Minhas'],
+  ['unassigned', 'Sem responsável'],
+  ['replied', 'Responderam ao disparo'],
+  ['waiting', 'Sem resposta ao disparo']
+];
+
+function chatAct() {
+  if (!isAdmin) return window._fb && window._fb.getProfile() ? window._fb.getProfile().act : null;
+  const sel = document.getElementById('chat-client-select');
+  return sel && sel.value ? sel.value : null;
+}
+
+function chatMe() {
+  const p = window._fb && window._fb.getProfile ? window._fb.getProfile() : null;
+  return p ? { uid: p.uid, name: p.name || p.login || 'Eu' } : { uid: '', name: 'Eu' };
+}
+
+// Mesma chave do Worker: número com 55 e sem o 9 extra do celular.
+function chatPhoneKey(phone) {
+  let d = String(phone || '').replace(/\D/g, '');
+  if (!d) return '';
+  if (!d.startsWith('55') && d.length <= 11) d = '55' + d;
+  if (d.startsWith('55') && d.length === 13 && d[4] === '9') d = d.slice(0, 4) + d.slice(5);
+  return d;
+}
+
+function chatFormatPhone(phone) {
+  const d = String(phone || '').replace(/\D/g, '');
+  if (d.startsWith('55') && d.length >= 12) {
+    const ddd = d.slice(2, 4);
+    let rest = d.slice(4);
+    if (rest.length === 8 && /[6-9]/.test(rest[0])) rest = '9' + rest; // celular salvo sem o 9
+    return `+55 ${ddd} ${rest.length === 9 ? rest.slice(0, 5) + '-' + rest.slice(5) : rest.slice(0, 4) + '-' + rest.slice(4)}`;
+  }
+  return d ? '+' + d : '';
+}
+
+function chatLeadIndex(act) {
+  const byPhone = {}, byJid = {};
+  (_leadsCache || []).forEach(l => {
+    if (normalizeActValue(l.act) !== act) return;
+    const k = chatPhoneKey(l.phone || l.whatsappPhone);
+    if (k) byPhone[k] = l;
+    if (l.whatsappJid) byJid[l.whatsappJid] = l;
+  });
+  return { byPhone, byJid };
+}
+
+function chatLeadFor(c, index) {
+  return (c.phone && index.byPhone[chatPhoneKey(c.phone)]) || (c.lid && index.byJid[c.lid]) || (c.jid && index.byJid[c.jid]) || null;
+}
+
+function chatName(c, lead) {
+  return c.contactName || (lead && lead.name) || c.pushName || chatFormatPhone(c.phone) || 'Número oculto';
+}
+
+function chatReplied(c) { return !!(c.dispatchAt && c.lastInAt && c.lastInAt > c.dispatchAt); }
+function chatWaiting(c) { return !!(c.dispatchAt && !chatReplied(c)); }
+
+function chatTime(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const y = new Date(today); y.setDate(today.getDate() - 1);
+  if (d.toDateString() === y.toDateString()) return 'Ontem';
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+}
+
+function renderChatView() {
+  const sel = document.getElementById('chat-client-select');
+  if (isAdmin) {
+    const current = sel.value || _chatAct || (activeClient && activeClient.account) || '';
+    const entries = Object.entries(CREDENTIALS)
+      .filter(([login, cred]) => login !== 'admin' && cred && cred.act)
+      .map(([, cred]) => [cred.act, getClientDisplayName(cred.act)])
+      .sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
+    sel.innerHTML = '<option value="">Escolha o cliente</option>' + entries.map(([act, name]) => `<option value="${escapeHtml(act)}">${escapeHtml(name)}</option>`).join('');
+    sel.value = entries.some(([act]) => act === current) ? current : '';
+    sel.style.display = 'block';
+  } else if (sel) {
+    sel.style.display = 'none';
+  }
+  if (!_leadsCache) getLeadsAsync().then(() => { renderChatList(); renderChatHeader(); }).catch(() => {});
+  onChatClientChange();
+}
+
+function onChatClientChange() {
+  const act = chatAct();
+  if (_chatUnsub && _chatAct !== act) { _chatUnsub(); _chatUnsub = null; closeChat(); }
+  const list = document.getElementById('chat-list');
+  if (!act) {
+    _chatAct = null; _chatItems = [];
+    list.innerHTML = '<div class="chat-empty">Escolha um cliente para ver as conversas.</div>';
+    renderChatFilters();
+    return;
+  }
+  _chatAct = act;
+  if (!_chatUnsub) {
+    list.innerHTML = '<div class="chat-empty">Carregando conversas...</div>';
+    _chatUnsub = window._fb.listenInboxChats(act, _chatLimit, (items, error) => {
+      if (!items) { list.innerHTML = `<div class="chat-empty" style="color:var(--red);">Não foi possível carregar: ${escapeHtml(error && error.message || '')}</div>`; return; }
+      _chatItems = items;
+      renderChatList();
+      renderChatHeader();
+      const open = items.find(c => c.id === _chatOpenKey);
+      if (open && open.unread > 0 && document.getElementById('chat-view').style.display !== 'none' && !document.hidden) {
+        window._fb.updateInboxChat(act, open.id, { unread: 0 }).catch(() => {});
+      }
+    });
+  }
+}
+
+function setChatFilter(f) { _chatFilter = f; renderChatList(); }
+
+function chatMatchesFilter(c, f, me) {
+  if (f === 'unread') return c.unread > 0;
+  if (f === 'mine') return c.assignedTo === me.uid;
+  if (f === 'unassigned') return !c.assignedTo;
+  if (f === 'replied') return chatReplied(c);
+  if (f === 'waiting') return chatWaiting(c);
+  return true;
+}
+
+function renderChatFilters() {
+  const box = document.getElementById('chat-filters');
+  if (!box) return;
+  const me = chatMe();
+  box.innerHTML = CHAT_FILTERS.map(([k, label]) => {
+    const n = _chatItems.filter(c => chatMatchesFilter(c, k, me)).length;
+    return `<button class="chat-pill ${_chatFilter === k ? 'active' : ''}" onclick="setChatFilter('${k}')">${label}${k !== 'all' && n ? ` · ${n}` : ''}</button>`;
+  }).join('');
+}
+
+function renderChatList() {
+  renderChatFilters();
+  const list = document.getElementById('chat-list');
+  if (!list || !_chatAct) return;
+  const me = chatMe();
+  const index = chatLeadIndex(_chatAct);
+  const term = (document.getElementById('chat-search').value || '').trim().toLowerCase();
+  const termDigits = term.replace(/\D/g, '');
+  const rows = _chatItems.filter(c => {
+    if (!chatMatchesFilter(c, _chatFilter, me)) return false;
+    if (!term) return true;
+    const lead = chatLeadFor(c, index);
+    return chatName(c, lead).toLowerCase().includes(term) || (termDigits.length >= 3 && String(c.phone || '').includes(termDigits));
+  });
+  const totalUnread = _chatItems.reduce((s, c) => s + (c.unread > 0 ? 1 : 0), 0);
+  const badge = document.getElementById('chat-nav-badge');
+  if (badge) { badge.textContent = totalUnread; badge.style.display = totalUnread ? 'inline-block' : 'none'; }
+  if (!rows.length) {
+    list.innerHTML = `<div class="chat-empty">${_chatItems.length ? 'Nenhuma conversa neste filtro.' : 'Ainda não há conversas.<br>Elas aparecem aqui quando alguém manda mensagem ou quando um disparo sai.'}</div>`;
+    return;
+  }
+  list.innerHTML = rows.map(c => {
+    const lead = chatLeadFor(c, index);
+    const name = chatName(c, lead);
+    const initials = name.replace(/[^\p{L}\p{N} ]/gu, '').split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+    const tags = [];
+    if (chatReplied(c)) tags.push('<span class="chat-tag" style="background:var(--green-dim);color:var(--green);">Respondeu</span>');
+    else if (chatWaiting(c)) tags.push('<span class="chat-tag" style="background:var(--amber-dim);color:var(--amber);">Aguardando resposta</span>');
+    if (c.assignedName) tags.push(`<span class="chat-tag" style="background:var(--blue-dim);color:var(--blue);">${escapeHtml(c.assignedTo === me.uid ? 'Você' : c.assignedName)}</span>`);
+    return `<div class="chat-row ${c.id === _chatOpenKey ? 'active' : ''}" onclick="openChat('${escapeJsString(c.id)}')">
+      <div class="chat-avatar">${escapeHtml(initials)}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;gap:6px;align-items:baseline;">
+          <div style="flex:1;min-width:0;font-size:13.5px;font-weight:${c.unread > 0 ? 700 : 600};color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(name)}</div>
+          <div style="font-size:11px;color:${c.unread > 0 ? 'var(--green)' : 'var(--muted2)'};white-space:nowrap;">${chatTime(c.lastAt)}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:2px;">
+          <div style="flex:1;min-width:0;font-size:12px;color:var(--muted2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.lastFromMe ? 'Você: ' : ''}${escapeHtml(c.lastText || '')}</div>
+          ${c.unread > 0 ? `<span style="background:var(--green);color:#000;font-size:10.5px;font-weight:700;border-radius:10px;padding:1px 6px;">${c.unread}</span>` : ''}
+        </div>
+        ${tags.length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;">${tags.join('')}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('') + (_chatItems.length >= _chatLimit ? `<div style="padding:12px;text-align:center;"><button class="chat-pill" onclick="loadMoreChats()">Carregar conversas mais antigas</button></div>` : '');
+}
+
+function loadMoreChats() {
+  _chatLimit += 300;
+  if (_chatUnsub) { _chatUnsub(); _chatUnsub = null; }
+  onChatClientChange();
+}
+
+function closeChat() {
+  if (_chatMsgUnsub) { _chatMsgUnsub(); _chatMsgUnsub = null; }
+  _chatOpenKey = null; _chatMsgs = []; _chatPendingMedia = null;
+  const wrap = document.getElementById('chat-wrap');
+  if (wrap) wrap.classList.remove('open');
+  const main = document.getElementById('chat-main');
+  if (main) main.innerHTML = '<div class="chat-empty">Escolha uma conversa.</div>';
+  renderChatList();
+}
+
+function openChat(key) {
+  if (!_chatAct) return;
+  if (_chatMsgUnsub) { _chatMsgUnsub(); _chatMsgUnsub = null; }
+  _chatOpenKey = key; _chatMsgs = []; _chatMsgLimit = 150; _chatPendingMedia = null;
+  document.getElementById('chat-wrap').classList.add('open');
+  document.getElementById('chat-main').innerHTML = `
+    <div class="chat-head" id="chat-head"></div>
+    <div class="chat-msgs" id="chat-msgs"><div class="chat-empty">Carregando mensagens...</div></div>
+    <div id="chat-media-chip" style="display:none;padding:6px 14px;font-size:12px;color:var(--text);border-top:1px solid var(--border);"></div>
+    <div class="chat-input">
+      <label class="chat-pill" style="padding:9px 11px;" title="Enviar foto, vídeo ou áudio">📎<input type="file" accept="image/jpeg,image/png,image/webp,video/mp4,audio/*" style="display:none;" onchange="attachChatMedia(this)"></label>
+      <textarea id="chat-text" class="field-input" rows="1" placeholder="Mensagem (Enter envia, Shift+Enter pula linha)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,140)+'px'"></textarea>
+      <button class="btn-save" id="chat-send-btn" style="width:auto;padding:10px 16px;" onclick="sendChatMessage()">Enviar</button>
+    </div>`;
+  renderChatHeader();
+  renderChatList();
+  const act = _chatAct;
+  _chatMsgUnsub = window._fb.listenInboxMessages(act, key, _chatMsgLimit, (msgs, error) => {
+    if (_chatOpenKey !== key) return;
+    if (!msgs) { document.getElementById('chat-msgs').innerHTML = `<div class="chat-empty" style="color:var(--red);">Erro: ${escapeHtml(error && error.message || '')}</div>`; return; }
+    _chatMsgs = msgs;
+    renderChatMessages();
+  });
+  const c = _chatItems.find(x => x.id === key);
+  if (c && c.unread > 0) window._fb.updateInboxChat(act, key, { unread: 0 }).catch(() => {});
+  setTimeout(() => { const t = document.getElementById('chat-text'); if (t && window.innerWidth > 768) t.focus(); }, 50);
+}
+
+function renderChatHeader() {
+  const head = document.getElementById('chat-head');
+  if (!head || !_chatOpenKey) return;
+  const c = _chatItems.find(x => x.id === _chatOpenKey) || { id: _chatOpenKey };
+  const lead = chatLeadFor(c, chatLeadIndex(_chatAct));
+  const me = chatMe();
+  const stage = lead ? (getStages(lead.act).find(s => s.id === lead.stage) || {}).label : '';
+  const assignBtn = c.assignedTo === me.uid
+    ? `<button class="chat-pill" onclick="toggleChatAssign()">Soltar conversa</button>`
+    : `<button class="chat-pill active" onclick="toggleChatAssign()">${c.assignedTo ? 'Assumir' : 'Atribuir para mim'}</button>`;
+  head.innerHTML = `
+    <button class="chat-pill chat-back" onclick="closeChat()">←</button>
+    <div style="flex:1;min-width:160px;">
+      <div style="font-size:15px;font-weight:600;color:var(--text);">${escapeHtml(chatName(c, lead))}</div>
+      <div style="font-size:12px;color:var(--muted2);display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:2px;">
+        <span>${escapeHtml(chatFormatPhone(c.phone) || 'Número oculto pelo WhatsApp')}</span>
+        ${stage ? `<span class="chat-tag" style="background:var(--accent-glow);color:var(--text);">Lead · ${escapeHtml(stage)}</span>` : ''}
+        ${c.dispatchSource ? `<span class="chat-tag" style="background:var(--surface3);color:var(--muted2);">${escapeHtml(c.dispatchSource)}</span>` : ''}
+        ${c.assignedName ? `<span class="chat-tag" style="background:var(--blue-dim);color:var(--blue);">Responsável: ${escapeHtml(c.assignedTo === me.uid ? 'você' : c.assignedName)}</span>` : '<span class="chat-tag" style="background:var(--surface3);color:var(--muted2);">Sem responsável</span>'}
+      </div>
+    </div>
+    ${lead ? `<button class="chat-pill" onclick="openMoveModal('${escapeJsString(lead.id)}')">Mover no funil</button>` : ''}
+    ${assignBtn}`;
+}
+
+async function toggleChatAssign() {
+  const c = _chatItems.find(x => x.id === _chatOpenKey);
+  if (!c || !_chatAct) return;
+  const me = chatMe();
+  const data = c.assignedTo === me.uid
+    ? { assignedTo: '', assignedName: '', assignedAt: new Date().toISOString() }
+    : { assignedTo: me.uid, assignedName: me.name, assignedAt: new Date().toISOString() };
+  try {
+    await window._fb.updateInboxChat(_chatAct, c.id, data);
+    showToast(data.assignedTo ? 'Conversa atribuída a você.' : 'Conversa solta.', 'success');
+  } catch (e) {
+    showToast('Erro: ' + e.message, 'error');
+  }
+}
+
+const CHAT_MEDIA_LABELS = { image: '📷 Foto', video: '🎥 Vídeo', audio: '🎤 Áudio', document: '📄 Documento', sticker: 'Figurinha', location: '📍 Localização', contact: '👤 Contato', poll: '📊 Enquete' };
+
+function renderChatMessages() {
+  const box = document.getElementById('chat-msgs');
+  if (!box) return;
+  const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 120 || !box.dataset.loaded;
+  if (!_chatMsgs.length) { box.innerHTML = '<div class="chat-empty">Nenhuma mensagem ainda.</div>'; box.dataset.loaded = '1'; return; }
+  let lastDay = '';
+  const parts = [];
+  if (_chatMsgs.length >= _chatMsgLimit) parts.push(`<button class="chat-pill" style="align-self:center;" onclick="loadOlderChatMessages()">Carregar mensagens anteriores</button>`);
+  _chatMsgs.forEach(m => {
+    const d = new Date(m.at);
+    const day = d.toDateString();
+    if (day !== lastDay) {
+      lastDay = day;
+      parts.push(`<div class="chat-day">${escapeHtml(cadenceDayLabel(d))}</div>`);
+    }
+    let media = '';
+    if (['image', 'video', 'audio', 'document', 'sticker'].includes(m.type)) {
+      const loaded = _chatMedia[m.id];
+      if (loaded && loaded.url) {
+        media = m.type === 'image' || m.type === 'sticker' ? `<img src="${loaded.url}" alt="">`
+          : m.type === 'video' ? `<video src="${loaded.url}" controls></video>`
+          : m.type === 'audio' ? `<audio src="${loaded.url}" controls style="max-width:240px;display:block;margin-bottom:4px;"></audio>`
+          : `<a href="${loaded.url}" download="${escapeHtml(m.fileName || 'arquivo')}" style="color:var(--accent2);">⬇ ${escapeHtml(m.fileName || 'Baixar documento')}</a><br>`;
+      } else {
+        media = `<button class="chat-pill" style="margin-bottom:4px;" onclick="loadChatMedia('${escapeJsString(m.id)}','${m.type}')">${loaded && loaded.loading ? 'Carregando...' : (CHAT_MEDIA_LABELS[m.type] + (m.fileName ? ' · ' + escapeHtml(m.fileName) : '') + ' · ver')}</button>${loaded && loaded.error ? `<div style="font-size:11px;color:var(--red);">${escapeHtml(loaded.error)}</div>` : ''}<br>`;
+      }
+    } else if (m.type !== 'text' && CHAT_MEDIA_LABELS[m.type]) {
+      media = `<span style="color:var(--muted2);">${CHAT_MEDIA_LABELS[m.type]}</span>${m.text ? '<br>' : ''}`;
+    }
+    const who = m.fromMe ? [m.source, m.sentBy].filter(Boolean).join(' · ') : '';
+    parts.push(`<div class="chat-bubble ${m.fromMe ? 'out' : 'in'}">${media}${escapeHtml(m.text || '')}<div class="chat-meta">${who ? escapeHtml(who) + ' · ' : ''}${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div></div>`);
+  });
+  box.innerHTML = parts.join('');
+  box.dataset.loaded = '1';
+  if (nearBottom) box.scrollTop = box.scrollHeight;
+}
+
+function loadOlderChatMessages() {
+  const key = _chatOpenKey;
+  if (!key) return;
+  _chatMsgLimit += 150;
+  if (_chatMsgUnsub) _chatMsgUnsub();
+  _chatMsgUnsub = window._fb.listenInboxMessages(_chatAct, key, _chatMsgLimit, msgs => {
+    if (_chatOpenKey !== key || !msgs) return;
+    _chatMsgs = msgs;
+    renderChatMessages();
+  });
+}
+
+async function loadChatMedia(id, type) {
+  if (!_chatAct) return;
+  _chatMedia[id] = { loading: true };
+  renderChatMessages();
+  try {
+    const r = await window._fb.whatsapp('/whatsapp/chat-media', _chatAct, { messageId: id });
+    const bytes = Uint8Array.from(atob(r.base64), ch => ch.charCodeAt(0));
+    const mime = type === 'audio' && /ogg|opus/.test(r.mimetype) ? 'audio/ogg' : r.mimetype;
+    _chatMedia[id] = { url: URL.createObjectURL(new Blob([bytes], { type: mime })) };
+  } catch (e) {
+    _chatMedia[id] = { error: e.message };
+  }
+  renderChatMessages();
+}
+
+async function attachChatMedia(input) {
+  const file = input.files && input.files[0];
+  input.value = '';
+  if (!file || !_chatAct) return;
+  const chip = document.getElementById('chat-media-chip');
+  chip.style.display = 'block';
+  chip.textContent = 'Enviando arquivo...';
+  try {
+    _chatPendingMedia = await window._fb.uploadCampaignMedia(_chatAct, file);
+    chip.innerHTML = `📎 ${escapeHtml(_chatPendingMedia.fileName)} <span style="color:var(--muted2);">(o texto vai como legenda)</span> <button class="chat-pill" onclick="clearChatMedia()">remover</button>`;
+  } catch (e) {
+    _chatPendingMedia = null;
+    chip.innerHTML = `<span style="color:var(--red);">Erro: ${escapeHtml(e.message)}</span>`;
+  }
+}
+
+function clearChatMedia() {
+  _chatPendingMedia = null;
+  const chip = document.getElementById('chat-media-chip');
+  if (chip) { chip.style.display = 'none'; chip.innerHTML = ''; }
+}
+
+async function sendChatMessage() {
+  if (_chatSending || !_chatAct || !_chatOpenKey) return;
+  const ta = document.getElementById('chat-text');
+  const text = ta.value.trim();
+  if (!text && !_chatPendingMedia) return;
+  const btn = document.getElementById('chat-send-btn');
+  _chatSending = true; btn.disabled = true; btn.textContent = 'Enviando...';
+  try {
+    await window._fb.whatsapp('/whatsapp/chat-send', _chatAct, { chatKey: _chatOpenKey, text, media: _chatPendingMedia || undefined });
+    ta.value = ''; ta.style.height = 'auto';
+    clearChatMedia();
+    const c = _chatItems.find(x => x.id === _chatOpenKey);
+    const me = chatMe();
+    // Quem responde primeiro fica com a conversa.
+    if (c && !c.assignedTo) window._fb.updateInboxChat(_chatAct, c.id, { assignedTo: me.uid, assignedName: me.name, assignedAt: new Date().toISOString() }).catch(() => {});
+  } catch (e) {
+    showToast('Não enviou: ' + e.message, 'error', 6000);
+  } finally {
+    _chatSending = false; btn.disabled = false; btn.textContent = 'Enviar';
+  }
+}
+
+function openNewChat() {
+  if (!_chatAct) { showToast('Escolha o cliente primeiro.', 'warning'); return; }
+  if (_chatMsgUnsub) { _chatMsgUnsub(); _chatMsgUnsub = null; }
+  _chatOpenKey = null;
+  document.getElementById('chat-wrap').classList.add('open');
+  document.getElementById('chat-main').innerHTML = `
+    <div class="chat-head"><button class="chat-pill chat-back" onclick="closeChat()">←</button><div style="font-size:15px;font-weight:600;color:var(--text);">Nova conversa</div></div>
+    <div style="padding:20px;max-width:420px;">
+      <label class="field-label">Número com DDD</label>
+      <input id="chat-new-phone" class="field-input" placeholder="(61) 99999-9999" style="margin-bottom:10px;">
+      <label class="field-label">Nome (opcional)</label>
+      <input id="chat-new-name" class="field-input" style="margin-bottom:10px;">
+      <label class="field-label">Mensagem</label>
+      <textarea id="chat-new-text" class="field-input" rows="4" style="resize:vertical;width:100%;box-sizing:border-box;margin-bottom:10px;"></textarea>
+      <button class="btn-save" id="chat-new-btn" style="width:auto;padding:10px 18px;" onclick="sendNewChat()">Enviar</button>
+      <div id="chat-new-fb" style="font-size:12px;margin-top:8px;"></div>
+    </div>`;
+  renderChatList();
+}
+
+async function sendNewChat() {
+  const phone = document.getElementById('chat-new-phone').value.trim();
+  const name = document.getElementById('chat-new-name').value.trim();
+  const text = document.getElementById('chat-new-text').value.trim();
+  const fb = document.getElementById('chat-new-fb');
+  if (phone.replace(/\D/g, '').length < 10) { fb.style.color = 'var(--red)'; fb.textContent = 'Digite o número com DDD.'; return; }
+  if (!text) { fb.style.color = 'var(--red)'; fb.textContent = 'Escreva a mensagem.'; return; }
+  const btn = document.getElementById('chat-new-btn');
+  btn.disabled = true; fb.style.color = 'var(--muted2)'; fb.textContent = 'Enviando...';
+  try {
+    const r = await window._fb.whatsapp('/whatsapp/chat-send', _chatAct, { phone, name, text });
+    const me = chatMe();
+    await window._fb.updateInboxChat(_chatAct, r.chatKey, { assignedTo: me.uid, assignedName: me.name, assignedAt: new Date().toISOString() }).catch(() => {});
+    openChat(r.chatKey);
+  } catch (e) {
+    fb.style.color = 'var(--red)'; fb.textContent = e.message;
+    btn.disabled = false;
   }
 }
 
@@ -7861,7 +8369,7 @@ function moveLeadTo(id, stageId) {
 
 
 function setMobileNav(view) {
-  ['report','crm','ajuda','conta','whatsapp','campanhas','cadencia','integracoes','cfg'].forEach(v => {
+  ['report','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','integracoes','cfg'].forEach(v => {
     const el = document.getElementById('mnav-' + v);
     if (el) el.classList.toggle('active', v === view);
   });
