@@ -1056,6 +1056,12 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
 .chat-input textarea { flex:1; resize:none; max-height:140px; min-height:40px; }
 .chat-back { display:none; }
 .contatos-bulk { position:sticky; top:0; }
+.wa-alert { position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:9000; width:min(680px, calc(100% - 24px)); box-sizing:border-box; background:#3a1218; border:1px solid #f87171; color:#fff; border-radius:12px; padding:12px 40px 12px 14px; font-size:13px; line-height:1.5; box-shadow:0 8px 30px rgba(0,0,0,.35); }
+[data-theme="light"] .wa-alert { background:#fff1f1; color:#7f1d1d; }
+.wa-alert-row { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:6px; flex-wrap:wrap; }
+.wa-alert-btn { background:#f87171; color:#fff; border:none; border-radius:8px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; }
+.wa-alert-close { position:absolute; top:6px; right:8px; background:none; border:none; color:inherit; font-size:20px; cursor:pointer; opacity:.7; }
+@media (max-width: 768px) { .wa-alert { top:64px; } }
 @media (max-width: 768px) { .contatos-bulk { position:static; } }
 @media (max-width: 768px) {
   #chat-view { padding:8px !important; }
@@ -1262,6 +1268,16 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
     async saveContactTags(act, tags) {
       act = normalizeAct(act);
       await setDoc(doc(db, 'contact_tags', act), { act, tags, updatedAt: new Date().toISOString() });
+    },
+    // Estado da conexão do WhatsApp (whatsapp_status). Admin: todos os clientes; cliente: só o dele.
+    listenWhatsAppStatus(callback) {
+      if (!currentProfile) return null;
+      const onError = error => console.warn('Estado do WhatsApp indisponível:', error);
+      if (currentProfile.role === 'admin') {
+        return onSnapshot(collection(db, 'whatsapp_status'), snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))), onError);
+      }
+      if (!currentProfile.act) return null;
+      return onSnapshot(doc(db, 'whatsapp_status', currentProfile.act), snap => callback(snap.exists() ? [{ id: snap.id, ...snap.data() }] : []), onError);
     },
     async getInboxChat(act, chatKey) {
       const snap = await getDoc(doc(db, 'inbox', normalizeAct(act), 'chats', chatKey));
@@ -9537,6 +9553,96 @@ function startLeadRealtimeListener() {
   }
 }
 
+// ===== AVISO: WHATSAPP DESCONECTADO =====
+// O Worker confere as conexões a cada 2 min e grava whatsapp_status. Aqui mostramos o aviso na hora.
+let _waStatusUnsub = null;
+let _waStatusList = [];
+let _waAlertHiddenUntil = 0;
+let _waAlertKey = '';
+let _waDownBefore = new Set();
+
+function startWhatsAppStatusWatch() {
+  if (_waStatusUnsub || !window._fb || typeof window._fb.listenWhatsAppStatus !== 'function') return;
+  try {
+    _waStatusUnsub = window._fb.listenWhatsAppStatus(list => { _waStatusList = list || []; renderWhatsAppAlert(); });
+  } catch (e) { console.warn('Aviso do WhatsApp indisponível:', e); }
+}
+
+// Só avisa de números que já estiveram conectados (clientes que nunca conectaram não entram).
+function whatsappDownList() {
+  return _waStatusList.filter(s => s.id !== '__server' && s.ok === false && (s.paired || s.lastOpenAt));
+}
+
+function waAlertTime(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const today = new Date().toDateString() === d.toDateString();
+  return today ? 'às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'em ' + d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function renderWhatsAppAlert() {
+  const down = whatsappDownList();
+  const server = isAdmin ? _waStatusList.find(s => s.id === '__server' && s.ok === false) : null;
+
+  // Avisa quando alguém voltou.
+  const nowDown = new Set(down.map(s => s.id));
+  _waDownBefore.forEach(id => {
+    if (!nowDown.has(id)) showToast(isAdmin ? `WhatsApp de ${getClientDisplayName(id) || id} reconectado.` : 'Seu WhatsApp está conectado de novo.', 'success');
+  });
+  _waDownBefore = nowDown;
+
+  // Ponto vermelho no menu WhatsApp.
+  const nav = document.getElementById('nav-whatsapp');
+  if (nav) {
+    let dot = document.getElementById('wa-nav-dot');
+    if (!dot) {
+      dot = document.createElement('span');
+      dot.id = 'wa-nav-dot';
+      dot.style.cssText = 'margin-left:auto;width:8px;height:8px;border-radius:50%;background:#f87171;display:none;';
+      nav.appendChild(dot);
+    }
+    dot.style.display = down.length || server ? 'inline-block' : 'none';
+    dot.title = down.length || server ? 'WhatsApp desconectado' : '';
+  }
+
+  // Um problema novo faz o aviso reaparecer mesmo se ele tinha sido fechado.
+  const key = down.map(s => s.id + s.since).join('|') + (server ? '|srv' + server.since : '');
+  if (key !== _waAlertKey) { _waAlertKey = key; _waAlertHiddenUntil = 0; }
+
+  let el = document.getElementById('wa-alert');
+  if ((!down.length && !server) || Date.now() < _waAlertHiddenUntil) { if (el) el.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'wa-alert'; el.className = 'wa-alert'; document.body.appendChild(el); }
+
+  const parts = [];
+  if (server) {
+    parts.push(`<div><b>⚠️ Servidor do WhatsApp fora do ar</b> ${escapeHtml(waAlertTime(server.since))}. O computador ou servidor onde ele roda pode estar desligado ou sem internet. Enquanto isso, nenhum cliente envia nem recebe mensagens pelo CRM.</div>`);
+  }
+  if (isAdmin) {
+    if (down.length) {
+      parts.push(`<div style="margin-top:${server ? 8 : 0}px;"><b>⚠️ WhatsApp desconectado ${down.length > 1 ? `(${down.length} clientes)` : ''}</b> — é preciso ler o QR Code de novo:</div>`);
+      parts.push(down.map(s => `<div class="wa-alert-row"><span>• <b>${escapeHtml(getClientDisplayName(s.id) || s.id)}</b> — ${s.loggedOut ? 'desconectado pelo celular' : 'sem conexão'} ${escapeHtml(waAlertTime(s.since))}</span><button class="wa-alert-btn" onclick="openWaReconnect('${escapeJsString(s.id)}')">Reconectar</button></div>`).join(''));
+    }
+  } else if (down.length) {
+    const s = down[0];
+    parts.push(`<div><b>⚠️ Seu WhatsApp foi desconectado do CRM</b> ${escapeHtml(waAlertTime(s.since))}.</div>
+      <div style="margin-top:4px;">Enquanto estiver desconectado, as mensagens do WhatsApp não viram card no kanban, o Chat não recebe mensagens e a 1ª mensagem automática não sai. Leia o QR Code de novo para voltar a funcionar.</div>
+      <div style="margin-top:8px;"><button class="wa-alert-btn" onclick="openWaReconnect('${escapeJsString(s.id)}')">Reconectar agora</button></div>`);
+  }
+  el.innerHTML = `<button class="wa-alert-close" title="Esconder por 30 minutos" onclick="hideWhatsAppAlert()">×</button>${parts.join('')}`;
+}
+
+function hideWhatsAppAlert() {
+  _waAlertHiddenUntil = Date.now() + 30 * 60 * 1000;
+  renderWhatsAppAlert();
+  setTimeout(renderWhatsAppAlert, 30 * 60 * 1000 + 1000);
+}
+
+function openWaReconnect(act) {
+  switchView('whatsapp');
+  if (typeof setMobileNav === 'function') setMobileNav('whatsapp');
+  openWhatsAppConnect(act, isAdmin ? (getClientDisplayName(act) || '') : '');
+}
+
 function startLeadNotifier() {
   if (_leadNotifierStarted) return;
   _leadNotifierStarted = true;
@@ -9546,6 +9652,7 @@ function startLeadNotifier() {
     window.addEventListener(evt, unlockLeadNotificationSound, { passive: true });
   });
   const realtimeStarted = startLeadRealtimeListener();
+  startWhatsAppStatusWatch();
   if (!realtimeStarted) checkForNewLeads().catch(e => console.warn('Lead notifier prime error:', e));
   setInterval(() => {
     if (!_leadRealtimeUnsubscribe) checkForNewLeads().catch(e => console.warn('Lead notifier error:', e));
