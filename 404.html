@@ -1327,6 +1327,14 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
     async deleteGroupSchedule(id) {
       await deleteDoc(doc(db, 'group_schedules', id));
     },
+    // updates: [{ id, data }] — edita envios agendados (texto, mídia, horário, grupo).
+    async updateGroupSchedules(updates) {
+      for (let i = 0; i < updates.length; i += 400) {
+        const batch = writeBatch(db);
+        updates.slice(i, i + 400).forEach(u => batch.update(doc(db, 'group_schedules', u.id), { ...u.data, updatedAt: new Date().toISOString() }));
+        await batch.commit();
+      }
+    },
     async deleteGroupSchedules(ids) {
       for (let i = 0; i < ids.length; i += 400) {
         const batch = writeBatch(db);
@@ -5667,6 +5675,8 @@ function cadenceSeriesKey(i) {
 }
 
 const _cadenceSelected = new Set();
+// Séries mostradas na tela; os botões usam a posição na lista (o texto da mensagem pode ter quebras de linha e emojis).
+let _cadenceSeriesList = [];
 
 function renderCadenceList() {
   const list = document.getElementById('cadence-list');
@@ -5684,10 +5694,11 @@ function renderCadenceList() {
     seriesMap.get(key).push(i);
   });
   const series = [...seriesMap.entries()].filter(([, items]) => items.length > 1);
+  _cadenceSeriesList = series;
   const fmtDate = d => new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
   const seriesHtml = series.length ? `
     <div style="font-size:13px;font-weight:600;color:var(--text);margin:4px 0 8px;">Séries programadas</div>
-    ${series.map(([key, items]) => {
+    ${series.map(([key, items], index) => {
       const first = items[0];
       const groups = [...new Set(items.map(i => i.groupName || i.groupId))];
       const time = new Date(first.sendAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -5698,8 +5709,9 @@ function renderCadenceList() {
           <div style="font-size:12px;color:var(--muted);margin-bottom:3px;">${escapeHtml(groups.join(', '))} · ${time} · ${items.length} envio(s) de ${fmtDate(items[0].sendAt)} a ${fmtDate(items[items.length - 1].sendAt)}</div>
           <div style="font-size:13px;color:var(--text);">${preview}</div>
         </div>
-        <button style="${wbtn}background:transparent;" onclick="selectCadenceSeries('${escapeJsString(key)}')">Selecionar</button>
-        <button style="${wbtn}background:transparent;color:#f87171;border-color:#f87171;" onclick="deleteCadenceSeries('${escapeJsString(key)}')">Excluir todos (${items.length})</button>
+        <button style="${wbtn}" onclick="editCadenceSeries(${index})">Editar série</button>
+        <button style="${wbtn}background:transparent;" onclick="selectCadenceSeries(${index})">Selecionar</button>
+        <button style="${wbtn}background:transparent;color:#f87171;border-color:#f87171;" onclick="deleteCadenceSeries(${index})">Excluir todos (${items.length})</button>
       </div>`;
     }).join('')}` : '';
 
@@ -5710,7 +5722,7 @@ function renderCadenceList() {
     const id = escapeJsString(i.id);
     const preview = i.text ? escapeHtml(i.text.length > 140 ? i.text.slice(0, 140) + '…' : i.text) : '<span style="color:var(--muted);">(sem texto)</span>';
     const actions = i.status === 'scheduled'
-      ? `<button style="${wbtn}" onclick="duplicateCadenceItem('${id}')">Duplicar</button><button style="${wbtn}background:transparent;" onclick="cancelCadenceItem('${id}')">Cancelar</button>`
+      ? `<button style="${wbtn}" onclick="editCadenceItem('${id}')">Editar</button><button style="${wbtn}background:transparent;" onclick="duplicateCadenceItem('${id}')">Duplicar</button><button style="${wbtn}background:transparent;" onclick="cancelCadenceItem('${id}')">Cancelar</button>`
       : `<button style="${wbtn}" onclick="duplicateCadenceItem('${id}')">Duplicar</button><button style="${wbtn}background:transparent;color:#f87171;border-color:#f87171;" onclick="deleteCadenceItem('${id}')">Excluir</button>`;
     return `
       <div style="display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1px solid ${_cadenceSelected.has(i.id) ? 'var(--accent)' : 'var(--border)'};border-radius:8px;padding:12px 14px;margin-bottom:8px;">
@@ -5774,8 +5786,9 @@ function selectAllCadence(checked) {
   renderCadenceList();
 }
 
-function selectCadenceSeries(key) {
-  _cadenceItems.filter(i => i.status === 'scheduled' && cadenceSeriesKey(i) === key).forEach(i => _cadenceSelected.add(i.id));
+function selectCadenceSeries(index) {
+  const entry = _cadenceSeriesList[index];
+  if (entry) entry[1].forEach(i => _cadenceSelected.add(i.id));
   renderCadenceList();
 }
 
@@ -5791,8 +5804,9 @@ async function deleteCadenceIds(ids, label) {
   }
 }
 
-function deleteCadenceSeries(key) {
-  const ids = _cadenceItems.filter(i => i.status === 'scheduled' && cadenceSeriesKey(i) === key).map(i => i.id);
+function deleteCadenceSeries(index) {
+  const entry = _cadenceSeriesList[index];
+  const ids = entry ? entry[1].map(i => i.id) : [];
   deleteCadenceIds(ids, 'desta série');
 }
 
@@ -5821,32 +5835,44 @@ function duplicateCadenceItem(id) {
 function toLocalDateInput(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 function toLocalTimeInput(d) { return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; }
 
-async function openCadenceEditor(copyFrom) {
+// options.mode: 'new' (padrão) | 'edit-item' (edita um envio) | 'edit-series' (edita todos os envios agendados da série)
+async function openCadenceEditor(copyFrom, options = {}) {
   const act = cadenceAct();
   if (!act) { showToast('Escolha o cliente primeiro.', 'warning'); return; }
+  const mode = options.mode || 'new';
   const editor = document.getElementById('cadence-editor');
   const hint = 'font-size:11px;color:var(--muted);margin:4px 0 10px;line-height:1.5;';
   const section = 'font-size:13px;font-weight:600;color:var(--text);margin:18px 0 6px;';
   const tomorrow = new Date(Date.now() + 86400000);
   const baseDate = copyFrom ? new Date(copyFrom.sendAt) : tomorrow;
-  if (copyFrom && baseDate < new Date()) baseDate.setTime(tomorrow.getTime());
-  _cadenceDraft = { act, type: copyFrom ? copyFrom.type || 'text' : 'text', media: copyFrom && copyFrom.media ? copyFrom.media : null, preselect: copyFrom ? [copyFrom.groupId] : [] };
+  if (copyFrom && mode === 'new' && baseDate < new Date()) baseDate.setTime(tomorrow.getTime());
+  _cadenceDraft = {
+    act, mode, editIds: options.ids || (copyFrom && mode === 'edit-item' ? [copyFrom.id] : []),
+    type: copyFrom ? copyFrom.type || 'text' : 'text',
+    media: copyFrom && copyFrom.media ? copyFrom.media : null,
+    preselect: copyFrom ? [...new Set((options.groupIds || [copyFrom.groupId]))] : []
+  };
+  const title = mode === 'edit-item' ? 'Editar envio' : mode === 'edit-series' ? `Editar série (${_cadenceDraft.editIds.length} envios)` : copyFrom ? 'Duplicar envio' : 'Programar envio';
   editor.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-      <div style="font-size:15px;font-weight:600;color:var(--text);">${copyFrom ? 'Duplicar envio' : 'Programar envio'}</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text);">${title}</div>
       <button class="btn-close-panel" onclick="closeCadenceEditor()">×</button>
     </div>
+    ${mode === 'edit-series' ? `<div style="${hint}">As mudanças valem para todos os envios desta série que ainda não saíram. As datas continuam as mesmas; o horário novo vale para todas.</div>` : ''}
 
     <div style="${section}margin-top:0;">Grupos</div>
-    <div style="${hint}">Marque um ou mais grupos: a mensagem sai em cada um deles.</div>
+    ${mode === 'edit-series' ? `
+    <div style="font-size:13px;color:var(--text);">${escapeHtml((options.groupNames || []).join(', '))}</div>
+    <div style="${hint}">Para trocar os grupos de uma série, exclua a série e programe de novo.</div>` : `
+    <div style="${hint}">${mode === 'edit-item' ? 'Escolha o grupo deste envio.' : 'Marque um ou mais grupos: a mensagem sai em cada um deles.'}</div>
     <input class="field-input" id="cad-group-search" placeholder="Buscar grupo..." oninput="filterCadenceGroups(this.value)" style="margin-bottom:6px;">
-    <div id="cad-groups" style="max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;color:var(--muted);">Carregando grupos... na primeira vez pode levar até 1 minuto.</div>
+    <div id="cad-groups" style="max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;color:var(--muted);">Carregando grupos... na primeira vez pode levar até 1 minuto.</div>`}
 
     <div style="${section}">Quando</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
-      <div><label class="field-label">Data</label><input type="date" class="field-input" id="cad-date" value="${toLocalDateInput(baseDate)}" onchange="renderCadencePreview()"></div>
+      <div style="${mode === 'edit-series' ? 'display:none;' : ''}"><label class="field-label">Data</label><input type="date" class="field-input" id="cad-date" value="${toLocalDateInput(baseDate)}" onchange="renderCadencePreview()"></div>
       <div><label class="field-label">Hora</label><input type="time" class="field-input" id="cad-time" value="${copyFrom ? toLocalTimeInput(baseDate) : '09:00'}" onchange="renderCadencePreview()"></div>
-      <div><label class="field-label">Repetir</label>
+      <div style="${mode !== 'new' ? 'display:none;' : ''}"><label class="field-label">Repetir</label>
         <select class="field-input" id="cad-repeat" onchange="renderCadencePreview()">
           <option value="none">Não repetir</option>
           <option value="daily">Todo dia</option>
@@ -5871,7 +5897,7 @@ async function openCadenceEditor(copyFrom) {
 
     <div id="cad-preview" style="margin-top:14px;padding:12px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text);"></div>
     <div style="display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap;">
-      <button style="${wbtn}" onclick="saveCadence()">Programar</button>
+      <button style="${wbtn}" onclick="saveCadence()">${mode === 'new' ? 'Programar' : 'Salvar alterações'}</button>
       <span id="cad-feedback" style="font-size:12px;"></span>
     </div>`;
   editor.style.display = 'block';
@@ -5882,7 +5908,68 @@ async function openCadenceEditor(copyFrom) {
     document.getElementById('cad-media-status').innerHTML = `<span style="color:#34d399;">✓ ${escapeHtml(_cadenceDraft.media.fileName || 'arquivo')} (o mesmo do envio original)</span>`;
   }
   renderCadencePreview();
-  await loadCadenceGroups(false);
+  if (mode !== 'edit-series') await loadCadenceGroups(false);
+}
+
+async function saveCadenceEdit(setFb) {
+  const draft = _cadenceDraft;
+  const text = document.getElementById('cad-text').value.trim();
+  const type = draft.type;
+  if (type === 'text' && !text) { setFb('#f87171', 'Escreva a mensagem.'); return; }
+  if (type !== 'text' && !draft.media) { setFb('#f87171', 'Envie o arquivo.'); return; }
+  const time = document.getElementById('cad-time').value;
+  if (!/^\d{2}:\d{2}$/.test(time)) { setFb('#f87171', 'Escolha a hora.'); return; }
+  const [hh, mm] = time.split(':').map(Number);
+  const content = {
+    type, text,
+    media: type === 'text' ? null : draft.media,
+    mentionAll: type === 'text' && !!document.getElementById('cad-mention').checked
+  };
+  const updates = [];
+  if (draft.mode === 'edit-item') {
+    const when = new Date(`${document.getElementById('cad-date').value}T${time}`);
+    if (isNaN(when.getTime()) || when <= new Date()) { setFb('#f87171', 'Escolha uma data e hora no futuro.'); return; }
+    const groups = [...document.querySelectorAll('.cad-group:checked')];
+    if (groups.length !== 1) { setFb('#f87171', 'Marque um grupo.'); return; }
+    updates.push({ id: draft.editIds[0], data: { ...content, groupId: groups[0].value, groupName: groups[0].getAttribute('data-subject'), sendAt: when.toISOString(), dueAt: when.toISOString() } });
+  } else {
+    let skipped = 0;
+    draft.editIds.forEach(id => {
+      const item = _cadenceItems.find(i => i.id === id);
+      if (!item || item.status !== 'scheduled') return;
+      const when = new Date(item.sendAt);
+      when.setHours(hh, mm, 0, 0);
+      if (when <= new Date()) { skipped += 1; return; }
+      updates.push({ id, data: { ...content, sendAt: when.toISOString(), dueAt: when.toISOString() } });
+    });
+    if (!updates.length) { setFb('#f87171', 'Nenhum envio futuro para atualizar.'); return; }
+    if (skipped) showToast(`${skipped} envio(s) de hoje ficariam no passado com o novo horário e não foram alterados.`, 'info');
+  }
+  setFb('var(--muted)', 'Salvando...');
+  try {
+    await window._fb.updateGroupSchedules(updates);
+    showToast(`${updates.length} envio(s) atualizado(s).`, 'success');
+    closeCadenceEditor();
+  } catch (e) {
+    setFb('#f87171', 'Erro: ' + e.message);
+  }
+}
+
+function editCadenceItem(id) {
+  const item = _cadenceItems.find(i => i.id === id);
+  if (item) openCadenceEditor(item, { mode: 'edit-item' });
+}
+
+function editCadenceSeries(index) {
+  const entry = _cadenceSeriesList[index];
+  if (!entry) return;
+  const items = entry[1];
+  openCadenceEditor(items[0], {
+    mode: 'edit-series',
+    ids: items.map(i => i.id),
+    groupIds: items.map(i => i.groupId),
+    groupNames: [...new Set(items.map(i => i.groupName || i.groupId))]
+  });
 }
 
 async function loadCadenceGroups(refresh) {
@@ -5982,6 +6069,21 @@ function cadenceOccurrences() {
 function renderCadencePreview() {
   const box = document.getElementById('cad-preview');
   if (!box || !_cadenceDraft) return;
+  if (_cadenceDraft.mode === 'edit-series') {
+    const time = document.getElementById('cad-time').value;
+    box.innerHTML = `<b>${_cadenceDraft.editIds.length} envio(s)</b> desta série serão atualizados${time ? `, todos às ${escapeHtml(time)}` : ''}.`;
+    return;
+  }
+  if (_cadenceDraft.mode === 'edit-item') {
+    const when = new Date(`${document.getElementById('cad-date').value}T${document.getElementById('cad-time').value}`);
+    const groups = [...document.querySelectorAll('.cad-group:checked')];
+    box.innerHTML = isNaN(when.getTime())
+      ? '<span style="color:var(--muted);">Escolha a data e a hora.</span>'
+      : `Este envio sai em <b>${escapeHtml(when.toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }))}</b>${groups.length === 1 ? ' no grupo ' + escapeHtml(groups[0].getAttribute('data-subject')) : ''}.`
+        + (when < new Date() ? '<div style="color:#f87171;font-size:12px;margin-top:4px;">Esse horário já passou.</div>' : '')
+        + (groups.length > 1 ? '<div style="color:#f87171;font-size:12px;margin-top:4px;">Marque só um grupo (para mais grupos, use Duplicar).</div>' : '');
+    return;
+  }
   const groups = [...document.querySelectorAll('.cad-group:checked')];
   const dates = cadenceOccurrences();
   const total = groups.length * dates.length;
@@ -5997,6 +6099,7 @@ function renderCadencePreview() {
 async function saveCadence() {
   const fb = document.getElementById('cad-feedback');
   const setFb = (color, text) => { fb.style.color = color; fb.textContent = text; };
+  if (_cadenceDraft.mode === 'edit-item' || _cadenceDraft.mode === 'edit-series') return saveCadenceEdit(setFb);
   const groups = [...document.querySelectorAll('.cad-group:checked')].map(cb => ({ id: cb.value, name: cb.getAttribute('data-subject') }));
   const dates = cadenceOccurrences().filter(d => d > new Date());
   const text = document.getElementById('cad-text').value.trim();
