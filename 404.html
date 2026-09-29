@@ -1457,6 +1457,10 @@ td { font-family: var(--font); font-size: 13px; }
   .cw-legend { margin-left: 0; }
 }
 
+/* Rolagem sem barra aparente (a rolagem continua funcionando) */
+.notifications-list, .csp-list, .chat-list, .chat-msgs, .chat-info, .kanban-cards, .modal-box, .modal-overlay, .config-panel, #huven-modal > div, .mnav-sheet, .integ-code, .client-switch-pop, .sidebar { scrollbar-width: none; -ms-overflow-style: none; }
+.notifications-list::-webkit-scrollbar, .csp-list::-webkit-scrollbar, .chat-list::-webkit-scrollbar, .chat-msgs::-webkit-scrollbar, .chat-info::-webkit-scrollbar, .kanban-cards::-webkit-scrollbar, .modal-box::-webkit-scrollbar, .modal-overlay::-webkit-scrollbar, .config-panel::-webkit-scrollbar, #huven-modal > div::-webkit-scrollbar, .mnav-sheet::-webkit-scrollbar, .integ-code::-webkit-scrollbar, .client-switch-pop::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
 /* Clientes (admin) */
 .huv-view { padding: 28px 36px; }
 .huv-header { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
