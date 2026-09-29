@@ -4934,7 +4934,6 @@ const CAMPAIGN_STATUS = {
   done: ['Concluída', '#60a5fa'],
   cancelled: ['Cancelada', '#f87171']
 };
-const CAMPAIGN_WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const CAMPAIGN_MEDIA_LABELS = { text: 'Só texto', image: 'Imagem', video: 'Vídeo', audio: 'Áudio (como gravado na hora)' };
 // Base de contatos importados do WhatsApp, por cliente (carregada sob demanda).
 const _crmContactsCache = {};
@@ -4989,7 +4988,10 @@ function renderCampaignList(campaigns) {
   }
   campaigns.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   list.innerHTML = campaigns.map(c => {
-    const [label, color] = CAMPAIGN_STATUS[c.status] || [c.status, 'var(--muted)'];
+    const scheduledStart = c.status === 'running' && c.startAt && new Date(c.startAt) > new Date();
+    const [label, color] = scheduledStart
+      ? [`Programada para ${new Date(c.startAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`, '#60a5fa']
+      : (CAMPAIGN_STATUS[c.status] || [c.status, 'var(--muted)']);
     const total = Number(c.total) || 0;
     const done = (Number(c.sent) || 0) + (Number(c.failed) || 0) + (Number(c.skipped) || 0);
     const pct = total ? Math.round(done / total * 100) : 0;
@@ -5018,8 +5020,7 @@ function renderCampaignList(campaigns) {
 }
 
 function describeDispatch(d) {
-  const days = (d.days || []).map(i => CAMPAIGN_WEEKDAYS[i]).join(', ');
-  return `um contato por vez, com intervalo de ${d.minIntervalSec}–${d.maxIntervalSec} s, no máximo ${d.hourlyLimit} por hora e ${d.dailyLimit} por dia, das ${d.startHour}h às ${d.endHour}h (${days})`;
+  return `um contato por vez, com intervalo de ${d.minIntervalSec}–${d.maxIntervalSec} s, no máximo ${d.hourlyLimit} por hora e ${d.dailyLimit} por dia, das ${d.startHour}h às ${d.endHour}h`;
 }
 
 async function startCampaign(id) {
@@ -5113,8 +5114,12 @@ function campaignDispatchHtml() {
       <label style="${lbl}"><span style="${rowLabel}">"Digitando..." / "Gravando..."</span>${num('typmin', d.typingMinSec, 1, 30)} a ${num('typmax', d.typingMaxSec, 1, 30)} segundos</label>
       <label style="${lbl}"><span style="${rowLabel}">Horário de envio</span>das ${num('start', d.startHour, 0, 23)} às ${num('end', d.endHour, 1, 24)} h (Brasília)</label>
     </div>
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--text);">
-      Dias: ${CAMPAIGN_WEEKDAYS.map((label, i) => `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="camp-day" value="${i}" ${d.days.includes(i) ? 'checked' : ''}>${label}</label>`).join('')}
+    <div style="margin-top:12px;font-size:12px;color:var(--text);display:flex;flex-direction:column;gap:8px;">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="radio" name="camp-start" value="now" checked onchange="onCampaignStartModeChange()"> Começar agora</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;flex-wrap:wrap;"><input type="radio" name="camp-start" value="scheduled" onchange="onCampaignStartModeChange()"> Programar o início para
+        <input type="date" class="field-input" id="camp-start-date" style="width:auto;padding:4px 8px;font-size:12px;" disabled>
+        <input type="time" class="field-input" id="camp-start-time" value="09:00" style="width:auto;padding:4px 8px;font-size:12px;" disabled>
+      </label>
     </div>
     <label style="${lbl}margin-top:10px;"><input type="checkbox" id="camp-check" checked> Conferir se o número tem WhatsApp antes de enviar</label>
     <label style="${lbl}margin-top:6px;"><input type="checkbox" id="camp-warmup"> Número novo (aquecimento: 20/dia nos dias 1–3, 50/dia nos dias 4–7, 100/dia nos dias 8–14)</label>
@@ -5126,7 +5131,6 @@ function resetCampaignDispatch() {
   const set = (f, v) => { const el = document.getElementById('camp-' + f); if (el) el.value = v; };
   set('daily', d.dailyLimit); set('hourly', d.hourlyLimit); set('minint', d.minIntervalSec); set('maxint', d.maxIntervalSec);
   set('typmin', d.typingMinSec); set('typmax', d.typingMaxSec); set('start', d.startHour); set('end', d.endHour);
-  document.querySelectorAll('.camp-day').forEach(cb => { cb.checked = d.days.includes(Number(cb.value)); });
   document.getElementById('camp-check').checked = true;
   document.getElementById('camp-warmup').checked = false;
   renderCampaignSummary();
@@ -5140,7 +5144,7 @@ function readCampaignDispatch() {
     minIntervalSec: val('minint'), maxIntervalSec: val('maxint'),
     typingMinSec: val('typmin'), typingMaxSec: val('typmax'),
     startHour: val('start'), endHour: val('end'),
-    days: [...document.querySelectorAll('.camp-day')].filter(cb => cb.checked).map(cb => Number(cb.value)),
+    days: [0, 1, 2, 3, 4, 5, 6],
     checkNumber: !!document.getElementById('camp-check')?.checked,
     warmup: !!document.getElementById('camp-warmup')?.checked
   };
@@ -5148,8 +5152,29 @@ function readCampaignDispatch() {
   if (nums.some(k => !Number.isFinite(d[k]) || d[k] < 0)) return { error: 'Confira os números das configurações de disparo.' };
   if (d.maxIntervalSec < d.minIntervalSec || d.typingMaxSec < d.typingMinSec) return { error: 'Nas configurações de disparo, o máximo precisa ser maior que o mínimo.' };
   if (d.endHour <= d.startHour) return { error: 'O horário final precisa ser depois do inicial.' };
-  if (!d.days.length) return { error: 'Escolha pelo menos um dia de envio.' };
   return { dispatch: d };
+}
+
+// Início da campanha: agora ou numa data/hora programada. Retorna { startAt } (vazio = agora) ou { error }.
+function readCampaignStart() {
+  const mode = (document.querySelector('input[name="camp-start"]:checked') || {}).value || 'now';
+  if (mode === 'now') return { startAt: '' };
+  const date = document.getElementById('camp-start-date').value;
+  const time = document.getElementById('camp-start-time').value;
+  const when = new Date(`${date}T${time}`);
+  if (!date || !time || isNaN(when.getTime())) return { error: 'Escolha a data e a hora de início.' };
+  if (when <= new Date()) return { error: 'A data de início precisa ser no futuro.' };
+  return { startAt: when.toISOString() };
+}
+
+function onCampaignStartModeChange() {
+  const scheduled = ((document.querySelector('input[name="camp-start"]:checked') || {}).value) === 'scheduled';
+  const date = document.getElementById('camp-start-date');
+  const time = document.getElementById('camp-start-time');
+  date.disabled = time.disabled = !scheduled;
+  if (scheduled && !date.value) date.value = toLocalDateInput(new Date(Date.now() + 86400000));
+  const btn = document.getElementById('camp-start-btn');
+  if (btn) btn.textContent = scheduled ? 'Salvar e programar' : 'Salvar e iniciar';
 }
 
 function openCampaignEditor() {
@@ -5234,12 +5259,12 @@ function openCampaignEditor() {
     <div id="camp-risk" style="display:none;margin-top:14px;padding:10px 12px;border-radius:8px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.35);font-size:12px;color:var(--text);line-height:1.5;"></div>
 
     <div style="display:flex;gap:8px;align-items:center;margin-top:16px;flex-wrap:wrap;">
-      <button style="${wbtn}" onclick="saveCampaign(true)">Salvar e iniciar</button>
+      <button style="${wbtn}" id="camp-start-btn" onclick="saveCampaign(true)">Salvar e iniciar</button>
       <button style="${wbtn}background:transparent;" onclick="saveCampaign(false)">Salvar como rascunho</button>
       <span id="camp-feedback" style="font-size:12px;"></span>
     </div>`;
   editor.style.display = 'block';
-  editor.querySelectorAll('#camp-daily,#camp-hourly,#camp-start,#camp-end,.camp-day,#camp-warmup').forEach(el => el.addEventListener('change', renderCampaignSummary));
+  editor.querySelectorAll('#camp-daily,#camp-hourly,#camp-start,#camp-end,#camp-warmup').forEach(el => el.addEventListener('change', renderCampaignSummary));
   selectCampaignMediaType('text');
   selectCampaignSource('crm');
 }
@@ -5421,14 +5446,19 @@ async function importContactsToCrm() {
   }
 }
 
-async function loadCampaignGroups() {
+function groupsCacheNote(r, reloadFn) {
+  const when = r.cachedAt ? new Date(r.cachedAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '';
+  return `<div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Lista atualizada em ${escapeHtml(when)} · <a href="#" onclick="event.preventDefault();${reloadFn}" style="color:var(--accent2);">atualizar agora</a> (leva até 1 minuto)</div>`;
+}
+
+async function loadCampaignGroups(refresh) {
   const box = document.getElementById('camp-groups-list');
-  box.innerHTML = '<div style="font-size:12px;color:var(--muted);">Carregando grupos...</div>';
+  box.innerHTML = '<div style="font-size:12px;color:var(--muted);">Carregando grupos... na primeira vez pode levar até 1 minuto.</div>';
   try {
-    const r = await window._fb.whatsapp('/whatsapp/groups', _campaignDraft.act);
+    const r = await window._fb.whatsapp('/whatsapp/groups', _campaignDraft.act, refresh ? { refresh: true } : undefined);
     const groups = (r.groups || []).sort((a, b) => a.subject.localeCompare(b.subject, 'pt-BR'));
     if (!groups.length) { box.innerHTML = '<div style="font-size:12px;color:var(--muted);">Nenhum grupo encontrado.</div>'; return; }
-    box.innerHTML = `<label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--text);padding:4px 0 8px;cursor:pointer;border-bottom:1px solid var(--border);margin-bottom:4px;">
+    box.innerHTML = groupsCacheNote(r, 'loadCampaignGroups(true)') + `<label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--text);padding:4px 0 8px;cursor:pointer;border-bottom:1px solid var(--border);margin-bottom:4px;">
         <input type="checkbox" id="camp-groups-all" onchange="toggleAllCampaignGroups(this.checked)"> Selecionar todos os ${groups.length} grupos</label>` +
       groups.map(g => `<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);padding:4px 0;cursor:pointer;">
       <input type="checkbox" class="camp-group" value="${escapeHtml(g.id)}" data-subject="${escapeHtml(g.subject)}" onchange="scheduleGroupParticipants()">
@@ -5519,7 +5549,10 @@ async function saveCampaign(start) {
   if (!_campaignDraft.recipients.length) { setFb('#f87171', 'A lista de contatos está vazia.'); return; }
   const read = readCampaignDispatch();
   if (read.error) { setFb('#f87171', read.error); return; }
-  if (start && !await showConfirm(`Enviar para ${_campaignDraft.recipients.length} contato(s): ${describeDispatch(read.dispatch)}.`, 'Iniciar disparo', 'Iniciar')) return;
+  const startInfo = readCampaignStart();
+  if (startInfo.error) { setFb('#f87171', startInfo.error); return; }
+  const startLabel = startInfo.startAt ? `a partir de ${new Date(startInfo.startAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}` : 'começando agora';
+  if (start && !await showConfirm(`Enviar para ${_campaignDraft.recipients.length} contato(s), ${startLabel}: ${describeDispatch(read.dispatch)}.`, startInfo.startAt ? 'Programar disparo' : 'Iniciar disparo', startInfo.startAt ? 'Programar' : 'Iniciar')) return;
   setFb('var(--muted)', 'Salvando...');
   try {
     const id = await window._fb.createCampaign({
@@ -5531,11 +5564,12 @@ async function saveCampaign(start) {
         fileName: _campaignDraft.media.fileName
       } : null,
       dispatch: read.dispatch,
+      startAt: startInfo.startAt,
       audienceType: _campaignDraft.source,
       audienceLabel: _campaignDraft.label
     }, _campaignDraft.recipients);
     if (start) await window._fb.updateCampaign(id, { status: 'running', startedAt: new Date().toISOString() });
-    showToast(start ? 'Campanha criada e iniciada.' : 'Campanha salva como rascunho.', 'success');
+    showToast(!start ? 'Campanha salva como rascunho.' : startInfo.startAt ? 'Campanha programada.' : 'Campanha criada e iniciada.', 'success');
     closeCampaignEditor();
   } catch (e) {
     setFb('#f87171', 'Erro: ' + e.message);
@@ -5692,7 +5726,7 @@ async function openCadenceEditor(copyFrom) {
     <div style="${section}margin-top:0;">Grupos</div>
     <div style="${hint}">Marque um ou mais grupos: a mensagem sai em cada um deles.</div>
     <input class="field-input" id="cad-group-search" placeholder="Buscar grupo..." oninput="filterCadenceGroups(this.value)" style="margin-bottom:6px;">
-    <div id="cad-groups" style="max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:6px 10px;">Carregando grupos...</div>
+    <div id="cad-groups" style="max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;color:var(--muted);">Carregando grupos... na primeira vez pode levar até 1 minuto.</div>
 
     <div style="${section}">Quando</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
@@ -5734,18 +5768,25 @@ async function openCadenceEditor(copyFrom) {
     document.getElementById('cad-media-status').innerHTML = `<span style="color:#34d399;">✓ ${escapeHtml(_cadenceDraft.media.fileName || 'arquivo')} (o mesmo do envio original)</span>`;
   }
   renderCadencePreview();
+  await loadCadenceGroups(false);
+}
+
+async function loadCadenceGroups(refresh) {
+  if (!_cadenceDraft) return;
+  const act = _cadenceDraft.act;
+  const box = document.getElementById('cad-groups');
+  if (refresh && box) box.innerHTML = 'Atualizando a lista de grupos... pode levar até 1 minuto.';
   try {
-    const r = await window._fb.whatsapp('/whatsapp/groups', act);
+    const r = await window._fb.whatsapp('/whatsapp/groups', act, refresh ? { refresh: true } : undefined);
     const groups = (r.groups || []).sort((a, b) => a.subject.localeCompare(b.subject, 'pt-BR'));
-    const box = document.getElementById('cad-groups');
-    if (!box) return;
-    box.innerHTML = groups.length ? groups.map(g => `<label class="cad-group-row" data-name="${escapeHtml(g.subject.toLowerCase())}" style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);padding:4px 0;cursor:pointer;">
-        <input type="checkbox" class="cad-group" value="${escapeHtml(g.id)}" data-subject="${escapeHtml(g.subject)}" ${_cadenceDraft.preselect.includes(g.id) ? 'checked' : ''} onchange="renderCadencePreview()">
+    if (!box || !_cadenceDraft) return;
+    const checked = new Set([...document.querySelectorAll('.cad-group:checked')].map(cb => cb.value).concat(_cadenceDraft.preselect));
+    box.innerHTML = groupsCacheNote(r, 'loadCadenceGroups(true)') + (groups.length ? groups.map(g => `<label class="cad-group-row" data-name="${escapeHtml(g.subject.toLowerCase())}" style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);padding:4px 0;cursor:pointer;">
+        <input type="checkbox" class="cad-group" value="${escapeHtml(g.id)}" data-subject="${escapeHtml(g.subject)}" ${checked.has(g.id) ? 'checked' : ''} onchange="renderCadencePreview()">
         ${escapeHtml(g.subject)} <span style="color:var(--muted);font-size:11px;">(${g.size})</span></label>`).join('')
-      : '<div style="font-size:12px;color:var(--muted);">Nenhum grupo neste WhatsApp.</div>';
+      : '<div style="font-size:12px;color:var(--muted);">Nenhum grupo neste WhatsApp.</div>');
     renderCadencePreview();
   } catch (e) {
-    const box = document.getElementById('cad-groups');
     if (box) box.innerHTML = `<div style="font-size:12px;color:#f87171;">${escapeHtml(e.message)}</div>`;
   }
 }
