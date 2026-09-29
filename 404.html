@@ -1313,6 +1313,10 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
     Conta
   </div>
+  <div class="mobile-nav-item" id="mnav-whatsapp" onclick="switchView('whatsapp'); setMobileNav('whatsapp')">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+    WhatsApp
+  </div>
   <div class="mobile-nav-item theme-toggle-mobile" id="mnav-theme" onclick="toggleHuvenTheme()">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
     Tema <span id="huven-theme-label-mobile">Claro</span>
@@ -1377,6 +1381,10 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
         <div class="nav-item" id="nav-conta" onclick="switchView('conta')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           Conta
+        </div>
+        <div class="nav-item" id="nav-whatsapp" onclick="switchView('whatsapp')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+          WhatsApp
         </div>
         <div class="nav-item" id="nav-contatos" onclick="if(window.abrirContatos) abrirContatos(); else switchView('contatos')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/><line x1="20" y1="8" x2="20" y2="14"/></svg>
@@ -2144,20 +2152,44 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
           <button class="btn-save" onclick="changePassword()">Salvar nova senha</button>
         </div>
 
-        <div id="whatsapp-section" style="display:none; margin-bottom:28px;">
-          <div style="font-size:15px; font-weight:600; color:var(--text); margin-bottom:6px;">WhatsApp</div>
-          <div style="font-size:13px; color:var(--muted); margin-bottom:12px;">Conecte o número de WhatsApp que vai falar com os seus leads.</div>
-          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-            <span id="whatsapp-own-status" style="font-size:13px;"></span>
-            <span id="whatsapp-own-actions" style="display:flex; gap:8px;"></span>
-          </div>
-          <div id="whatsapp-own-auto" style="font-size:12px; color:var(--muted); margin-top:10px;"></div>
-        </div>
-
         <div id="admin-logins-section" style="display:none;">
           <div style="font-size:15px; font-weight:600; color:var(--text); margin-bottom:6px;">Clientes</div>
           <div style="font-size:13px; color:var(--muted); margin-bottom:16px;">Edite o nome e a conta de anúncios de cada cliente, ou defina uma nova senha. Trocar a conta de anúncios muda só de onde vêm as métricas; os leads do CRM continuam os mesmos.</div>
           <div id="admin-logins-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WhatsApp View -->
+    <div id="whatsapp-view" style="display:none; padding:28px 32px;">
+      <div style="max-width:760px;">
+        <div style="font-size:18px; font-weight:600; color:var(--text); margin-bottom:6px;">WhatsApp</div>
+        <div id="whatsapp-view-subtitle" style="font-size:13px; color:var(--muted); margin-bottom:24px;"></div>
+
+        <!-- Cliente: o próprio número -->
+        <div id="whatsapp-client-panel" style="display:none;">
+          <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--r2); padding:24px; margin-bottom:20px;">
+            <div style="font-size:15px; font-weight:600; color:var(--text); margin-bottom:12px;">Conexão</div>
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <span id="whatsapp-own-status" style="font-size:13px;"></span>
+              <span id="whatsapp-own-actions" style="display:flex; gap:8px;"></span>
+            </div>
+            <div id="whatsapp-own-auto" style="font-size:12px; color:var(--muted); margin-top:12px;"></div>
+          </div>
+          <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--r2); padding:24px;">
+            <div style="font-size:15px; font-weight:600; color:var(--text); margin-bottom:6px;">Primeira mensagem</div>
+            <div style="font-size:12px; color:var(--muted); margin-bottom:12px;">Enviada aos leads novos. Use {primeiro_nome}, {nome}, {rede_social} e {origem}.</div>
+            <textarea class="field-input" id="whatsapp-own-template" rows="5" style="resize:vertical; width:100%; box-sizing:border-box;"></textarea>
+            <div style="display:flex; align-items:center; gap:10px; margin-top:12px;">
+              <button class="btn-save" style="width:auto; padding:10px 20px;" onclick="saveOwnWhatsAppTemplate()">Salvar mensagem</button>
+              <span id="whatsapp-own-template-feedback" style="font-size:12px;"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Admin: todos os clientes -->
+        <div id="whatsapp-admin-panel" style="display:none;">
+          <div id="whatsapp-admin-list" style="display:flex; flex-direction:column; gap:10px;"></div>
         </div>
       </div>
     </div>
@@ -3777,12 +3809,12 @@ window.abrirContatos = function abrirContatos() {
     if(topbar) topbar.style.display = 'none';
     const contentEl = document.querySelector('.content');
     if(contentEl) contentEl.style.display = 'none';
-    ['crm-view','conta-view'].forEach(id => {
+    ['crm-view','conta-view','whatsapp-view'].forEach(id => {
       const el = document.getElementById(id); if(el) el.style.display = 'none';
     });
     const v = document.getElementById('contatos-view');
     if(v) { v.style.cssText += ';display:block!important;visibility:visible!important;opacity:1!important;'; }
-    ['report','crm','ajuda','conta','contatos','integracoes'].forEach(n => {
+    ['report','crm','ajuda','conta','whatsapp','contatos','integracoes'].forEach(n => {
       const el = document.getElementById('nav-'+n);
       if(el) el.classList.toggle('active', n==='contatos');
     });
@@ -4545,7 +4577,7 @@ function renderAtendimento() {
 }
 
 function switchView(view) {
-  ['report','crm','ajuda','conta','contatos','integracoes'].forEach(v => {
+  ['report','crm','ajuda','conta','whatsapp','contatos','integracoes'].forEach(v => {
     const el = document.getElementById('nav-' + v);
     if (el) el.classList.toggle('active', v === view);
   });
@@ -4555,6 +4587,9 @@ function switchView(view) {
   const ajudaView = document.getElementById('ajuda-view');
   if (ajudaView) ajudaView.style.display = view === 'ajuda' ? 'block' : 'none';
   document.getElementById('conta-view').style.display = view === 'conta' ? 'block' : 'none';
+  const whatsappView = document.getElementById('whatsapp-view');
+  if (whatsappView) whatsappView.style.display = view === 'whatsapp' ? 'block' : 'none';
+  if (view === 'whatsapp') renderWhatsAppView();
   const contView = document.getElementById('contatos-view');
   if (contView) contView.style.display = view === 'contatos' ? 'block' : 'none';
   if (view === 'crm') {
@@ -4573,7 +4608,6 @@ function switchView(view) {
     document.getElementById('pw-error').style.display = 'none';
     document.getElementById('pw-success').style.display = 'none';
     if (isAdmin) renderAdminLogins();
-    renderOwnWhatsAppSection();
   }
 }
 
@@ -4602,7 +4636,6 @@ async function renderAdminLogins() {
   await loadExtraClients();
   let vault = {};
   try { vault = await window._fb.getVault(); } catch(e) { console.warn('Cofre de senhas indisponível:', e); }
-  try { Object.assign(WHATSAPP_SETTINGS, await window._fb.getWhatsAppSettings()); } catch(e) { console.warn('Configuração de WhatsApp indisponível:', e); }
 
   const todos = Object.entries(CREDENTIALS)
     .filter(([login, cred]) => login !== 'admin' && cred && cred.act)
@@ -4645,14 +4678,6 @@ async function renderAdminLogins() {
         <span id="client-info-feedback-${id}" style="font-size:11px;display:none;"></span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <span style="${labelStyle}">WhatsApp:</span>
-        <span data-wa-act="${escapeHtml(c.act)}" style="display:flex;align-items:center;gap:8px;font-size:12px;"></span>
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);cursor:pointer;margin-left:auto;">
-          <input type="checkbox" onchange="toggleWhatsAppAuto('${jsLogin}', this)" ${WHATSAPP_SETTINGS[c.act] && WHATSAPP_SETTINGS[c.act].autoFirstMessage ? 'checked' : ''}>
-          Mensagem automática no "Novo lead"
-        </label>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <span style="${labelStyle}">Senha atual:</span>
         ${c.password ? `
         <input id="client-current-pass-${id}" class="field-input mono" style="${inputStyle}width:150px;" type="password" value="${escapeHtml(c.password)}" readonly>
@@ -4668,7 +4693,6 @@ async function renderAdminLogins() {
       </div>
     </div>`;
   }).join('');
-  refreshAdminWhatsAppStates();
 }
 
 async function saveClientInfo(login) {
@@ -4735,12 +4759,34 @@ function whatsappStateBadge(result) {
 
 const wbtn = 'background:var(--accent-glow);border:1px solid var(--accent);color:var(--accent2);border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;white-space:nowrap;';
 
-async function renderOwnWhatsAppSection() {
-  const section = document.getElementById('whatsapp-section');
-  if (!section) return;
+// Tela "WhatsApp": admin vê todos os clientes; cliente vê só o próprio número e a própria mensagem.
+async function renderWhatsAppView() {
   const profile = window._fb && window._fb.getProfile();
-  if (!profile || profile.role === 'admin' || !profile.act) { section.style.display = 'none'; return; }
-  section.style.display = 'block';
+  const clientPanel = document.getElementById('whatsapp-client-panel');
+  const adminPanel = document.getElementById('whatsapp-admin-panel');
+  const subtitle = document.getElementById('whatsapp-view-subtitle');
+  if (!profile || !clientPanel || !adminPanel) return;
+  try { Object.assign(WHATSAPP_SETTINGS, await window._fb.getWhatsAppSettings()); } catch(e) { console.warn('Configuração de WhatsApp indisponível:', e); }
+
+  if (profile.role === 'admin') {
+    clientPanel.style.display = 'none';
+    adminPanel.style.display = 'block';
+    subtitle.textContent = 'Conecte o WhatsApp de cada cliente, ative a mensagem automática no "Novo lead" e ajuste o texto de cada um.';
+    renderAdminWhatsAppList();
+  } else {
+    adminPanel.style.display = 'none';
+    clientPanel.style.display = 'block';
+    subtitle.textContent = 'Conecte o número de WhatsApp que vai falar com os seus leads.';
+    document.getElementById('whatsapp-own-template').value = getFirstMessageTemplate(profile.act);
+    document.getElementById('whatsapp-own-template-feedback').textContent = '';
+    renderOwnWhatsAppSection();
+  }
+}
+
+async function renderOwnWhatsAppSection() {
+  const panel = document.getElementById('whatsapp-client-panel');
+  const profile = window._fb && window._fb.getProfile();
+  if (!panel || !profile || profile.role === 'admin' || !profile.act) return;
   const act = profile.act;
   const status = document.getElementById('whatsapp-own-status');
   const actions = document.getElementById('whatsapp-own-actions');
@@ -4758,6 +4804,87 @@ async function renderOwnWhatsAppSection() {
   document.getElementById('whatsapp-own-auto').textContent = auto
     ? 'Mensagem automática para leads novos: ativada.'
     : 'Mensagem automática para leads novos: desativada (a Huven ativa para você).';
+}
+
+async function saveWhatsAppTemplate(act, template, feedbackEl) {
+  const text = String(template || '').trim() || DEFAULT_FIRST_MESSAGE_TEMPLATE;
+  const setFeedback = (color, msg) => { if (feedbackEl) { feedbackEl.style.color = color; feedbackEl.textContent = msg; } };
+  try {
+    await window._fb.saveWhatsAppSettings(act, { template: text });
+    WHATSAPP_SETTINGS[act] = { ...(WHATSAPP_SETTINGS[act] || {}), template: text };
+    const templates = getFirstMessageTemplates();
+    templates[act] = text;
+    localStorage.setItem(FIRST_MESSAGE_TEMPLATE_KEY, JSON.stringify(templates));
+    setFeedback('#34d399', 'Mensagem salva!');
+  } catch (e) {
+    setFeedback('#f87171', 'Erro: ' + e.message);
+  }
+}
+
+function saveOwnWhatsAppTemplate() {
+  const profile = window._fb && window._fb.getProfile();
+  if (!profile || !profile.act) return;
+  saveWhatsAppTemplate(profile.act, document.getElementById('whatsapp-own-template').value,
+    document.getElementById('whatsapp-own-template-feedback'));
+}
+
+function renderAdminWhatsAppList() {
+  const list = document.getElementById('whatsapp-admin-list');
+  if (!list) return;
+  const clients = Object.entries(CREDENTIALS)
+    .filter(([login, cred]) => login !== 'admin' && cred && cred.act)
+    .map(([login, cred]) => ({ login, act: cred.act, name: getClientDisplayName(cred.act) }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  if (!clients.length) { list.innerHTML = '<div style="font-size:12px;color:var(--muted);">Nenhum cliente.</div>'; return; }
+
+  list.innerHTML = clients.map(c => {
+    const id = escapeHtml(c.login);
+    const jsLogin = escapeJsString(c.login);
+    const auto = WHATSAPP_SETTINGS[c.act] && WHATSAPP_SETTINGS[c.act].autoFirstMessage;
+    return `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div style="font-size:14px;font-weight:600;color:var(--text);flex:1;min-width:160px;">${escapeHtml(c.name)}</div>
+        <span data-wa-act="${escapeHtml(c.act)}" style="display:flex;align-items:center;gap:8px;font-size:12px;"></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);cursor:pointer;">
+          <input type="checkbox" onchange="toggleWhatsAppAuto('${jsLogin}', this)" ${auto ? 'checked' : ''}>
+          Mensagem automática no "Novo lead"
+        </label>
+        <button style="${wbtn}margin-left:auto;" onclick="toggleWhatsAppTemplateEditor('${jsLogin}')">Editar mensagem</button>
+      </div>
+      <div id="wa-template-box-${id}" style="display:none;">
+        <textarea class="field-input" id="wa-template-${id}" rows="4" style="resize:vertical;width:100%;box-sizing:border-box;font-size:13px;"></textarea>
+        <div style="font-size:11px;color:var(--muted);margin:6px 0 8px;">Use {primeiro_nome}, {nome}, {rede_social} e {origem}.</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button style="${wbtn}" onclick="saveAdminWhatsAppTemplate('${jsLogin}')">Salvar mensagem</button>
+          <span id="wa-template-feedback-${id}" style="font-size:12px;"></span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  refreshAdminWhatsAppStates();
+}
+
+function toggleWhatsAppTemplateEditor(login) {
+  const box = document.getElementById('wa-template-box-' + login);
+  const input = document.getElementById('wa-template-' + login);
+  const act = CREDENTIALS[login] && CREDENTIALS[login].act;
+  if (!box || !input || !act) return;
+  const open = box.style.display === 'none';
+  box.style.display = open ? 'block' : 'none';
+  if (open) {
+    input.value = getFirstMessageTemplate(act);
+    document.getElementById('wa-template-feedback-' + login).textContent = '';
+  }
+}
+
+function saveAdminWhatsAppTemplate(login) {
+  const act = CREDENTIALS[login] && CREDENTIALS[login].act;
+  if (!act) return;
+  saveWhatsAppTemplate(act, document.getElementById('wa-template-' + login).value,
+    document.getElementById('wa-template-feedback-' + login));
 }
 
 let _whatsappPoll = null;
@@ -6035,7 +6162,7 @@ function moveLeadTo(id, stageId) {
 
 
 function setMobileNav(view) {
-  ['report','crm','ajuda','conta','integracoes','cfg'].forEach(v => {
+  ['report','crm','ajuda','conta','whatsapp','integracoes','cfg'].forEach(v => {
     const el = document.getElementById('mnav-' + v);
     if (el) el.classList.toggle('active', v === view);
   });
