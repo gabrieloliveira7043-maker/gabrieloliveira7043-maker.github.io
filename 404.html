@@ -2178,9 +2178,9 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
           </div>
           <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--r2); padding:24px;">
             <div style="font-size:15px; font-weight:600; color:var(--text); margin-bottom:6px;">Primeira mensagem</div>
-            <div style="font-size:12px; color:var(--muted); margin-bottom:12px;">Enviada aos leads novos. Use {primeiro_nome}, {nome}, {rede_social} e {origem}.</div>
-            <textarea class="field-input" id="whatsapp-own-template" rows="5" style="resize:vertical; width:100%; box-sizing:border-box;"></textarea>
-            <div style="display:flex; align-items:center; gap:10px; margin-top:12px;">
+            <div style="font-size:12px; color:var(--muted); margin-bottom:12px; line-height:1.5;">Enviada aos leads novos. Cadastre variações: a cada envio uma é sorteada, o que ajuda a evitar bloqueio do número. Use {primeiro_nome}, {nome}, {rede_social} e {origem}.</div>
+            <div id="whatsapp-own-variations"></div>
+            <div style="display:flex; align-items:center; gap:10px; margin-top:4px;">
               <button class="btn-save" style="width:auto; padding:10px 20px;" onclick="saveOwnWhatsAppTemplate()">Salvar mensagem</button>
               <span id="whatsapp-own-template-feedback" style="font-size:12px;"></span>
             </div>
@@ -4777,7 +4777,7 @@ async function renderWhatsAppView() {
     adminPanel.style.display = 'none';
     clientPanel.style.display = 'block';
     subtitle.textContent = 'Conecte o número de WhatsApp que vai falar com os seus leads.';
-    document.getElementById('whatsapp-own-template').value = getFirstMessageTemplate(profile.act);
+    document.getElementById('whatsapp-own-variations').innerHTML = whatsappVariationsHtml('wa-own', getWhatsAppTemplates(profile.act));
     document.getElementById('whatsapp-own-template-feedback').textContent = '';
     renderOwnWhatsAppSection();
   }
@@ -4806,26 +4806,52 @@ async function renderOwnWhatsAppSection() {
     : 'Mensagem automática para leads novos: desativada (a Huven ativa para você).';
 }
 
-async function saveWhatsAppTemplate(act, template, feedbackEl) {
-  const text = String(template || '').trim() || DEFAULT_FIRST_MESSAGE_TEMPLATE;
-  const setFeedback = (color, msg) => { if (feedbackEl) { feedbackEl.style.color = color; feedbackEl.textContent = msg; } };
-  try {
-    await window._fb.saveWhatsAppSettings(act, { template: text });
-    WHATSAPP_SETTINGS[act] = { ...(WHATSAPP_SETTINGS[act] || {}), template: text };
-    const templates = getFirstMessageTemplates();
-    templates[act] = text;
-    localStorage.setItem(FIRST_MESSAGE_TEMPLATE_KEY, JSON.stringify(templates));
-    setFeedback('#34d399', 'Mensagem salva!');
-  } catch (e) {
-    setFeedback('#f87171', 'Erro: ' + e.message);
+// Selo no card do lead: situação do envio automático e número oculto pelo WhatsApp.
+function whatsappCardBadge(lead, hasPhoneLink) {
+  const style = 'cursor:default;font-size:10px;';
+  const auto = lead.whatsappAuto || {};
+  const tags = [];
+  if (!hasPhoneLink && lead.whatsappJid) {
+    tags.push(`<span class="card-btn" style="${style}" title="O WhatsApp ocultou o número deste contato. Responda pelo WhatsApp conectado.">WhatsApp · nº oculto</span>`);
   }
+  if (!lead.whatsappFirstMessageAt) {
+    if (auto.status === 'queued') tags.push(`<span class="card-btn" style="${style}" title="Mensagem automática aguardando o horário e o intervalo seguros de envio.">Na fila do WhatsApp</span>`);
+    if (auto.status === 'failed') tags.push(`<span class="card-btn" style="${style}color:#f87171;" title="${escapeHtml(auto.error || '')}">Envio falhou</span>`);
+  }
+  if (lead.whatsappOptOut) tags.push(`<span class="card-btn" style="${style}" title="O contato pediu para não receber mensagens automáticas.">Pediu para sair</span>`);
+  return tags.join('');
 }
 
-function saveOwnWhatsAppTemplate() {
-  const profile = window._fb && window._fb.getProfile();
-  if (!profile || !profile.act) return;
-  saveWhatsAppTemplate(profile.act, document.getElementById('whatsapp-own-template').value,
-    document.getElementById('whatsapp-own-template-feedback'));
+// Padrões recomendados contra bloqueio (os mesmos do Worker).
+const WHATSAPP_DISPATCH_DEFAULTS = {
+  dailyLimit: 100, hourlyLimit: 20, minIntervalSec: 60, maxIntervalSec: 180,
+  startHour: 8, endHour: 20, days: [1, 2, 3, 4, 5, 6],
+  typingMinSec: 3, typingMaxSec: 8, checkNumber: true, warmup: false, warmupStartedAt: ''
+};
+const WHATSAPP_MAX_VARIATIONS = 5;
+const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+function getWhatsAppTemplates(act) {
+  const s = WHATSAPP_SETTINGS[act] || {};
+  const list = (Array.isArray(s.templates) ? s.templates : []).map(t => String(t || '').trim()).filter(Boolean);
+  return list.length ? list : [getFirstMessageTemplate(act)];
+}
+
+function whatsappVariationsHtml(prefix, templates) {
+  const rows = [];
+  for (let i = 0; i < WHATSAPP_MAX_VARIATIONS; i++) {
+    rows.push(`<textarea class="field-input" id="${prefix}-var-${i}" rows="3" style="resize:vertical;width:100%;box-sizing:border-box;font-size:13px;margin-bottom:8px;" placeholder="${i === 0 ? 'Mensagem principal' : 'Variação ' + (i + 1) + ' (opcional)'}">${escapeHtml(templates[i] || '')}</textarea>`);
+  }
+  return rows.join('');
+}
+
+function readWhatsAppVariations(prefix) {
+  const list = [];
+  for (let i = 0; i < WHATSAPP_MAX_VARIATIONS; i++) {
+    const v = (document.getElementById(`${prefix}-var-${i}`)?.value || '').trim();
+    if (v) list.push(v);
+  }
+  return list;
 }
 
 function renderAdminWhatsAppList() {
@@ -4837,10 +4863,13 @@ function renderAdminWhatsAppList() {
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   if (!clients.length) { list.innerHTML = '<div style="font-size:12px;color:var(--muted);">Nenhum cliente.</div>'; return; }
 
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
   list.innerHTML = clients.map(c => {
     const id = escapeHtml(c.login);
     const jsLogin = escapeJsString(c.login);
-    const auto = WHATSAPP_SETTINGS[c.act] && WHATSAPP_SETTINGS[c.act].autoFirstMessage;
+    const s = WHATSAPP_SETTINGS[c.act] || {};
+    const sentToday = s.sentDate === today ? Number(s.sentCount) || 0 : 0;
+    const capture = s.leadCapture && s.leadCapture.enabled;
     return `
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -4849,42 +4878,139 @@ function renderAdminWhatsAppList() {
       </div>
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
         <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);cursor:pointer;">
-          <input type="checkbox" onchange="toggleWhatsAppAuto('${jsLogin}', this)" ${auto ? 'checked' : ''}>
+          <input type="checkbox" onchange="toggleWhatsAppAuto('${jsLogin}', this)" ${s.autoFirstMessage ? 'checked' : ''}>
           Mensagem automática no "Novo lead"
         </label>
-        <button style="${wbtn}margin-left:auto;" onclick="toggleWhatsAppTemplateEditor('${jsLogin}')">Editar mensagem</button>
+        <span style="font-size:11px;color:var(--muted);">Enviadas hoje: ${sentToday}${capture ? ' · Captura pelo WhatsApp ativa' : ''}</span>
+        <button style="${wbtn}margin-left:auto;" onclick="toggleWhatsAppSettings('${jsLogin}')">Configurações</button>
       </div>
-      <div id="wa-template-box-${id}" style="display:none;">
-        <textarea class="field-input" id="wa-template-${id}" rows="4" style="resize:vertical;width:100%;box-sizing:border-box;font-size:13px;"></textarea>
-        <div style="font-size:11px;color:var(--muted);margin:6px 0 8px;">Use {primeiro_nome}, {nome}, {rede_social} e {origem}.</div>
-        <div style="display:flex;align-items:center;gap:10px;">
-          <button style="${wbtn}" onclick="saveAdminWhatsAppTemplate('${jsLogin}')">Salvar mensagem</button>
-          <span id="wa-template-feedback-${id}" style="font-size:12px;"></span>
-        </div>
-      </div>
+      <div id="wa-settings-${id}" style="display:none;"></div>
     </div>`;
   }).join('');
   refreshAdminWhatsAppStates();
 }
 
-function toggleWhatsAppTemplateEditor(login) {
-  const box = document.getElementById('wa-template-box-' + login);
-  const input = document.getElementById('wa-template-' + login);
+function toggleWhatsAppSettings(login) {
+  const box = document.getElementById('wa-settings-' + login);
   const act = CREDENTIALS[login] && CREDENTIALS[login].act;
-  if (!box || !input || !act) return;
-  const open = box.style.display === 'none';
-  box.style.display = open ? 'block' : 'none';
-  if (open) {
-    input.value = getFirstMessageTemplate(act);
-    document.getElementById('wa-template-feedback-' + login).textContent = '';
+  if (!box || !act) return;
+  if (box.style.display !== 'none') { box.style.display = 'none'; return; }
+
+  const s = WHATSAPP_SETTINGS[act] || {};
+  const d = { ...WHATSAPP_DISPATCH_DEFAULTS, ...(s.dispatch || {}) };
+  const capture = s.leadCapture || {};
+  const id = escapeHtml(login);
+  const jsLogin = escapeJsString(login);
+  const days = (Array.isArray(d.days) ? d.days : WHATSAPP_DISPATCH_DEFAULTS.days).map(Number);
+  const section = 'font-size:13px;font-weight:600;color:var(--text);margin:14px 0 6px;';
+  const hint = 'font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.5;';
+  const num = (field, value, min, max) => `<input type="number" class="field-input" id="wa-${field}-${id}" value="${escapeHtml(String(value))}" min="${min}" max="${max}" style="width:80px;padding:4px 8px;font-size:12px;">`;
+  const lbl = 'display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);flex-wrap:wrap;';
+  const rowLabel = 'display:inline-block;min-width:190px;color:var(--muted);';
+
+  box.innerHTML = `
+    <div style="border-top:1px solid var(--border);padding-top:4px;">
+      <div style="${section}">Mensagens</div>
+      <div style="${hint}">Cadastre variações da mesma mensagem: a cada envio uma é sorteada, o que reduz o risco de bloqueio. Use {primeiro_nome}, {nome}, {rede_social} e {origem}.</div>
+      ${whatsappVariationsHtml('wa-' + id, getWhatsAppTemplates(act))}
+
+      <div style="${section}">Captura de leads pelo WhatsApp</div>
+      <div style="${hint}">Quando alguém mandar uma mensagem com uma destas frases (uma por linha), o card é criado em "Novo lead" com o nome e o telefone. Maiúsculas e acentos não importam. Quem responder "sair" ou "parar" deixa de receber mensagens automáticas.</div>
+      <label style="${lbl}margin-bottom:8px;"><input type="checkbox" id="wa-capture-${id}" ${capture.enabled ? 'checked' : ''}> Criar lead automaticamente com a mensagem da campanha</label>
+      <textarea class="field-input" id="wa-phrases-${id}" rows="3" style="resize:vertical;width:100%;box-sizing:border-box;font-size:13px;" placeholder="Quero mais informações sobre o seu serviço">${escapeHtml((capture.phrases || []).join('\n'))}</textarea>
+
+      <div style="${section}">Disparo seguro (contra bloqueio)</div>
+      <div style="${hint}">Os valores já vêm com o recomendado. Número novo ou que já foi bloqueado: ligue o aquecimento.</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <label style="${lbl}"><span style="${rowLabel}">Máximo por dia</span>${num('daily', d.dailyLimit, 1, 1000)} mensagens</label>
+        <label style="${lbl}"><span style="${rowLabel}">Máximo por hora</span>${num('hourly', d.hourlyLimit, 1, 60)} mensagens</label>
+        <label style="${lbl}"><span style="${rowLabel}">Intervalo entre envios</span>${num('minint', d.minIntervalSec, 15, 3600)} a ${num('maxint', d.maxIntervalSec, 15, 3600)} segundos (sorteado)</label>
+        <label style="${lbl}"><span style="${rowLabel}">"Digitando..." antes de enviar</span>${num('typmin', d.typingMinSec, 1, 20)} a ${num('typmax', d.typingMaxSec, 1, 20)} segundos</label>
+        <label style="${lbl}"><span style="${rowLabel}">Horário de envio</span>das ${num('start', d.startHour, 0, 23)} às ${num('end', d.endHour, 1, 24)} h (Brasília)</label>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--text);">
+        Dias: ${WEEKDAY_LABELS.map((label, i) => `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="wa-day-${id}" value="${i}" ${days.includes(i) ? 'checked' : ''}>${label}</label>`).join('')}
+      </div>
+      <label style="${lbl}margin-top:10px;"><input type="checkbox" id="wa-check-${id}" ${d.checkNumber ? 'checked' : ''}> Conferir se o número tem WhatsApp antes de enviar</label>
+      <label style="${lbl}margin-top:6px;"><input type="checkbox" id="wa-warmup-${id}" ${d.warmup ? 'checked' : ''}> Número novo (aquecimento: 20/dia nos dias 1–3, 50/dia nos dias 4–7, 100/dia nos dias 8–14)</label>
+
+      <div style="display:flex;align-items:center;gap:10px;margin-top:14px;">
+        <button style="${wbtn}" onclick="saveAdminWhatsAppSettings('${jsLogin}')">Salvar configurações</button>
+        <button style="${wbtn}background:transparent;" onclick="resetWhatsAppDispatch('${jsLogin}')">Voltar ao recomendado</button>
+        <span id="wa-settings-feedback-${id}" style="font-size:12px;"></span>
+      </div>
+    </div>`;
+  box.style.display = 'block';
+}
+
+function resetWhatsAppDispatch(login) {
+  const id = login;
+  const d = WHATSAPP_DISPATCH_DEFAULTS;
+  const set = (field, value) => { const el = document.getElementById(`wa-${field}-${id}`); if (el) el.value = value; };
+  set('daily', d.dailyLimit); set('hourly', d.hourlyLimit); set('minint', d.minIntervalSec); set('maxint', d.maxIntervalSec);
+  set('typmin', d.typingMinSec); set('typmax', d.typingMaxSec); set('start', d.startHour); set('end', d.endHour);
+  document.querySelectorAll(`.wa-day-${CSS.escape(id)}`).forEach(cb => { cb.checked = d.days.includes(Number(cb.value)); });
+  const check = document.getElementById('wa-check-' + id); if (check) check.checked = true;
+}
+
+async function saveAdminWhatsAppSettings(login) {
+  const act = CREDENTIALS[login] && CREDENTIALS[login].act;
+  if (!act) return;
+  const id = login;
+  const fb = document.getElementById('wa-settings-feedback-' + id);
+  const feedback = (color, text) => { if (fb) { fb.style.color = color; fb.textContent = text; } };
+  const val = field => Number(document.getElementById(`wa-${field}-${id}`)?.value);
+
+  const templates = readWhatsAppVariations('wa-' + id);
+  if (!templates.length) { feedback('#f87171', 'Escreva pelo menos uma mensagem.'); return; }
+  const phrases = (document.getElementById('wa-phrases-' + id)?.value || '').split('\n').map(p => p.trim()).filter(Boolean);
+  const captureEnabled = !!document.getElementById('wa-capture-' + id)?.checked;
+  if (captureEnabled && !phrases.length) { feedback('#f87171', 'Informe pelo menos uma frase da campanha.'); return; }
+
+  const days = [...document.querySelectorAll(`.wa-day-${CSS.escape(id)}`)].filter(cb => cb.checked).map(cb => Number(cb.value));
+  const dispatch = {
+    dailyLimit: val('daily'), hourlyLimit: val('hourly'),
+    minIntervalSec: val('minint'), maxIntervalSec: val('maxint'),
+    typingMinSec: val('typmin'), typingMaxSec: val('typmax'),
+    startHour: val('start'), endHour: val('end'),
+    days, checkNumber: !!document.getElementById('wa-check-' + id)?.checked,
+    warmup: !!document.getElementById('wa-warmup-' + id)?.checked
+  };
+  const numbers = ['dailyLimit', 'hourlyLimit', 'minIntervalSec', 'maxIntervalSec', 'typingMinSec', 'typingMaxSec', 'startHour', 'endHour'];
+  if (numbers.some(k => !Number.isFinite(dispatch[k]) || dispatch[k] < 0)) { feedback('#f87171', 'Confira os números.'); return; }
+  if (dispatch.maxIntervalSec < dispatch.minIntervalSec || dispatch.typingMaxSec < dispatch.typingMinSec) { feedback('#f87171', 'O valor máximo precisa ser maior que o mínimo.'); return; }
+  if (dispatch.endHour <= dispatch.startHour) { feedback('#f87171', 'O horário final precisa ser depois do inicial.'); return; }
+  if (!days.length) { feedback('#f87171', 'Escolha pelo menos um dia.'); return; }
+  if (dispatch.minIntervalSec < 30 || dispatch.hourlyLimit > 30) {
+    if (!await showConfirm('Intervalos abaixo de 30 s ou mais de 30 mensagens por hora aumentam bastante o risco de o WhatsApp bloquear o número.', 'Configuração arriscada', 'Salvar assim mesmo', true)) return;
+  }
+
+  const previous = (WHATSAPP_SETTINGS[act] && WHATSAPP_SETTINGS[act].dispatch) || {};
+  dispatch.warmupStartedAt = dispatch.warmup ? (previous.warmup && previous.warmupStartedAt ? previous.warmupStartedAt : new Date().toISOString()) : '';
+
+  const data = { templates, template: templates[0], leadCapture: { enabled: captureEnabled, phrases }, dispatch };
+  try {
+    await window._fb.saveWhatsAppSettings(act, data);
+    WHATSAPP_SETTINGS[act] = { ...(WHATSAPP_SETTINGS[act] || {}), ...data };
+    feedback('#34d399', 'Configurações salvas!');
+  } catch (e) {
+    feedback('#f87171', 'Erro: ' + e.message);
   }
 }
 
-function saveAdminWhatsAppTemplate(login) {
-  const act = CREDENTIALS[login] && CREDENTIALS[login].act;
-  if (!act) return;
-  saveWhatsAppTemplate(act, document.getElementById('wa-template-' + login).value,
-    document.getElementById('wa-template-feedback-' + login));
+// Cliente: edita só as variações da própria mensagem.
+function saveOwnWhatsAppTemplate() {
+  const profile = window._fb && window._fb.getProfile();
+  if (!profile || !profile.act) return;
+  const fb = document.getElementById('whatsapp-own-template-feedback');
+  const templates = readWhatsAppVariations('wa-own');
+  if (!templates.length) { fb.style.color = '#f87171'; fb.textContent = 'Escreva pelo menos uma mensagem.'; return; }
+  window._fb.saveWhatsAppSettings(profile.act, { templates, template: templates[0] })
+    .then(() => {
+      WHATSAPP_SETTINGS[profile.act] = { ...(WHATSAPP_SETTINGS[profile.act] || {}), templates, template: templates[0] };
+      fb.style.color = '#34d399'; fb.textContent = 'Mensagens salvas!';
+    })
+    .catch(e => { fb.style.color = '#f87171'; fb.textContent = 'Erro: ' + e.message; });
 }
 
 let _whatsappPoll = null;
@@ -5679,6 +5805,7 @@ function renderKanban() {
           ? `<button class="card-btn card-btn-whatsapp" onclick="window.open('${waLink}','_blank')" title="Abrir WhatsApp"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.112.554 4.094 1.523 5.812L.057 23.997l6.305-1.654A11.954 11.954 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.012-1.376l-.36-.214-3.733.979 1-3.647-.235-.374A9.818 9.818 0 0 1 2.182 12C2.182 6.58 6.58 2.182 12 2.182S21.818 6.58 21.818 12 17.42 21.818 12 21.818z"/></svg></button>`
           : `<button class="card-btn card-btn-first-msg" onclick="openFirstWhatsAppMessage('${lead.id}')" title="Enviar primeira mensagem no WhatsApp"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.112.554 4.094 1.523 5.812L.057 23.997l6.305-1.654A11.954 11.954 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.012-1.376l-.36-.214-3.733.979 1-3.647-.235-.374A9.818 9.818 0 0 1 2.182 12C2.182 6.58 6.58 2.182 12 2.182S21.818 6.58 21.818 12 17.42 21.818 12 21.818z"/></svg><span>1ª msg</span></button>`)
         : ''}
+        ${whatsappCardBadge(lead, !!waLink)}
         <button class="card-btn del" onclick="deleteLead('${safeLeadId}')">✕</button>
       </div>`;
       cardHTML = cardHTML.replace(`openFirstWhatsAppMessage('${lead.id}')`, `openFirstWhatsAppMessage('${safeLeadId}')`);
@@ -6008,7 +6135,10 @@ function getFirstMessageTemplates() {
 }
 // O modelo salvo no banco (usado também pelo envio automático) tem prioridade sobre o do navegador.
 function getFirstMessageTemplate(act) {
-  const saved = act && WHATSAPP_SETTINGS[act] && WHATSAPP_SETTINGS[act].template;
+  const settings = act && WHATSAPP_SETTINGS[act];
+  const variations = settings && Array.isArray(settings.templates) ? settings.templates.filter(Boolean) : [];
+  if (variations.length) return variations[Math.floor(Math.random() * variations.length)];
+  const saved = settings && settings.template;
   if (saved) return saved;
   const templates = getFirstMessageTemplates();
   return templates[act || 'geral'] || templates.geral || DEFAULT_FIRST_MESSAGE_TEMPLATE;
@@ -6017,7 +6147,7 @@ function openFirstMessageModal() {
   const modal = document.getElementById('first-message-modal');
   const input = document.getElementById('first-message-template');
   if (!modal || !input) return;
-  input.value = getFirstMessageTemplate(firstMessageTemplateAct());
+  input.value = getWhatsAppTemplates(firstMessageTemplateAct())[0];
   modal.style.display = 'flex';
   modal.classList.add('open');
 }
@@ -6037,8 +6167,11 @@ function saveFirstMessageTemplate() {
   localStorage.setItem(FIRST_MESSAGE_TEMPLATE_KEY, JSON.stringify(templates));
   closeFirstMessageModal();
   if (act && act !== 'geral' && window._fb && window._fb.getProfile()) {
-    WHATSAPP_SETTINGS[act] = { ...(WHATSAPP_SETTINGS[act] || {}), template };
-    window._fb.saveWhatsAppSettings(act, { template })
+    // Esta tela edita a mensagem principal; as outras variações (tela WhatsApp) são mantidas.
+    const variations = getWhatsAppTemplates(act).slice(1);
+    const all = [template, ...variations];
+    WHATSAPP_SETTINGS[act] = { ...(WHATSAPP_SETTINGS[act] || {}), template, templates: all };
+    window._fb.saveWhatsAppSettings(act, { template, templates: all })
       .then(() => showToast('Primeira mensagem atualizada.', 'success'))
       .catch(e => showToast('Mensagem salva só neste navegador: ' + e.message, 'warning'));
   } else {
