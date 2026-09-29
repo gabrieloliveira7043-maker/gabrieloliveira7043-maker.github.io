@@ -1232,8 +1232,8 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
       await setDoc(doc(db, 'extra_clients', login), data, { merge: true });
     },
     // WhatsApp (Evolution API via Worker). path: '/whatsapp/status' | '/whatsapp/connect' | '/whatsapp/logout'
-    async whatsapp(path, act) {
-      return await callAdminApi(path, { act });
+    async whatsapp(path, act, extra) {
+      return await callAdminApi(path, { ...(extra || {}), act });
     },
     // Configuração de WhatsApp por cliente (whatsapp_settings/{act}). Admin recebe todos; cliente, só o dele.
     async getWhatsAppSettings() {
@@ -5801,7 +5801,7 @@ function renderKanban() {
         <button class="card-btn" onclick="editLead('${safeLeadId}')">Editar</button>
         <button class="card-btn" onclick="openMoveModal('${safeLeadId}')">Mover</button>
         <button class="card-btn" onclick="showHistory('${safeLeadId}')">Hist.</button>
-        ${waLink ? (lead.whatsappFirstMessageAt
+        ${(waLink || (lead.whatsappJid && !lead.whatsappFirstMessageAt)) ? (lead.whatsappFirstMessageAt
           ? `<button class="card-btn card-btn-whatsapp" onclick="window.open('${waLink}','_blank')" title="Abrir WhatsApp"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.112.554 4.094 1.523 5.812L.057 23.997l6.305-1.654A11.954 11.954 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.012-1.376l-.36-.214-3.733.979 1-3.647-.235-.374A9.818 9.818 0 0 1 2.182 12C2.182 6.58 6.58 2.182 12 2.182S21.818 6.58 21.818 12 17.42 21.818 12 21.818z"/></svg></button>`
           : `<button class="card-btn card-btn-first-msg" onclick="openFirstWhatsAppMessage('${lead.id}')" title="Enviar primeira mensagem no WhatsApp"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.112.554 4.094 1.523 5.812L.057 23.997l6.305-1.654A11.954 11.954 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.012-1.376l-.36-.214-3.733.979 1-3.647-.235-.374A9.818 9.818 0 0 1 2.182 12C2.182 6.58 6.58 2.182 12 2.182S21.818 6.58 21.818 12 17.42 21.818 12 21.818z"/></svg><span>1ª msg</span></button>`)
         : ''}
@@ -6191,31 +6191,35 @@ function buildFirstWhatsAppMessage(lead) {
     .replaceAll('{rede_social}', lead.redeSocial || 'Instagram')
     .replaceAll('{origem}', lead.origem || '');
 }
-function openFirstWhatsAppMessage(id) {
-  const leads = getLeads();
-  const lead = leads.find(l => l.id === id);
+// Envia a primeira mensagem pelo WhatsApp conectado do cliente (Evolution API), sem abrir o navegador.
+const _firstMessageSending = new Set();
+async function openFirstWhatsAppMessage(id) {
+  const lead = getLeads().find(l => l.id === id);
   if (!lead) return;
-  const phone = normalizeWhatsAppPhone(lead.phone);
-  if (!phone) {
+  if (!normalizeWhatsAppPhone(lead.phone) && !lead.whatsappJid) {
     alert('Esse lead ainda não tem telefone cadastrado.');
     return;
   }
-  const message = buildFirstWhatsAppMessage(lead);
-  const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-
-  const alreadySentFirstMessage = !!lead.whatsappFirstMessageAt;
-  if (!alreadySentFirstMessage) {
-    lead.whatsappFirstMessageAt = new Date().toISOString();
-    if (!lead.history) lead.history = [];
-    lead.history.push({ stage: '1ª mensagem enviada', at: new Date().toLocaleString('pt-BR') });
+  if (!lead._docId) {
+    showToast('Aguarde o lead terminar de salvar e tente de novo.', 'warning');
+    return;
   }
-  if (_leadsCache) {
-    const cacheIdx = _leadsCache.findIndex(l => l.id === id);
-    if (cacheIdx !== -1) _leadsCache[cacheIdx] = { ..._leadsCache[cacheIdx], ...lead };
+  if (_firstMessageSending.has(id)) return;
+  _firstMessageSending.add(id);
+  showToast('Enviando a primeira mensagem pelo WhatsApp...', 'info');
+  try {
+    const r = await window._fb.whatsapp('/whatsapp/send-first', lead.act, { leadDocId: lead._docId });
+    if (_leadsCache) {
+      const cached = _leadsCache.find(l => l.id === id);
+      if (cached) cached.whatsappFirstMessageAt = r.at;
+    }
+    renderKanban();
+    showToast(r.status === 'already_sent' ? 'Esse lead já tinha recebido a primeira mensagem.' : 'Primeira mensagem enviada pelo WhatsApp!', 'success');
+  } catch (e) {
+    showToast('Não foi possível enviar: ' + e.message, 'warning');
+  } finally {
+    _firstMessageSending.delete(id);
   }
-  saveLeadToDb(lead);
-  renderKanban();
-  window.open(url, '_blank');
 }
 window.openFirstWhatsAppMessage = openFirstWhatsAppMessage;
 
