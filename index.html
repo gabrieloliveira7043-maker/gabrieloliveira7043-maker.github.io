@@ -1035,7 +1035,7 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script type="module">
   import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, doc, query, where, onSnapshot, writeBatch, limit, deleteField } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, addDoc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, doc, query, where, onSnapshot, writeBatch, limit, deleteField } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
   const firebaseConfig = {
@@ -1052,7 +1052,14 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
   const ADMIN_API_URL = 'https://huven-crm-admin.gabrieloliveira7043.workers.dev';
 
   const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
+  // Cache local no navegador: ao reabrir o CRM, o Firebase manda só o que mudou (economiza a cota diária de leituras).
+  let db;
+  try {
+    db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+  } catch (e) {
+    console.warn('Cache local do Firebase indisponível:', e);
+    db = initializeFirestore(app, {});
+  }
   const auth = getAuth(app);
 
   let currentProfile = null;
@@ -4518,7 +4525,17 @@ let dragCol = null;
 // Firebase-backed lead storage with localStorage cache
 let _leadsCache = null;
 
+// Com a conexão ao vivo aberta, o cache já está sempre atualizado: não baixa a coleção de novo
+// (cada download completo custa uma leitura por lead na cota diária do Firebase).
+let _leadRealtimeReady = false;
+let _leadRealtimeReadyResolve = null;
+const _leadRealtimeFirstSnapshot = new Promise(resolve => { _leadRealtimeReadyResolve = resolve; });
+
 async function getLeadsAsync() {
+  if (typeof _leadRealtimeUnsubscribe !== 'undefined' && _leadRealtimeUnsubscribe) {
+    if (!_leadRealtimeReady) await Promise.race([_leadRealtimeFirstSnapshot, new Promise(r => setTimeout(r, 15000))]);
+    if (_leadRealtimeReady) return normalizeImportedLeadsFields(_leadsCache || []);
+  }
   if (window._fbReady) {
     try {
       const leads = await window._fb.getLeads();
@@ -7797,6 +7814,7 @@ function startLeadRealtimeListener() {
   try {
     _leadRealtimeUnsubscribe = window._fb.listenLeads((freshLeads) => {
       _leadsCache = normalizeImportedLeadsFields(freshLeads || []);
+      if (!_leadRealtimeReady) { _leadRealtimeReady = true; _leadRealtimeReadyResolve(); }
       processLeadNotificationSnapshot(_leadsCache);
       if (document.getElementById('crm-view') && document.getElementById('crm-view').style.display === 'block') {
         renderKanban();
