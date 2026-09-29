@@ -1342,6 +1342,121 @@ td { font-family: var(--font); font-size: 13px; }
 .mnav-sheet-item { display: flex; flex-direction: column; align-items: center; gap: 6px; background: var(--surface2); border: 1px solid var(--border); border-radius: 14px; padding: 14px 6px; color: var(--text); font-size: 12.5px; font-weight: 700; cursor: pointer; }
 @media (min-width: 769px) { .mnav-sheet, .mnav-sheet-backdrop { display: none !important; } }
 
+/* Seletores de cliente dentro das telas: a troca agora é no topo do menu */
+#campaign-client-select, #cadence-client-select, #chat-client-select, #contatos-client-select, #crm-client-select { display: none !important; }
+
+/* Contatos em tabela */
+.ct-table { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: var(--card-shadow); }
+.ct-row { display: grid; grid-template-columns: 40px minmax(180px, 2.2fr) 1.2fr 1.5fr 1.1fr 1.3fr 0.8fr 44px; gap: 10px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.ct-row:last-child { border-bottom: none; }
+.ct-row.selected { background: var(--accent-glow2); }
+.ct-head { background: var(--surface2); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); padding: 11px 16px; }
+.ct-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ct-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px; flex-shrink: 0; }
+.ct-strong { font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ct-sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ct-cell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted2); font-weight: 600; }
+.ct-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.ct-stage { font-size: 11.5px; font-weight: 700; border-radius: 20px; padding: 3px 10px; white-space: nowrap; }
+.ct-chat { width: 30px; height: 30px; border: 1px solid var(--border2); background: var(--surface); border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #1FA855; }
+@media (max-width: 900px) {
+  .ct-head { display: none; }
+  .ct-row { grid-template-columns: 32px 1fr auto; grid-template-areas: "c n chat" "c p p" "c t t"; row-gap: 4px; }
+  .ct-row > :nth-child(1) { grid-area: c; } .ct-row > :nth-child(2) { grid-area: n; } .ct-row > :nth-child(8) { grid-area: chat; }
+  .ct-row > :nth-child(3), .ct-row > :nth-child(5) { display: inline; }
+  .ct-row > :nth-child(6), .ct-row > :nth-child(7) { display: none; }
+  .ct-row > :nth-child(3) { grid-area: p; } .ct-row > :nth-child(4) { grid-area: t; } .ct-row > :nth-child(5) { display: none; }
+}
+
+/* Chat: painel do lead */
+.chat-info { display: none; width: 290px; flex-shrink: 0; border-left: 1px solid var(--border); padding: 16px; overflow-y: auto; background: var(--surface); }
+.chat-info.open { display: block; }
+.ci-block { margin-bottom: 18px; }
+.ci-label { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.ci-field-label { display: block; font-size: 12px; font-weight: 700; color: var(--muted2); margin-bottom: 5px; }
+.ci-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.ci-k { font-size: 12px; font-weight: 700; color: var(--muted); }
+.ci-v { font-size: 14px; font-weight: 800; margin-top: 2px; color: var(--text); overflow-wrap: anywhere; }
+.ci-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.ci-add { font-size: 12px; font-weight: 700; border-radius: 20px; padding: 3px 10px; border: 1px dashed var(--border2); background: transparent; color: var(--muted2); cursor: pointer; }
+.ci-muted { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.ci-hist { display: flex; gap: 10px; font-size: 12.5px; margin-bottom: 9px; color: var(--text); }
+.ci-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-top: 6px; flex-shrink: 0; }
+#chat-info textarea { width: 100%; resize: vertical; font-size: 12.5px; }
+@media (max-width: 1200px) { .chat-info, .chat-info.open { display: none; } }
+
+/* Campanhas */
+.cp-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.cp-kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; box-shadow: var(--card-shadow); }
+.cp-kpi-label { font-size: 12px; font-weight: 700; color: var(--muted); }
+.cp-kpi-value { font-family: var(--font-display); font-size: 28px; font-weight: 600; margin-top: 4px; color: var(--text); }
+.cp-table { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: var(--card-shadow); }
+.cp-row { display: grid; grid-template-columns: minmax(200px, 2.2fr) 1.1fr 2fr 1fr minmax(220px, 1.8fr); gap: 12px; align-items: center; padding: 13px 18px; border-bottom: 1px solid var(--border); }
+.cp-row:last-child { border-bottom: none; }
+.cp-head { background: var(--surface2); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); padding: 11px 18px; }
+.cp-name { font-size: 14px; font-weight: 800; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cp-sub { font-size: 12px; color: var(--muted); font-weight: 600; margin-top: 3px; }
+.cp-status { font-size: 12px; font-weight: 800; white-space: nowrap; }
+.cp-bar { height: 7px; background: var(--surface3); border-radius: 6px; overflow: hidden; }
+.cp-bar > div { height: 100%; border-radius: 6px; }
+.cp-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.cp-actions button { border-radius: 9px !important; font-weight: 700 !important; padding: 6px 10px !important; background: var(--surface) !important; border: 1px solid var(--border2) !important; color: var(--text) !important; }
+@media (max-width: 900px) {
+  .cp-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cp-head { display: none; }
+  .cp-row { grid-template-columns: 1fr; gap: 8px; }
+  .cp-actions { justify-content: flex-start; }
+}
+
+/* Conexões do WhatsApp */
+.wa-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+.wa-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; box-shadow: var(--card-shadow); }
+.wa-card.wide { grid-column: 1 / -1; }
+.wa-card-head { display: flex; align-items: center; gap: 12px; }
+.wa-card-head { flex-wrap: wrap; }
+.wa-card-head [data-wa-act] { flex-basis: 100%; justify-content: flex-start !important; }
+.wa-card-stats { display: flex; flex-direction: column; gap: 8px; background: var(--surface2); border-radius: 12px; padding: 10px 12px; font-size: 12.5px; font-weight: 700; color: var(--muted2); }
+.wa-card-stats b { color: var(--text); }
+#whatsapp-view > div, #campanhas-view > div { max-width: 1240px !important; }
+
+/* Cadência: semana */
+.cw-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.cw-seg { display: flex; background: var(--surface); border: 1px solid var(--border2); border-radius: 11px; padding: 3px; }
+.cw-seg button { border: none; background: transparent; color: var(--muted2); border-radius: 8px; padding: 7px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.cw-seg button.active { background: var(--btn-bg); color: var(--btn-text); }
+.cw-nav { display: flex; align-items: center; gap: 4px; background: var(--surface); border: 1px solid var(--border2); border-radius: 11px; padding: 3px 6px; font-size: 13px; font-weight: 800; color: var(--text); }
+.cw-nav button { border: none; background: transparent; color: var(--text); font-size: 17px; font-weight: 800; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; }
+.cw-nav button.cw-today { width: auto; font-size: 12px; padding: 0 8px; border: 1px solid var(--border2); }
+.cw-legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; font-weight: 700; color: var(--muted2); margin-left: auto; }
+.cw-legend span { display: flex; align-items: center; gap: 6px; }
+.cw-legend i { width: 10px; height: 10px; border-radius: 3px; border: 1px solid; display: inline-block; }
+.cw-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; }
+.cw-day { background: var(--col-bg); border: 1px solid transparent; border-radius: 14px; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 360px; }
+.cw-day.today { background: var(--surface); border-color: var(--accent); }
+.cw-day-head { display: flex; align-items: baseline; gap: 6px; padding: 2px 2px 4px; }
+.cw-wd { font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); }
+.cw-num { font-size: 18px; font-weight: 800; color: var(--text); }
+.cw-day.today .cw-num { color: var(--accent2); }
+.cw-item { text-align: left; border-radius: 10px; padding: 8px 9px; border: 1px solid; cursor: pointer; display: flex; flex-direction: column; gap: 3px; font-family: inherit; color: var(--text); }
+.cw-item.done { opacity: .6; cursor: default; }
+.cw-text { font-size: 12.5px; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+.cw-time { font-size: 12px; font-weight: 800; display: flex; gap: 6px; align-items: baseline; }
+.cw-time em { font-style: normal; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; opacity: .75; }
+.cw-group { font-size: 11px; font-weight: 600; opacity: .8; }
+.cw-text { color: inherit; }
+.cw-empty { font-size: 12px; color: var(--muted); padding: 6px 2px; }
+.cw-text, .cw-time, .cw-group { color: var(--text); }
+.cw-item.cw-text { background: var(--blue-dim); border-color: var(--blue); }
+.cw-item.cw-media { background: var(--amber-dim); border-color: var(--amber); }
+.cw-item.cw-poll { background: var(--purple-dim); border-color: var(--purple); }
+.cw-item.cw-event { background: var(--green-dim); border-color: var(--green); }
+#cadencia-view > div { max-width: 1240px !important; }
+@media (max-width: 900px) {
+  .cw-grid { grid-template-columns: 1fr; }
+  .cw-day { min-height: 0; }
+  .cw-legend { margin-left: 0; }
+}
+
 /* Clientes (admin) */
 .huv-view { padding: 28px 36px; }
 .huv-header { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
@@ -2595,10 +2710,10 @@ td { font-family: var(--font); font-size: 13px; }
   
     <!-- Contatos View -->
     <div id="contatos-view" style="display:none; padding:28px 32px; overflow-x:hidden; box-sizing:border-box;">
-      <div style="max-width:820px;">
+      <div style="max-width:1240px;">
         <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
           <div>
-            <div style="font-size:18px; font-weight:600; color:var(--text); margin-bottom:6px;">Contatos</div>
+            <div class="huv-page-title" style="color:var(--text);margin-bottom:4px;">Contatos</div>
             <div style="font-size:13px; color:var(--muted);">Busque, etiquete e mande contatos para o funil.</div>
           </div>
           <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
@@ -2779,7 +2894,7 @@ td { font-family: var(--font); font-size: 13px; }
       <div style="max-width:900px;">
         <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:20px;">
           <div>
-            <div style="font-size:18px; font-weight:600; color:var(--text); margin-bottom:6px;">Campanhas</div>
+            <div class="huv-page-title" style="color:var(--text);margin-bottom:4px;">Campanhas</div>
             <div style="font-size:13px; color:var(--muted);">Disparos de WhatsApp para uma lista de contatos, no ritmo seguro do número.</div>
           </div>
           <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
@@ -2840,6 +2955,7 @@ td { font-family: var(--font); font-size: 13px; }
         <div class="chat-main" id="chat-main">
           <div class="chat-empty">Escolha uma conversa.</div>
         </div>
+        <aside class="chat-info" id="chat-info" aria-label="Dados do lead"></aside>
       </div>
     </div>
 
@@ -2848,7 +2964,7 @@ td { font-family: var(--font); font-size: 13px; }
       <div style="max-width:900px;">
         <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:20px;">
           <div>
-            <div style="font-size:18px; font-weight:600; color:var(--text); margin-bottom:6px;">Cadência</div>
+            <div class="huv-page-title" style="color:var(--text);margin-bottom:4px;">Cadência</div>
             <div style="font-size:13px; color:var(--muted);">Programe mensagens, imagens, vídeos e áudios para sair nos grupos do WhatsApp no dia e hora certos.</div>
           </div>
           <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
@@ -2857,6 +2973,7 @@ td { font-family: var(--font); font-size: 13px; }
           </div>
         </div>
         <div id="cadence-editor" style="display:none; background:var(--surface); border:1px solid var(--border); border-radius:var(--r2); padding:22px; margin-bottom:20px;"></div>
+        <div id="cadence-modebar"></div>
         <div id="cadence-list"></div>
       </div>
     </div>
@@ -2864,7 +2981,7 @@ td { font-family: var(--font); font-size: 13px; }
     <!-- WhatsApp View -->
     <div id="whatsapp-view" style="display:none; padding:28px 32px;">
       <div style="max-width:760px;">
-        <div style="font-size:18px; font-weight:600; color:var(--text); margin-bottom:6px;">WhatsApp</div>
+        <div class="huv-page-title" style="color:var(--text);margin-bottom:4px;">Conexões</div>
         <div id="whatsapp-view-subtitle" style="font-size:13px; color:var(--muted); margin-bottom:24px;"></div>
 
         <!-- Cliente: o próprio número -->
@@ -5187,7 +5304,7 @@ function populateContatosClientSelect() {
   if (!isAdmin) { sel.style.display = 'none'; return; }
   if (sel.dataset.ready === '1') return;
   const crmSel = document.getElementById('crm-client-select');
-  const current = crmSel && crmSel.value && crmSel.value !== 'all' ? normalizeActValue(crmSel.value) : '';
+  const current = activeClient && activeClient.account ? normalizeActValue(activeClient.account) : (crmSel && crmSel.value && crmSel.value !== 'all' ? normalizeActValue(crmSel.value) : '');
   const entries = Object.entries(CREDENTIALS)
     .filter(([login, cred]) => login !== 'admin' && cred && cred.act)
     .map(([, cred]) => [cred.act, getClientDisplayName(cred.act)])
@@ -5309,7 +5426,7 @@ function renderContatos() {
   const tagBar = document.getElementById('contatos-tag-filter');
   if (tagBar) {
     tagBar.innerHTML = !act
-      ? (isAdmin ? '<span style="font-size:12px;color:var(--muted);">Escolha um cliente no topo para usar etiquetas e mandar contatos para o funil.</span>' : '')
+      ? (isAdmin ? '<span style="font-size:12px;color:var(--muted);">Escolha o cliente no topo do menu para usar etiquetas e mandar contatos para o funil.</span>' : '')
       : tags.length
         ? `<span style="font-size:12px;color:var(--muted);align-self:center;">Filtrar por etiqueta:</span>${tagFilterChipsHtml(tags, _contatosTagFilter, 'toggleContatosTagFilter')}`
         : '<span style="font-size:12px;color:var(--muted);">Nenhuma etiqueta criada ainda. Clique em "🏷️ Etiquetas" para criar.</span>';
@@ -5337,29 +5454,32 @@ function renderContatos() {
   [...new Set(_contatosFiltered.map(e => e.act).filter(Boolean))].forEach(a => getStages(a).forEach(s => { if (!STAGE_LABELS[s.id]) STAGE_LABELS[s.id] = s.label; }));
   const waIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.855L0 24l6.292-1.508A11.947 11.947 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.848 0-3.579-.498-5.073-1.367l-.361-.214-3.737.895.952-3.638-.235-.374A9.953 9.953 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>';
 
-  list.innerHTML = _contatosFiltered.slice(0, _contatosShown).map(e => {
+  const fmtDate = iso => { const d = new Date(iso); return isNaN(d) ? '—' : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }); };
+  list.innerHTML = `<div class="ct-table" role="table" aria-label="Contatos">
+    <div class="ct-row ct-head" role="row">
+      <span>${act ? '' : ''}</span><span>Nome</span><span>Telefone</span><span>Etiquetas</span><span>Etapa</span><span>Origem</span><span>Entrada</span><span></span>
+    </div>` + _contatosFiltered.slice(0, _contatosShown).map(e => {
     const initials = (e.name || '?').split(' ').filter(Boolean).map(w => w[0]).join('').substring(0, 2).toUpperCase();
     const stageLabel = STAGE_LABELS[e.stage] || e.stage || '—';
-    const stageColor = CONTACT_STAGE_COLORS[e.stage] || { bg: 'rgba(124,109,250,0.12)', color: 'var(--accent2)' };
+    const stageColor = CONTACT_STAGE_COLORS[e.stage] || { bg: 'var(--surface3)', color: 'var(--muted2)' };
     const key = escapeJsString(e.key);
     const selected = _contatosSelected.has(e.key);
     const canChat = e.phone || (e.lead && e.lead.whatsappJid);
-    const chips = e.tags.map(id => tagById[id]).filter(Boolean).map(t => tagChipHtml(t)).join(' ');
-    return `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px 12px;padding:12px 16px;background:var(--surface);border:1px solid ${selected ? 'var(--accent)' : 'var(--border)'};border-radius:var(--r2);margin-bottom:8px;">
-      ${act ? `<input type="checkbox" style="cursor:pointer;flex-shrink:0;" ${selected ? 'checked' : ''} onchange="toggleContatoSelected('${key}', this.checked)">` : ''}
-      <div style="width:38px;height:38px;border-radius:50%;background:${stageColor.bg};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:${stageColor.color};flex-shrink:0;">${escapeHtml(initials)}</div>
-      <div style="flex:1 1 160px;min-width:0;">
-        <div style="font-size:14px;font-weight:500;color:var(--text);margin-bottom:2px;">${escapeHtml(e.name || '—')}</div>
-        <div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(e.phone || '')}${e.email ? ' · ' + escapeHtml(e.email) : ''}</div>
-        ${chips ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;">${chips}</div>` : ''}
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto;">
-        <span style="font-size:11px;padding:3px 10px;border-radius:20px;background:${stageColor.bg};color:${stageColor.color};font-weight:500;">${escapeHtml(stageLabel)}</span>
-        ${canChat ? `<button onclick="openContatoChat('${key}')" title="Abrir no Chat do CRM" style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;background:rgba(37,211,102,0.12);border:1px solid rgba(37,211,102,0.3);color:#25d366;">${waIcon} Chat</button>` : ''}
-      </div>
+    const chips = e.tags.map(id => tagById[id]).filter(Boolean).map(t => tagChipHtml(t)).join('');
+    const t = huvTone(e.key);
+    const origem = e.lead ? (e.lead.origem || e.lead.redeSocial || '') : 'Base do WhatsApp';
+    return `<div class="ct-row ${selected ? 'selected' : ''}" role="row">
+      <span>${act ? `<input type="checkbox" aria-label="Selecionar ${escapeHtml(e.name || 'contato')}" ${selected ? 'checked' : ''} onchange="toggleContatoSelected('${key}', this.checked)">` : ''}</span>
+      <div class="ct-name"><span class="ct-avatar" style="background:${t[0]};color:${t[1]};">${escapeHtml(initials)}</span><div style="min-width:0;"><div class="ct-strong">${escapeHtml(e.name || '—')}</div><div class="ct-sub">${escapeHtml(e.email || '')}</div></div></div>
+      <span class="ct-cell">${escapeHtml(e.phone || '—')}</span>
+      <div class="ct-tags">${chips || '<span class="ct-sub">—</span>'}</div>
+      <span><span class="ct-stage" style="background:${stageColor.bg};color:${stageColor.color};">${escapeHtml(stageLabel)}</span></span>
+      <span class="ct-cell ct-sub" title="${escapeHtml(origem)}">${escapeHtml(limitText(origem, 40) || '—')}</span>
+      <span class="ct-cell ct-sub">${e.lead && e.lead.createdAt ? fmtDate(e.lead.createdAt) : '—'}</span>
+      <span>${canChat ? `<button class="ct-chat" onclick="openContatoChat('${key}')" title="Abrir no Chat do CRM" aria-label="Abrir conversa"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>` : ''}</span>
     </div>`;
-  }).join('') + (_contatosFiltered.length > _contatosShown
-    ? `<div style="text-align:center;padding:8px;"><button class="chat-pill" onclick="_contatosShown += 300; renderContatos();">Mostrar mais (${_contatosFiltered.length - _contatosShown} restantes)</button></div>` : '');
+  }).join('') + '</div>' + (_contatosFiltered.length > _contatosShown
+    ? `<div style="text-align:center;padding:12px;"><button class="chat-pill" onclick="_contatosShown += 300; renderContatos();">Mostrar mais (${_contatosFiltered.length - _contatosShown} restantes)</button></div>` : '');
 }
 
 function renderContatosBulkBar() {
@@ -5939,7 +6059,7 @@ function onCampaignClientChange() {
   closeCampaignEditor();
   if (_campaignsUnsubscribe && _campaignsAct !== act) { _campaignsUnsubscribe(); _campaignsUnsubscribe = null; }
   const list = document.getElementById('campaign-list');
-  if (!act) { list.innerHTML = '<div style="font-size:13px;color:var(--muted);">Escolha um cliente para ver e criar campanhas.</div>'; return; }
+  if (!act) { list.innerHTML = '<div class="integ-empty">Escolha o cliente no topo do menu para ver e criar campanhas.</div>'; return; }
   _campaignsAct = act;
   if (!_campaignsUnsubscribe) {
     list.innerHTML = '<div style="font-size:13px;color:var(--muted);">Carregando...</div>';
@@ -5956,7 +6076,12 @@ function renderCampaignList(campaigns) {
     return;
   }
   campaigns.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
-  list.innerHTML = campaigns.map(c => {
+  const sum = k => campaigns.reduce((t, c) => t + (Number(c[k]) || 0), 0);
+  const running = campaigns.filter(c => c.status === 'running' && !(c.startAt && new Date(c.startAt) > new Date())).length;
+  const scheduled = campaigns.filter(c => c.status === 'running' && c.startAt && new Date(c.startAt) > new Date()).length;
+  const kpis = [['Mensagens enviadas', sum('sent').toLocaleString('pt-BR'), ''], ['Em andamento', running, ''], ['Programadas', scheduled, ''], ['Puladas ou com erro', (sum('skipped') + sum('failed')).toLocaleString('pt-BR'), '']];
+  list.innerHTML = `<div class="cp-kpis">${kpis.map(k => `<div class="cp-kpi"><div class="cp-kpi-label">${k[0]}</div><div class="cp-kpi-value">${k[1]}</div></div>`).join('')}</div>
+    <div class="cp-table"><div class="cp-row cp-head"><span>Campanha</span><span>Situação</span><span>Progresso</span><span>Início</span><span></span></div>` + campaigns.map(c => {
     const scheduledStart = c.status === 'running' && c.startAt && new Date(c.startAt) > new Date();
     const [label, color] = scheduledStart
       ? [`Programada para ${new Date(c.startAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`, '#60a5fa']
@@ -5975,18 +6100,24 @@ function renderCampaignList(campaigns) {
     actions.push(btn('Reutilizar', 'reuseCampaign', 'background:transparent;'));
     if (c.status !== 'running') actions.push(btn('Excluir', 'deleteCampaignConfirm', 'background:transparent;color:#f87171;border-color:#f87171;'));
     const mediaLabel = c.media && c.media.type ? ' · ' + CAMPAIGN_MEDIA_LABELS[c.media.type] : '';
+    const barColor = c.status === 'done' ? 'var(--muted)' : c.status === 'paused' ? 'var(--accent)' : c.status === 'cancelled' ? 'var(--red)' : '#1FA855';
+    const startIso = c.startAt || c.startedAt || c.createdAt;
+    const startTxt = startIso ? new Date(startIso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
     return `
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
-        <div style="font-size:14px;font-weight:600;color:var(--text);flex:1;min-width:160px;">${escapeHtml(c.name || 'Campanha')}</div>
-        <span style="font-size:12px;font-weight:600;color:${color};">● ${label}</span>
+    <div class="cp-row">
+      <div style="min-width:0;">
+        <div class="cp-name">${escapeHtml(c.name || 'Campanha')}</div>
+        <div class="cp-sub">${escapeHtml(c.audienceLabel || '')}${mediaLabel}</div>
       </div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">${escapeHtml(c.audienceLabel || '')}${mediaLabel} · criada em ${c.createdAt ? new Date(c.createdAt).toLocaleString('pt-BR') : '-'}</div>
-      <div style="height:6px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:6px;"><div style="height:100%;width:${pct}%;background:#34d399;"></div></div>
-      <div style="font-size:12px;color:var(--text);margin-bottom:10px;">${Number(c.sent) || 0} enviadas · ${Number(c.skipped) || 0} puladas · ${Number(c.failed) || 0} com erro · ${Math.max(total - done, 0)} na fila · total ${total}</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">${actions.join('')}</div>
+      <span><span class="cp-status" style="color:${color};">● ${escapeHtml(label)}</span></span>
+      <div>
+        <div class="cp-bar"><div style="width:${pct}%;background:${barColor};"></div></div>
+        <div class="cp-sub">${Number(c.sent) || 0} enviadas de ${total} · ${Number(c.skipped) || 0} puladas · ${Number(c.failed) || 0} com erro</div>
+      </div>
+      <span class="cp-sub">${escapeHtml(startTxt)}</span>
+      <div class="cp-actions">${actions.join('')}</div>
     </div>`;
-  }).join('');
+  }).join('') + '</div>';
 }
 
 function describeDispatch(d) {
@@ -6726,6 +6857,8 @@ let _cadenceAct = null;
 let _cadenceItems = [];
 let _cadenceDraft = null;
 let _cadenceShowHistory = false;
+let _cadenceMode = 'week';
+let _cadenceWeekOffset = 0;
 
 function cadenceAct() {
   if (!isAdmin) return window._fb && window._fb.getProfile() ? window._fb.getProfile().act : null;
@@ -6755,7 +6888,7 @@ function onCadenceClientChange() {
   closeCadenceEditor();
   if (_cadenceUnsubscribe && _cadenceAct !== act) { _cadenceUnsubscribe(); _cadenceUnsubscribe = null; }
   const list = document.getElementById('cadence-list');
-  if (!act) { list.innerHTML = '<div style="font-size:13px;color:var(--muted);">Escolha um cliente para ver e programar envios.</div>'; return; }
+  if (!act) { list.innerHTML = '<div class="integ-empty">Escolha o cliente no topo do menu para ver e programar envios.</div>'; return; }
   _cadenceAct = act;
   if (!_cadenceUnsubscribe) {
     list.innerHTML = '<div style="font-size:13px;color:var(--muted);">Carregando...</div>';
@@ -6782,7 +6915,72 @@ const _cadenceSelected = new Set();
 // Séries mostradas na tela; os botões usam a posição na lista (o texto da mensagem pode ter quebras de linha e emojis).
 let _cadenceSeriesList = [];
 
+// Semana (calendário) ou Lista (séries e histórico).
 function renderCadenceList() {
+  renderCadenceModeBar();
+  if (_cadenceMode === 'week') renderCadenceWeek();
+  else renderCadenceListView();
+}
+
+function setCadenceMode(mode) { _cadenceMode = mode; renderCadenceList(); }
+function moveCadenceWeek(delta) { _cadenceWeekOffset = delta === 0 ? 0 : _cadenceWeekOffset + delta; renderCadenceList(); }
+
+function cadenceWeekStart() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  const dow = (d.getDay() + 6) % 7; // segunda = 0
+  d.setDate(d.getDate() - dow + _cadenceWeekOffset * 7);
+  return d;
+}
+
+function renderCadenceModeBar() {
+  const bar = document.getElementById('cadence-modebar');
+  if (!bar) return;
+  if (!_cadenceAct) { bar.innerHTML = ''; return; }
+  const start = cadenceWeekStart();
+  const end = new Date(start); end.setDate(start.getDate() + 6);
+  const fmt = d => d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '');
+  bar.innerHTML = `<div class="cw-bar">
+    <div class="cw-seg" role="group" aria-label="Visualização">
+      <button class="${_cadenceMode === 'week' ? 'active' : ''}" onclick="setCadenceMode('week')">Semana</button>
+      <button class="${_cadenceMode === 'list' ? 'active' : ''}" onclick="setCadenceMode('list')">Lista e séries</button>
+    </div>
+    ${_cadenceMode === 'week' ? `<div class="cw-nav">
+      <button aria-label="Semana anterior" onclick="moveCadenceWeek(-1)">‹</button>
+      <span>${fmt(start)} – ${fmt(end)} ${end.getFullYear()}</span>
+      <button aria-label="Próxima semana" onclick="moveCadenceWeek(1)">›</button>
+      ${_cadenceWeekOffset ? '<button class="cw-today" onclick="moveCadenceWeek(0)">Hoje</button>' : ''}
+    </div>
+    <div class="cw-legend"><span><i style="background:var(--blue-dim);border-color:var(--blue);"></i>Texto</span><span><i style="background:var(--amber-dim);border-color:var(--amber);"></i>Imagem / vídeo / áudio</span><span><i style="background:var(--purple-dim);border-color:var(--purple);"></i>Enquete</span><span><i style="background:var(--green-dim);border-color:var(--green);"></i>Evento</span></div>` : ''}
+  </div>`;
+}
+
+function renderCadenceWeek() {
+  const list = document.getElementById('cadence-list');
+  if (!list) return;
+  const start = cadenceWeekStart();
+  const today = new Date().toDateString();
+  const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d; });
+  const items = _cadenceItems.filter(i => i.status !== 'cancelled');
+  const kindOf = i => i.eventName ? 'event' : i.type === 'poll' ? 'poll' : ['image', 'video', 'audio'].includes(i.type) ? 'media' : 'text';
+  const typeName = i => i.eventName ? 'Evento' : CADENCE_TYPES[i.type] || 'Texto';
+  const preview = i => i.type === 'poll' && i.poll ? i.poll.question : (i.text || (i.media && i.media.fileName) || typeName(i));
+  const statusMark = { sent: '✓ enviada', failed: '! não enviada', scheduled: '' };
+  list.innerHTML = `<div class="cw-grid">${days.map(d => {
+    const dayItems = items.filter(i => new Date(i.sendAt).toDateString() === d.toDateString()).sort((a, b) => String(a.sendAt).localeCompare(String(b.sendAt)));
+    const isToday = d.toDateString() === today;
+    return `<section class="cw-day ${isToday ? 'today' : ''}">
+      <div class="cw-day-head"><span class="cw-wd">${d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}</span><span class="cw-num">${d.getDate()}</span></div>
+      ${dayItems.length ? dayItems.map(i => `<button class="cw-item cw-${kindOf(i)} ${i.status !== 'scheduled' ? 'done' : ''}" ${i.status === 'scheduled' ? `onclick="editCadenceItem('${escapeJsString(i.id)}')" title="Editar envio"` : `title="${escapeHtml(statusMark[i.status] || i.status)}"`}>
+          <span class="cw-time">${new Date(i.sendAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}<em>${escapeHtml(typeName(i))}</em></span>
+          <span class="cw-text">${escapeHtml(limitText(preview(i), 90))}</span>
+          <span class="cw-group">${escapeHtml(i.groupName || i.groupId || '')}${statusMark[i.status] ? ' · ' + statusMark[i.status] : ''}</span>
+        </button>`).join('') : '<div class="cw-empty">Nada programado</div>'}
+    </section>`;
+  }).join('')}</div>`;
+}
+
+function renderCadenceListView() {
   const list = document.getElementById('cadence-list');
   if (!list) return;
   const upcoming = _cadenceItems.filter(i => i.status === 'scheduled').sort((a, b) => String(a.sendAt).localeCompare(String(b.sendAt)));
@@ -8169,7 +8367,7 @@ function onChatClientChange() {
   const list = document.getElementById('chat-list');
   if (!act) {
     _chatAct = null; _chatItems = [];
-    list.innerHTML = '<div class="chat-empty">Escolha um cliente para ver as conversas.</div>';
+    list.innerHTML = '<div class="chat-empty">Escolha o cliente no topo do menu para ver as conversas.</div>';
     renderChatFilters();
     return;
   }
@@ -8385,6 +8583,7 @@ function loadMoreChats() {
 function closeChat() {
   if (_chatMsgUnsub) { _chatMsgUnsub(); _chatMsgUnsub = null; }
   _chatOpenKey = null; _chatMsgs = []; _chatPendingMedia = null;
+  renderChatInfo();
   const wrap = document.getElementById('chat-wrap');
   if (wrap) wrap.classList.remove('open');
   const main = document.getElementById('chat-main');
@@ -8420,7 +8619,79 @@ function openChat(key) {
   setTimeout(() => { const t = document.getElementById('chat-text'); if (t && window.innerWidth > 768) t.focus(); }, 50);
 }
 
+// Painel da direita: etapa, valor, etiquetas, anotação e histórico do lead desta conversa.
+function renderChatInfo() {
+  const box = document.getElementById('chat-info');
+  if (!box) return;
+  if (!_chatOpenKey || !_chatAct) { box.innerHTML = ''; box.classList.remove('open'); return; }
+  box.classList.add('open');
+  const c = _chatItems.find(x => x.id === _chatOpenKey) || { id: _chatOpenKey };
+  const lead = chatLeadFor(c, chatLeadIndex(_chatAct));
+  const tagById = Object.fromEntries((_contactTagsCache[_chatAct] || []).map(t => [t.id, t]));
+  const tags = chatTagIds(c, lead, lead ? null : chatContactFor(c, chatContactIndex(_chatAct))).map(id => tagById[id]).filter(Boolean);
+  const label = t => `<div class="ci-label">${t}</div>`;
+  const tagsHtml = `<div class="ci-block">${label('Etiquetas')}<div class="ci-tags">${tags.map(t => tagChipHtml(t)).join('')}<button class="ci-add" onclick="openChatTags()">+ Etiqueta</button></div></div>`;
+  if (!lead) {
+    box.innerHTML = `<div class="ci-block">${label('Lead')}<div class="ci-muted">Esta conversa ainda não está no funil.</div><button class="huv-btn primary" style="margin-top:10px;" onclick="createLeadFromChat()">Criar lead no funil</button></div>${tagsHtml}`;
+    return;
+  }
+  const stages = getStages(normalizeActValue(lead.act)) || [];
+  const lid = escapeJsString(lead.id);
+  const fmt = iso => { const d = new Date(iso); return isNaN(d) ? '—' : d.toLocaleDateString('pt-BR'); };
+  const hist = (Array.isArray(lead.history) ? lead.history : []).slice(-6).reverse();
+  box.innerHTML = `
+    <div class="ci-block">${label('Lead')}
+      <label class="ci-field-label" for="ci-stage">Etapa</label>
+      <select id="ci-stage" class="field-input" onchange="moveLeadTo('${lid}', this.value); setTimeout(renderChatInfo, 50)">${stages.map(st => `<option value="${escapeHtml(st.id)}" ${st.id === lead.stage ? 'selected' : ''}>${escapeHtml(st.label)}</option>`).join('')}</select>
+      <div class="ci-grid">
+        <div><div class="ci-k">Valor</div><div class="ci-v">${lead.valor ? 'R$ ' + escapeHtml(lead.valor) : '—'}</div></div>
+        <div><div class="ci-k">Entrada</div><div class="ci-v">${fmt(lead.createdAt)}</div></div>
+        <div style="grid-column:1/-1;"><div class="ci-k">Origem</div><div class="ci-v" style="font-size:12.5px;">${escapeHtml(lead.origem || lead.redeSocial || '—')}</div></div>
+      </div>
+      <button class="huv-btn" style="margin-top:10px;" onclick="editLead('${lid}')">Editar lead</button>
+    </div>
+    ${tagsHtml}
+    <div class="ci-block">${label('Anotação')}
+      <textarea id="ci-obs" class="field-input" rows="4" placeholder="Anote algo sobre este lead" onblur="saveChatLeadObs('${lid}', this.value)">${escapeHtml(lead.obs || '')}</textarea>
+    </div>
+    <div class="ci-block">${label('Histórico')}
+      ${hist.length ? hist.map(h => `<div class="ci-hist"><span class="ci-dot"></span><div><b>${escapeHtml(h.stage || '')}</b><div class="ci-muted">${escapeHtml(h.at || '')}</div></div></div>`).join('') : '<div class="ci-muted">Sem histórico.</div>'}
+    </div>`;
+}
+
+function saveChatLeadObs(id, value) {
+  const lead = (_leadsCache || []).find(l => l.id === id);
+  if (!lead || (lead.obs || '') === value) return;
+  lead.obs = value;
+  lead.updatedAt = new Date().toISOString();
+  saveLeadToDb(lead);
+  showToast('Anotação salva.', 'success', 1800);
+}
+
+async function createLeadFromChat() {
+  const c = _chatItems.find(x => x.id === _chatOpenKey);
+  if (!c || !_chatAct) return;
+  const stages = getStages(_chatAct) || STAGES_DEFAULT;
+  let phone = String(c.phone || '').replace(/\D/g, '');
+  if (phone.startsWith('55') && phone.length >= 12) phone = phone.slice(2);
+  const now = new Date();
+  const lead = {
+    id: now.getTime().toString(), name: chatName(c, null), phone, email: '',
+    stage: stages[0] ? stages[0].id : 'novo', act: _chatAct,
+    origem: 'WhatsApp - Chat do CRM', redeSocial: 'WhatsApp', source: 'chat', importado: true,
+    whatsappJid: phone ? '' : (c.lid || c.jid || ''),
+    history: [{ stage: (stages[0] || {}).label || 'Novo lead', at: now.toLocaleString('pt-BR') }],
+    createdAt: now.toISOString(), updatedAt: now.toISOString()
+  };
+  try {
+    await saveLeadToDb(lead);
+    showToast('Lead criado no funil.', 'success');
+    renderChatHeader();
+  } catch (e) { showToast('Erro: ' + e.message, 'warning'); }
+}
+
 function renderChatHeader() {
+  renderChatInfo();
   const head = document.getElementById('chat-head');
   if (!head || !_chatOpenKey) return;
   const c = _chatItems.find(x => x.id === _chatOpenKey) || { id: _chatOpenKey };
@@ -8784,37 +9055,43 @@ function renderAdminWhatsAppList() {
   if (!clients.length) { list.innerHTML = '<div style="font-size:12px;color:var(--muted);">Nenhum cliente.</div>'; return; }
 
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  list.className = 'wa-grid';
+  list.removeAttribute('style');
   list.innerHTML = clients.map(c => {
     const id = escapeHtml(c.login);
     const jsLogin = escapeJsString(c.login);
     const s = WHATSAPP_SETTINGS[c.act] || {};
     const sentToday = s.sentDate === today ? Number(s.sentCount) || 0 : 0;
     const capture = s.leadCapture && s.leadCapture.enabled;
+    const rules = s.leadCapture && Array.isArray(s.leadCapture.rules) ? s.leadCapture.rules.filter(r => r && r.phrase).length : 0;
+    const t = huvTone(c.act);
     return `
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        <div style="font-size:14px;font-weight:600;color:var(--text);flex:1;min-width:160px;">${escapeHtml(c.name)}</div>
-        <span data-wa-act="${escapeHtml(c.act)}" style="display:flex;align-items:center;gap:8px;font-size:12px;"></span>
+    <div class="wa-card" id="wa-card-${id}">
+      <div class="wa-card-head">
+        <div class="huv-avatar" style="background:${t[0]};color:${t[1]};">${escapeHtml(huvInitials(c.name))}</div>
+        <div style="flex:1;min-width:0;"><div class="huv-name">${escapeHtml(c.name)}</div></div>
+        <span data-wa-act="${escapeHtml(c.act)}" style="display:flex;align-items:center;gap:8px;font-size:12px;flex-wrap:wrap;justify-content:flex-end;"></span>
       </div>
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);cursor:pointer;">
-          <input type="checkbox" onchange="toggleWhatsAppAuto('${jsLogin}', this)" ${s.autoFirstMessage ? 'checked' : ''}>
-          Mensagem automática no "Novo lead"
-        </label>
-        <span style="font-size:11px;color:var(--muted);">Enviadas hoje: ${sentToday}${capture ? ' · Captura pelo WhatsApp ativa' : ''}</span>
-        <button style="${wbtn}margin-left:auto;" onclick="toggleWhatsAppSettings('${jsLogin}')">Configurações</button>
+      <div class="wa-card-stats">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><span style="flex:1;">1ª mensagem automática no "Novo lead"</span><input type="checkbox" onchange="toggleWhatsAppAuto('${jsLogin}', this)" ${s.autoFirstMessage ? 'checked' : ''}></label>
+        <div style="display:flex;"><span style="flex:1;">Captura de leads pelo WhatsApp</span><b>${capture ? (rules ? rules + (rules > 1 ? ' regras' : ' regra') : 'Ligada') : 'Desligada'}</b></div>
+        <div style="display:flex;"><span style="flex:1;">Enviadas hoje</span><b>${sentToday}</b></div>
       </div>
+      <div style="display:flex;gap:8px;"><button class="huv-btn" onclick="toggleWhatsAppSettings('${jsLogin}')">Configurações</button></div>
       <div id="wa-settings-${id}" style="display:none;"></div>
     </div>`;
   }).join('');
   refreshAdminWhatsAppStates();
 }
 
+
 function toggleWhatsAppSettings(login) {
   const box = document.getElementById('wa-settings-' + login);
   const act = CREDENTIALS[login] && CREDENTIALS[login].act;
   if (!box || !act) return;
-  if (box.style.display !== 'none') { box.style.display = 'none'; return; }
+  const card = document.getElementById('wa-card-' + login);
+  if (box.style.display !== 'none') { box.style.display = 'none'; if (card) card.classList.remove('wide'); return; }
+  if (card) card.classList.add('wide');
 
   const s = WHATSAPP_SETTINGS[act] || {};
   const capture = s.leadCapture || {};
@@ -10856,8 +11133,9 @@ function updateSidebarForUser() {
 
 function onMobileClientChange() {
   const sel = document.getElementById('mobile-client-select');
-  if (!sel || !sel.value) return;
-  selectClientByAct(sel.value);
+  if (!sel) return;
+  pickClient(sel.value);
+  if (!sel.value) return;
   // Recarregar dashboard mobile se estiver visível
   const content = document.querySelector('.content');
   if (content && content.style.display !== 'none') {
