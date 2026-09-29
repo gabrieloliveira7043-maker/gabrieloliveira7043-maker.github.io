@@ -5890,7 +5890,7 @@ async function openCadenceEditor(copyFrom, options = {}) {
       <input type="file" id="cad-media-file" class="field-input" onchange="uploadCadenceMedia(this)">
       <div id="cad-media-status" style="${hint}"></div>
     </div>
-    <textarea class="field-input" id="cad-text" rows="5" style="resize:vertical;width:100%;box-sizing:border-box;" placeholder="Texto da mensagem"></textarea>
+    <textarea class="field-input" id="cad-text" rows="5" style="resize:vertical;width:100%;box-sizing:border-box;" placeholder="Texto da mensagem" oninput="updateCadenceMentionState()"></textarea>
     <label id="cad-mention-box" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);margin-top:8px;cursor:pointer;">
       <input type="checkbox" id="cad-mention" ${copyFrom && copyFrom.mentionAll ? 'checked' : ''}> Marcar todos do grupo (notifica cada participante) <span id="cad-mention-hint" style="color:var(--muted);font-size:11px;"></span>
     </label>
@@ -5923,7 +5923,7 @@ async function saveCadenceEdit(setFb) {
   const content = {
     type, text,
     media: type === 'text' ? null : draft.media,
-    mentionAll: !!document.getElementById('cad-mention').checked
+    mentionAll: !!document.getElementById('cad-mention').checked && !!text
   };
   const updates = [];
   if (draft.mode === 'edit-item') {
@@ -6014,7 +6014,7 @@ function selectCadenceType(type, keepMedia) {
   const file = document.getElementById('cad-media-file');
   document.getElementById('cad-media-box').style.display = type === 'text' ? 'none' : 'block';
   document.getElementById('cad-mention-box').style.display = 'flex';
-  document.getElementById('cad-mention-hint').textContent = type === 'audio' ? '(no áudio, a marcação vai no texto enviado logo depois)' : '';
+  updateCadenceMentionState();
   file.value = '';
   file.accept = type === 'image' ? 'image/jpeg,image/png,image/webp' : type === 'video' ? 'video/mp4' : 'audio/*';
   if (!keepMedia) {
@@ -6025,6 +6025,20 @@ function selectCadenceType(type, keepMedia) {
   document.getElementById('cad-text').placeholder = type === 'text' ? 'Texto da mensagem' : 'Texto opcional';
 }
 
+// "Marcar todos" usa o texto: legenda da imagem/vídeo, o próprio texto, ou o texto enviado depois do áudio.
+function updateCadenceMentionState() {
+  const box = document.getElementById('cad-mention');
+  const hint = document.getElementById('cad-mention-hint');
+  if (!box || !hint || !_cadenceDraft) return;
+  const hasText = !!document.getElementById('cad-text').value.trim();
+  const type = _cadenceDraft.type;
+  box.disabled = !hasText;
+  if (!hasText) box.checked = false;
+  hint.textContent = !hasText
+    ? '(escreva um texto para poder marcar todos)'
+    : type === 'audio' ? '(a marcação vai no texto enviado logo depois do áudio)'
+      : type === 'image' || type === 'video' ? '(a marcação vai na legenda)' : '';
+}
 async function uploadCadenceMedia(input) {
   const file = input.files && input.files[0];
   const status = document.getElementById('cad-media-status');
@@ -6120,7 +6134,7 @@ async function saveCadence() {
     type,
     text,
     media: type === 'text' ? null : _cadenceDraft.media,
-    mentionAll: !!document.getElementById('cad-mention').checked,
+    mentionAll: !!document.getElementById('cad-mention').checked && !!text,
     sendAt: d.toISOString()
   })));
   if (items.length > CADENCE_MAX_ITEMS) { setFb('#f87171', `São ${items.length} envios; o máximo é ${CADENCE_MAX_ITEMS} por vez.`); return; }
