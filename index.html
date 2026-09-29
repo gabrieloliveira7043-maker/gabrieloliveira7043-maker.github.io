@@ -1231,6 +1231,26 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
       if (fixed) data.fixed = true;
       await setDoc(doc(db, 'extra_clients', login), data, { merge: true });
     },
+    // WhatsApp (Evolution API via Worker). path: '/whatsapp/status' | '/whatsapp/connect' | '/whatsapp/logout'
+    async whatsapp(path, act) {
+      return await callAdminApi(path, { act });
+    },
+    // Configuração de WhatsApp por cliente (whatsapp_settings/{act}). Admin recebe todos; cliente, só o dele.
+    async getWhatsAppSettings() {
+      if (!currentProfile) return {};
+      const out = {};
+      if (currentProfile.role === 'admin') {
+        const snap = await getDocs(collection(db, 'whatsapp_settings'));
+        snap.forEach(d => { out[d.id] = d.data(); });
+      } else if (currentProfile.act) {
+        const snap = await getDoc(doc(db, 'whatsapp_settings', currentProfile.act));
+        if (snap.exists()) out[currentProfile.act] = snap.data();
+      }
+      return out;
+    },
+    async saveWhatsAppSettings(act, data) {
+      await setDoc(doc(db, 'whatsapp_settings', normalizeAct(act)), { ...data, updatedAt: new Date().toISOString() }, { merge: true });
+    },
     async adminSetPassword(login, password) {
       await callAdminApi('/set-password', { login, password });
       await saveToVault(login, password);
@@ -1854,6 +1874,16 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
         </div>
       </div>
     </div>
+    <div class="modal-overlay stages-modal" id="whatsapp-qr-modal" style="display:none;">
+      <div class="modal-box" style="max-width:420px; width:92vw; text-align:center;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;">
+          <div class="modal-title" style="margin-bottom:0;" id="whatsapp-qr-title">Conectar WhatsApp</div>
+          <button class="btn-close-panel" onclick="closeWhatsAppQrModal()">×</button>
+        </div>
+        <div id="whatsapp-qr-body" style="min-height:280px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;"></div>
+        <div style="font-size:12px; color:var(--muted); margin-top:12px; line-height:1.5;">No celular: <b>WhatsApp → Aparelhos conectados → Conectar um aparelho</b> e aponte a câmera para o QR Code.</div>
+      </div>
+    </div>
     <div id="confirm-modal">
       <div class="confirm-box">
         <div class="confirm-title" id="confirm-title">Confirmação</div>
@@ -2114,6 +2144,16 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
           <button class="btn-save" onclick="changePassword()">Salvar nova senha</button>
         </div>
 
+        <div id="whatsapp-section" style="display:none; margin-bottom:28px;">
+          <div style="font-size:15px; font-weight:600; color:var(--text); margin-bottom:6px;">WhatsApp</div>
+          <div style="font-size:13px; color:var(--muted); margin-bottom:12px;">Conecte o número de WhatsApp que vai falar com os seus leads.</div>
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <span id="whatsapp-own-status" style="font-size:13px;"></span>
+            <span id="whatsapp-own-actions" style="display:flex; gap:8px;"></span>
+          </div>
+          <div id="whatsapp-own-auto" style="font-size:12px; color:var(--muted); margin-top:10px;"></div>
+        </div>
+
         <div id="admin-logins-section" style="display:none;">
           <div style="font-size:15px; font-weight:600; color:var(--text); margin-bottom:6px;">Clientes</div>
           <div style="font-size:13px; color:var(--muted); margin-bottom:16px;">Edite o nome e a conta de anúncios de cada cliente, ou defina uma nova senha. Trocar a conta de anúncios muda só de onde vêm as métricas; os leads do CRM continuam os mesmos.</div>
@@ -2192,7 +2232,10 @@ function normalizeAdAccountInput(value) {
   return isAdAccountId(candidate) ? candidate : null;
 }
 
-const NO_AD_ACCOUNT_MESSAGE = 'Este cliente ainda não tem conta de anúncios configurada. O admin pode definir em Conta → Clientes.';
+// Configuração de WhatsApp por chave de cliente: { autoFirstMessage, enabledAt, template }.
+const WHATSAPP_SETTINGS = {};
+
+const NO_AD_ACCOUNT_MESSAGE ='Este cliente ainda não tem conta de anúncios configurada. O admin pode definir em Conta → Clientes.';
 let activeClient = null;
 let isAdmin = false;
 
@@ -3675,7 +3718,8 @@ async function confirmarImportacao() {
 
   for (const row of rows) {
     const importedAt = new Date().toISOString();
-    const lead = { act, stage: stages[0]?.id || 'novo', createdAt: importedAt, updatedAt: importedAt };
+    // "importado" impede o disparo automático de WhatsApp para leads antigos vindos de planilha.
+    const lead = { act, stage: stages[0]?.id || 'novo', createdAt: importedAt, updatedAt: importedAt, importado: true };
     let rawValor = null;
     let isFechado = false;
 
@@ -4529,6 +4573,7 @@ function switchView(view) {
     document.getElementById('pw-error').style.display = 'none';
     document.getElementById('pw-success').style.display = 'none';
     if (isAdmin) renderAdminLogins();
+    renderOwnWhatsAppSection();
   }
 }
 
@@ -4557,6 +4602,7 @@ async function renderAdminLogins() {
   await loadExtraClients();
   let vault = {};
   try { vault = await window._fb.getVault(); } catch(e) { console.warn('Cofre de senhas indisponível:', e); }
+  try { Object.assign(WHATSAPP_SETTINGS, await window._fb.getWhatsAppSettings()); } catch(e) { console.warn('Configuração de WhatsApp indisponível:', e); }
 
   const todos = Object.entries(CREDENTIALS)
     .filter(([login, cred]) => login !== 'admin' && cred && cred.act)
@@ -4599,6 +4645,14 @@ async function renderAdminLogins() {
         <span id="client-info-feedback-${id}" style="font-size:11px;display:none;"></span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="${labelStyle}">WhatsApp:</span>
+        <span data-wa-act="${escapeHtml(c.act)}" style="display:flex;align-items:center;gap:8px;font-size:12px;"></span>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);cursor:pointer;margin-left:auto;">
+          <input type="checkbox" onchange="toggleWhatsAppAuto('${jsLogin}', this)" ${WHATSAPP_SETTINGS[c.act] && WHATSAPP_SETTINGS[c.act].autoFirstMessage ? 'checked' : ''}>
+          Mensagem automática no "Novo lead"
+        </label>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <span style="${labelStyle}">Senha atual:</span>
         ${c.password ? `
         <input id="client-current-pass-${id}" class="field-input mono" style="${inputStyle}width:150px;" type="password" value="${escapeHtml(c.password)}" readonly>
@@ -4614,6 +4668,7 @@ async function renderAdminLogins() {
       </div>
     </div>`;
   }).join('');
+  refreshAdminWhatsAppStates();
 }
 
 async function saveClientInfo(login) {
@@ -4654,6 +4709,171 @@ async function saveClientInfo(login) {
   } catch(e) {
     feedback('#f87171', 'Erro: ' + e.message);
   }
+}
+
+// ===== WHATSAPP (Evolution API) =====
+const WHATSAPP_STATE_LABELS = {
+  open: ['Conectado', '#34d399'],
+  connecting: ['Aguardando leitura do QR Code', '#fbbf24'],
+  close: ['Desconectado', '#f87171'],
+  not_created: ['Não conectado', 'var(--muted)']
+};
+
+async function fetchWhatsAppState(act) {
+  try {
+    const r = await window._fb.whatsapp('/whatsapp/status', act);
+    return { state: r.state };
+  } catch (e) {
+    return { state: 'offline', error: e.message };
+  }
+}
+
+function whatsappStateBadge(result) {
+  const [label, color] = WHATSAPP_STATE_LABELS[result.state] || ['Servidor do WhatsApp fora do ar', '#f87171'];
+  return `<span style="color:${color};font-weight:600;">● ${escapeHtml(label)}</span>`;
+}
+
+const wbtn = 'background:var(--accent-glow);border:1px solid var(--accent);color:var(--accent2);border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;white-space:nowrap;';
+
+async function renderOwnWhatsAppSection() {
+  const section = document.getElementById('whatsapp-section');
+  if (!section) return;
+  const profile = window._fb && window._fb.getProfile();
+  if (!profile || profile.role === 'admin' || !profile.act) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  const act = profile.act;
+  const status = document.getElementById('whatsapp-own-status');
+  const actions = document.getElementById('whatsapp-own-actions');
+  status.textContent = 'Verificando...';
+  actions.innerHTML = '';
+  const result = await fetchWhatsAppState(act);
+  status.innerHTML = whatsappStateBadge(result);
+  const jsAct = escapeJsString(act);
+  if (result.state === 'open') {
+    actions.innerHTML = `<button style="${wbtn}" onclick="disconnectWhatsApp('${jsAct}')">Desconectar</button>`;
+  } else if (result.state !== 'offline') {
+    actions.innerHTML = `<button style="${wbtn}" onclick="openWhatsAppConnect('${jsAct}')">Conectar WhatsApp</button>`;
+  }
+  const auto = WHATSAPP_SETTINGS[act] && WHATSAPP_SETTINGS[act].autoFirstMessage;
+  document.getElementById('whatsapp-own-auto').textContent = auto
+    ? 'Mensagem automática para leads novos: ativada.'
+    : 'Mensagem automática para leads novos: desativada (a Huven ativa para você).';
+}
+
+let _whatsappPoll = null;
+let _whatsappQrAct = null;
+
+function setWhatsAppQrBody(html) {
+  const body = document.getElementById('whatsapp-qr-body');
+  if (body) body.innerHTML = html;
+}
+
+async function loadWhatsAppQr(act) {
+  try {
+    const r = await window._fb.whatsapp('/whatsapp/connect', act);
+    if (r.state === 'open') { onWhatsAppConnected(); return; }
+    const qr = String(r.qr || '');
+    if (!qr.startsWith('data:image/')) { setWhatsAppQrBody('<div style="color:var(--muted);">Gerando QR Code...</div>'); return; }
+    setWhatsAppQrBody(`<img src="${escapeHtml(qr)}" alt="QR Code do WhatsApp" style="width:260px;height:260px;background:#fff;border-radius:10px;padding:8px;">`);
+  } catch (e) {
+    setWhatsAppQrBody(`<div style="color:#f87171;">${escapeHtml(e.message)}</div>`);
+  }
+}
+
+function onWhatsAppConnected() {
+  clearInterval(_whatsappPoll);
+  _whatsappPoll = null;
+  setWhatsAppQrBody('<div style="font-size:40px;">✅</div><div style="font-weight:600;color:var(--text);">WhatsApp conectado!</div>');
+  setTimeout(closeWhatsAppQrModal, 1800);
+}
+
+async function openWhatsAppConnect(act, name) {
+  const modal = document.getElementById('whatsapp-qr-modal');
+  if (!modal) return;
+  _whatsappQrAct = act;
+  document.getElementById('whatsapp-qr-title').textContent = 'Conectar WhatsApp' + (name ? ' — ' + name : '');
+  setWhatsAppQrBody('<div style="color:var(--muted);">Gerando QR Code...</div>');
+  modal.style.display = 'flex';
+  modal.classList.add('open');
+  await loadWhatsAppQr(act);
+
+  // Confere a conexão a cada 5 s e troca o QR Code a cada ~25 s (ele expira). Para depois de 5 min.
+  let ticks = 0;
+  clearInterval(_whatsappPoll);
+  _whatsappPoll = setInterval(async () => {
+    ticks += 1;
+    const result = await fetchWhatsAppState(act);
+    if (result.state === 'open') { onWhatsAppConnected(); return; }
+    if (ticks >= 60) {
+      clearInterval(_whatsappPoll);
+      _whatsappPoll = null;
+      setWhatsAppQrBody(`<div style="color:var(--muted);">O QR Code expirou.</div><button style="${wbtn}" onclick="openWhatsAppConnect('${escapeJsString(act)}')">Gerar outro</button>`);
+      return;
+    }
+    if (ticks % 5 === 0) loadWhatsAppQr(act);
+  }, 5000);
+}
+
+function closeWhatsAppQrModal() {
+  clearInterval(_whatsappPoll);
+  _whatsappPoll = null;
+  const modal = document.getElementById('whatsapp-qr-modal');
+  if (modal) { modal.classList.remove('open'); modal.style.display = 'none'; }
+  renderOwnWhatsAppSection();
+  if (isAdmin && _whatsappQrAct) refreshAdminWhatsAppStates();
+}
+
+async function disconnectWhatsApp(act) {
+  if (!await showConfirm('O número deixa de enviar mensagens pelo CRM até ser conectado de novo.', 'Desconectar WhatsApp', 'Desconectar', true)) return;
+  try {
+    await window._fb.whatsapp('/whatsapp/logout', act);
+    showToast('WhatsApp desconectado.', 'success');
+  } catch (e) {
+    showToast('Erro ao desconectar: ' + e.message, 'warning');
+  }
+  renderOwnWhatsAppSection();
+  if (isAdmin) refreshAdminWhatsAppStates();
+}
+
+// Preenche o estado do WhatsApp de cada cliente no painel admin.
+function refreshAdminWhatsAppStates() {
+  document.querySelectorAll('[data-wa-act]').forEach(async el => {
+    const act = el.getAttribute('data-wa-act');
+    el.innerHTML = '<span style="color:var(--muted);">verificando...</span>';
+    const result = await fetchWhatsAppState(act);
+    const jsAct = escapeJsString(act);
+    const name = escapeJsString(getClientDisplayName(act));
+    const action = result.state === 'open'
+      ? `<button style="${wbtn}" onclick="disconnectWhatsApp('${jsAct}')">Desconectar</button>`
+      : result.state === 'offline' ? '' : `<button style="${wbtn}" onclick="openWhatsAppConnect('${jsAct}','${name}')">Conectar</button>`;
+    el.innerHTML = whatsappStateBadge(result) + ' ' + action;
+  });
+}
+
+async function toggleWhatsAppAuto(login, checkbox) {
+  const act = CREDENTIALS[login] && CREDENTIALS[login].act;
+  if (!act) return;
+  const enable = checkbox.checked;
+  if (enable) {
+    const ok = await showConfirm(
+      `A partir de agora, todo lead novo de "${getClientDisplayName(act)}" que entrar em "Novo lead" recebe a primeira mensagem automaticamente pelo WhatsApp. Leads antigos e importados de planilha não recebem.`,
+      'Ativar mensagem automática', 'Ativar'
+    );
+    if (!ok) { checkbox.checked = false; return; }
+  }
+  checkbox.disabled = true;
+  try {
+    const data = enable
+      ? { autoFirstMessage: true, enabledAt: new Date().toISOString(), template: getFirstMessageTemplate(act) }
+      : { autoFirstMessage: false };
+    await window._fb.saveWhatsAppSettings(act, data);
+    WHATSAPP_SETTINGS[act] = { ...(WHATSAPP_SETTINGS[act] || {}), ...data };
+    showToast(enable ? 'Mensagem automática ativada.' : 'Mensagem automática desativada.', 'success');
+  } catch (e) {
+    checkbox.checked = !enable;
+    showToast('Erro: ' + e.message, 'warning');
+  }
+  checkbox.disabled = false;
 }
 
 function toggleClientPassword(login, btn) {
@@ -5659,7 +5879,10 @@ function firstMessageTemplateAct() {
 function getFirstMessageTemplates() {
   try { return JSON.parse(localStorage.getItem(FIRST_MESSAGE_TEMPLATE_KEY) || '{}'); } catch(e) { return {}; }
 }
+// O modelo salvo no banco (usado também pelo envio automático) tem prioridade sobre o do navegador.
 function getFirstMessageTemplate(act) {
+  const saved = act && WHATSAPP_SETTINGS[act] && WHATSAPP_SETTINGS[act].template;
+  if (saved) return saved;
   const templates = getFirstMessageTemplates();
   return templates[act || 'geral'] || templates.geral || DEFAULT_FIRST_MESSAGE_TEMPLATE;
 }
@@ -5680,11 +5903,20 @@ function closeFirstMessageModal() {
 function saveFirstMessageTemplate() {
   const input = document.getElementById('first-message-template');
   if (!input) return;
+  const act = firstMessageTemplateAct();
+  const template = input.value.trim() || DEFAULT_FIRST_MESSAGE_TEMPLATE;
   const templates = getFirstMessageTemplates();
-  templates[firstMessageTemplateAct()] = input.value.trim() || DEFAULT_FIRST_MESSAGE_TEMPLATE;
+  templates[act] = template;
   localStorage.setItem(FIRST_MESSAGE_TEMPLATE_KEY, JSON.stringify(templates));
   closeFirstMessageModal();
-  showToast('Primeira mensagem atualizada.', 'success');
+  if (act && act !== 'geral' && window._fb && window._fb.getProfile()) {
+    WHATSAPP_SETTINGS[act] = { ...(WHATSAPP_SETTINGS[act] || {}), template };
+    window._fb.saveWhatsAppSettings(act, { template })
+      .then(() => showToast('Primeira mensagem atualizada.', 'success'))
+      .catch(e => showToast('Mensagem salva só neste navegador: ' + e.message, 'warning'));
+  } else {
+    showToast('Primeira mensagem atualizada.', 'success');
+  }
 }
 window.openFirstMessageModal = openFirstMessageModal;
 window.closeFirstMessageModal = closeFirstMessageModal;
@@ -6215,6 +6447,9 @@ function applyProfileLocally(profile) {
 }
 
 function refreshLeadsAfterLogin() {
+  window._fb.getWhatsAppSettings()
+    .then(settings => Object.assign(WHATSAPP_SETTINGS, settings))
+    .catch(e => console.warn('Configuração de WhatsApp indisponível:', e));
   startLeadNotifier();
   getLeadsAsync().then(() => {
     if (document.getElementById('crm-view') && document.getElementById('crm-view').style.display === 'block') {
