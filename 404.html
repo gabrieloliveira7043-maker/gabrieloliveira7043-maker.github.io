@@ -1118,7 +1118,12 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
         throw err;
       }
       const data = snap.data();
-      currentProfile = { uid: user.uid, ...data, act: data.act ? normalizeAct(data.act) : null };
+      currentProfile = {
+        uid: user.uid,
+        ...data,
+        act: data.act ? normalizeAct(data.act) : null,
+        adAccount: data.adAccount !== undefined ? (data.adAccount || '') : null
+      };
       return currentProfile;
     },
     // Resolve com o perfil de quem já estava logado neste navegador, ou null.
@@ -1180,8 +1185,9 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
       } catch(e) { return []; }
     },
     // Só admin. Cria o login no Firebase Auth usando uma instância separada, para o admin não ser deslogado.
-    async saveExtraClient(login, name, act, pass, layout) {
+    async saveExtraClient(login, name, act, pass, layout, adAccount) {
       act = normalizeAct(act);
+      adAccount = adAccount || '';
       let uid = await findUidByLogin(login);
       if (!uid) {
         const secondary = initializeApp(firebaseConfig, 'huven-admin-' + Date.now());
@@ -1196,8 +1202,17 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
       } else if (pass) {
         await callAdminApi('/set-password', { login, password: pass });
       }
-      await setDoc(doc(db, 'users', uid), { login, act, role: 'client', name, layout: layout || 'default' });
-      await setDoc(doc(db, 'extra_clients', login), { name, act, layout: layout || 'default', uid });
+      await setDoc(doc(db, 'users', uid), { login, act, adAccount, role: 'client', name, layout: layout || 'default' });
+      await setDoc(doc(db, 'extra_clients', login), { name, act, adAccount, layout: layout || 'default', uid });
+    },
+    // Só admin. Muda nome e conta de anúncios; a chave "act" (que liga o cliente aos leads) não muda.
+    async updateClientInfo(login, { act, name, adAccount, fixed }) {
+      const uid = await findUidByLogin(login);
+      if (uid) await updateDoc(doc(db, 'users', uid), { name, adAccount });
+      const data = { name, act: normalizeAct(act), adAccount };
+      if (uid) data.uid = uid;
+      if (fixed) data.fixed = true;
+      await setDoc(doc(db, 'extra_clients', login), data, { merge: true });
     },
     async adminSetPassword(login, password) {
       await callAdminApi('/set-password', { login, password });
@@ -2081,8 +2096,8 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
         </div>
 
         <div id="admin-logins-section" style="display:none;">
-          <div style="font-size:15px; font-weight:600; color:var(--text); margin-bottom:6px;">Logins dos clientes</div>
-          <div style="font-size:13px; color:var(--muted); margin-bottom:16px;">Visualize e edite usuário e senha de cada cliente.</div>
+          <div style="font-size:15px; font-weight:600; color:var(--text); margin-bottom:6px;">Clientes</div>
+          <div style="font-size:13px; color:var(--muted); margin-bottom:16px;">Edite o nome e a conta de anúncios de cada cliente, ou defina uma nova senha. Trocar a conta de anúncios muda só de onde vêm as métricas; os leads do CRM continuam os mesmos.</div>
           <div id="admin-logins-list" style="display:flex; flex-direction:column; gap:8px;"></div>
         </div>
       </div>
@@ -2111,8 +2126,8 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
     <input type="text" class="field-input mono" id="cfg-senha" placeholder="Ex: vital123">
   </div>
   <div class="field-group">
-    <label class="field-label">Ad Account ID</label>
-    <input type="text" class="field-input mono" id="cfg-account" placeholder="act_123456789">
+    <label class="field-label">Conta de anúncios (opcional)</label>
+    <input type="text" class="field-input mono" id="cfg-account" placeholder="act_123456789 — pode definir depois">
   </div>
   <div class="field-group">
     <label class="field-label">Layout do CRM</label>
@@ -2135,6 +2150,30 @@ async function metaFetch(url) {
   const token = window._fb ? await window._fb.getIdToken() : null;
   return fetch(url, token ? { headers: { 'Authorization': 'Bearer ' + token } } : undefined);
 }
+
+// Conta de anúncios usada nas métricas, por chave interna do cliente.
+// Sem entrada aqui, a própria chave é usada quando ela é uma conta de anúncios (act_ + números).
+const AD_ACCOUNTS = {};
+
+function isAdAccountId(value) {
+  return /^act_\d+$/.test(String(value || ''));
+}
+
+function getAdAccountFor(act) {
+  if (!act) return '';
+  if (Object.prototype.hasOwnProperty.call(AD_ACCOUNTS, act)) return AD_ACCOUNTS[act] || '';
+  return isAdAccountId(act) ? act : '';
+}
+
+// '' = sem conta; null = valor inválido.
+function normalizeAdAccountInput(value) {
+  const raw = String(value || '').trim().replace(/\s+/g, '');
+  if (!raw) return '';
+  const candidate = raw.startsWith('act_') ? raw : 'act_' + raw.replace(/^act[_-]?/i, '');
+  return isAdAccountId(candidate) ? candidate : null;
+}
+
+const NO_AD_ACCOUNT_MESSAGE = 'Este cliente ainda não tem conta de anúncios configurada. O admin pode definir em Conta → Clientes.';
 let activeClient = null;
 let isAdmin = false;
 
@@ -2151,36 +2190,48 @@ async function saveClient() {
   const feedback = document.getElementById('cfg-feedback');
   const btn = document.getElementById('btn-salvar-cliente');
 
-  if (!name || !login || !senha || !account) {
+  const showFeedbackError = (message) => {
     feedback.style.display = 'block';
     feedback.style.color = '#f87171';
-    feedback.textContent = 'Preencha todos os campos.';
+    feedback.textContent = message;
+  };
+
+  if (!name || !login || !senha) {
+    showFeedbackError('Preencha nome, login e senha.');
     return;
   }
-  if (!account.startsWith('act_')) {
-    feedback.style.display = 'block';
-    feedback.style.color = '#f87171';
-    feedback.textContent = 'Ad Account ID deve começar com act_';
+  if (!/^[a-z0-9._-]{2,40}$/.test(login)) {
+    showFeedbackError('Login só pode ter letras minúsculas, números, ponto, hífen ou _.');
+    return;
+  }
+  if (CREDENTIALS[login]) {
+    showFeedbackError('Já existe um cliente com esse login. Para editar, use a tela Conta → Clientes.');
+    return;
+  }
+  const adAccount = normalizeAdAccountInput(account);
+  if (adAccount === null) {
+    showFeedbackError('Conta de anúncios inválida. Use act_ seguido dos números, ou deixe em branco.');
     return;
   }
   if (senha.length < 6) {
-    feedback.style.display = 'block';
-    feedback.style.color = '#f87171';
-    feedback.textContent = 'A senha precisa ter pelo menos 6 caracteres.';
+    showFeedbackError('A senha precisa ter pelo menos 6 caracteres.');
     return;
   }
+  // Chave interna do cliente no CRM (liga o cliente aos leads). Não muda depois, mesmo se a conta de anúncios mudar.
+  const clientKey = adAccount || ('act_huven_' + login.replace(/[^a-z0-9_]/g, '_'));
 
   btn.textContent = 'Salvando...';
   btn.disabled = true;
   feedback.style.display = 'none';
 
   try {
-    await window._fb.saveExtraClient(login, name, account, senha, layout);
+    await window._fb.saveExtraClient(login, name, clientKey, senha, layout, adAccount);
     // Atualizar dinamicamente
-    CREDENTIALS[login] = { pass: null, act: account };
-    CLIENT_NAMES[account] = name;
-    if (layout === 'clinica' && !CLINICA_ACTS.includes(account)) {
-      CLINICA_ACTS.push(account);
+    CREDENTIALS[login] = { pass: null, act: clientKey };
+    CLIENT_NAMES[clientKey] = name;
+    AD_ACCOUNTS[clientKey] = adAccount;
+    if (layout === 'clinica' && !CLINICA_ACTS.includes(clientKey)) {
+      CLINICA_ACTS.push(clientKey);
     }
     // Limpar campos
     document.getElementById('cfg-name').value = '';
@@ -2326,7 +2377,8 @@ async function renderSavedList() {
   if (!el) return;
   el.innerHTML = '<div style="font-size:12px;color:var(--muted);margin:16px 0 8px;">Carregando...</div>';
   try {
-    const extras = await window._fb.getExtraClients();
+    // Documentos "fixed" só guardam edições dos clientes que vêm do código; não entram nesta lista.
+    const extras = (await window._fb.getExtraClients()).filter(c => !c.fixed && !FIXED_CLIENT_LOGINS.includes(c.login));
     if (!extras.length) {
       el.innerHTML = '<div style="font-size:12px;color:var(--muted);margin:16px 0 8px;">Nenhum cliente extra adicionado.</div>';
       return;
@@ -2334,7 +2386,7 @@ async function renderSavedList() {
     el.innerHTML = '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 8px;">Clientes adicionados</div>' +
       extras.map(c => `
       <div class="saved-item">
-        <div><div class="saved-name">${escapeHtml(c.name)}</div><div class="saved-id">${escapeHtml(c.act)} · login: ${escapeHtml(c.login)}</div></div>
+        <div><div class="saved-name">${escapeHtml(c.name)}</div><div class="saved-id">${escapeHtml(getAdAccountFor(c.act) || 'sem conta de anúncios')} · login: ${escapeHtml(c.login)}</div></div>
         <button class="btn-remove" onclick="removeExtraClient('${escapeJsString(c.login)}','${escapeJsString(c.name)}')">Remover</button>
       </div>`).join('');
   } catch(e) { el.innerHTML = '<div style="font-size:12px;color:#f87171;margin:16px 0 8px;">Erro ao carregar.</div>'; }
@@ -2363,14 +2415,14 @@ async function loadData() {
   const from = document.getElementById('date-from').value;
   const to = document.getElementById('date-to').value;
   if (!from || !to) { showError('Selecione o período.'); return; }
+  const account = getAdAccountFor(activeClient.account);
+  if (!account) { showError(NO_AD_ACCOUNT_MESSAGE); return; }
 
   hideError(); showLoading(true);
   document.getElementById('welcome-state').style.display = 'none';
   document.getElementById('data-area').style.display = 'none';
   document.getElementById('page-meta').textContent = `${from} → ${to}`;
 
-  
-  const account = activeClient.account;
   const insightsUrl = `${WORKER_URL}?account=${account}&from=${from}&to=${to}&fields=spend,reach,impressions,cpm,ctr,frequency,clicks,inline_link_clicks,actions,campaign_name,campaign_id`;
     const adsUrl = `${WORKER_URL}?account=${account}&from=${from}&to=${to}&fields=spend,reach,impressions,cpm,ctr,frequency,clicks,inline_link_clicks,actions,ad_name,ad_id,campaign_name,campaign_id&level=ad`;
   const campaignsUrl = `${WORKER_URL}?account=${account}&from=${from}&to=${to}&fields=id,effective_status`;
@@ -2529,8 +2581,9 @@ async function extractTrafficData() {
   const from = document.getElementById('date-from').value;
   const to = document.getElementById('date-to').value;
   if (!from || !to) { showError('Selecione o período.'); return; }
+  const account = getAdAccountFor(activeClient.account);
+  if (!account) { showError(NO_AD_ACCOUNT_MESSAGE); return; }
   await ensureXlsxLoaded();
-  const account = activeClient.account;
   const fields = 'spend,reach,impressions,cpm,ctr,frequency,clicks,inline_link_clicks,actions,campaign_name,campaign_id';
   const adsFields = 'spend,reach,impressions,cpm,ctr,frequency,clicks,inline_link_clicks,actions,ad_name,ad_id,campaign_name,campaign_id';
   showLoading(true);
@@ -2966,6 +3019,8 @@ const CREDENTIALS = {
   "travi":      { pass: null,    act: "act_379348482601330"  },
   "boleto":     { pass: null,    act: "act_1712273919281701" },
 };
+// Logins que vêm do código (não foram criados pelo painel); não podem ser removidos pelo painel.
+const FIXED_CLIENT_LOGINS = Object.keys(CREDENTIALS);
 
 const CLIENT_NAMES = {
   "act_1324786597927962": "Raquel Odonto",
@@ -4472,47 +4527,103 @@ function filterHelpCards(query) {
   if (empty) empty.style.display = visible ? 'none' : 'block';
 }
 
-﻿async function renderAdminLogins() {
+async function renderAdminLogins() {
   const section = document.getElementById('admin-logins-section');
   const list = document.getElementById('admin-logins-list');
   if (!section || !list) return;
   section.style.display = 'block';
   list.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 0;">Carregando...</div>';
 
-  // Clientes fixos
-  const fixed = Object.entries(CREDENTIALS).filter(([u]) => u !== 'admin').map(([login, cred]) => ({
-    login, name: CLIENT_NAMES[cred.act] || login
-  }));
+  // Garante que clientes criados pelo painel e edições já salvas estejam carregados.
+  await loadExtraClients();
 
-  // Clientes extras do Firebase (sem duplicar os fixos)
-  let extras = [];
-  try {
-    const raw = await window._fb.getExtraClients();
-    extras = raw
-      .filter(c => !fixed.find(f => f.login === c.login))
-      .map(c => ({ login: c.login, name: c.name }));
-  } catch(e) {}
+  const todos = Object.entries(CREDENTIALS)
+    .filter(([login, cred]) => login !== 'admin' && cred && cred.act)
+    .map(([login, cred]) => ({
+      login,
+      act: cred.act,
+      name: getClientDisplayName(cred.act),
+      adAccount: getAdAccountFor(cred.act)
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
-  const todos = [...fixed, ...extras];
   if (!todos.length) { list.innerHTML = '<div style="font-size:12px;color:var(--muted);">Nenhum cliente.</div>'; return; }
 
+  const labelStyle = 'font-size:11px;color:var(--muted);';
+  const inputStyle = 'padding:4px 8px;font-size:12px;';
+  const buttonStyle = 'background:var(--accent-glow);border:1px solid var(--accent);color:var(--accent2);border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;white-space:nowrap;';
+
   // As senhas ficam só no Firebase Auth e não podem ser lidas; aqui o admin só define uma nova.
-  list.innerHTML = todos.map(c => `
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-      <div style="flex:1;min-width:120px;">
-        <div style="font-size:13px;font-weight:600;color:var(--text);">${escapeHtml(c.name)}</div>
+  list.innerHTML = todos.map(c => {
+    const id = escapeHtml(c.login);
+    const jsLogin = escapeJsString(c.login);
+    return `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;display:flex;flex-direction:column;gap:10px;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="${labelStyle}">Login:</span>
+        <span class="mono" style="font-size:12px;color:var(--text);">${id}</span>
+        ${c.adAccount ? '' : '<span style="font-size:11px;color:#fbbf24;">sem conta de anúncios</span>'}
       </div>
-      <div style="display:flex;align-items:center;gap:6px;">
-        <span style="font-size:11px;color:var(--muted);">Login:</span>
-        <input class="field-input mono" style="width:120px;padding:4px 8px;font-size:12px;" value="${escapeHtml(c.login)}" disabled>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:6px;flex:1;min-width:180px;">
+          <span style="${labelStyle}">Nome:</span>
+          <input id="client-name-${id}" class="field-input" style="${inputStyle}flex:1;" value="${escapeHtml(c.name)}">
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;flex:1;min-width:200px;">
+          <span style="${labelStyle}">Conta de anúncios:</span>
+          <input id="client-ad-${id}" class="field-input mono" style="${inputStyle}flex:1;" value="${escapeHtml(c.adAccount)}" placeholder="act_... (vazio = sem conta)">
+        </label>
+        <button onclick="saveClientInfo('${jsLogin}')" style="${buttonStyle}">Salvar dados</button>
+        <span id="client-info-feedback-${id}" style="font-size:11px;display:none;"></span>
       </div>
-      <div style="display:flex;align-items:center;gap:6px;">
-        <span style="font-size:11px;color:var(--muted);">Nova senha:</span>
-        <input id="login-pass-${escapeHtml(c.login)}" class="field-input mono" style="width:130px;padding:4px 8px;font-size:12px;" placeholder="mín. 6 caracteres" type="text" autocomplete="off">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="${labelStyle}">Nova senha:</span>
+        <input id="login-pass-${id}" class="field-input mono" style="${inputStyle}width:150px;" placeholder="mín. 6 caracteres" type="text" autocomplete="off">
+        <button onclick="saveClientCredential('${jsLogin}')" style="${buttonStyle}">Trocar senha</button>
+        <span id="login-feedback-${id}" style="font-size:11px;display:none;"></span>
       </div>
-      <button onclick="saveClientCredential('${escapeJsString(c.login)}')" style="background:var(--accent-glow);border:1px solid var(--accent);color:var(--accent2);border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;white-space:nowrap;">Trocar senha</button>
-      <span id="login-feedback-${escapeHtml(c.login)}" style="font-size:11px;display:none;"></span>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+}
+
+async function saveClientInfo(login) {
+  const cred = CREDENTIALS[login];
+  const fb = document.getElementById('client-info-feedback-' + login);
+  const feedback = (color, text) => { if (fb) { fb.style.display = 'inline'; fb.style.color = color; fb.textContent = text; } };
+  if (!isAdmin || !cred || !cred.act) return;
+
+  const name = (document.getElementById('client-name-' + login)?.value || '').trim();
+  const adAccount = normalizeAdAccountInput(document.getElementById('client-ad-' + login)?.value);
+  if (!name) { feedback('#f87171', 'Informe o nome.'); return; }
+  if (adAccount === null) { feedback('#f87171', 'Conta inválida: use act_ + números, ou deixe vazio.'); return; }
+
+  const act = cred.act;
+  const previousAdAccount = getAdAccountFor(act);
+  if (previousAdAccount && adAccount !== previousAdAccount) {
+    const ok = await showConfirm(
+      `As métricas de "${name}" passarão a vir de ${adAccount || 'nenhuma conta'} em vez de ${previousAdAccount}. Os leads do CRM não mudam.`,
+      'Trocar conta de anúncios', 'Trocar'
+    );
+    if (!ok) return;
+  }
+
+  try {
+    await window._fb.updateClientInfo(login, { act, name, adAccount, fixed: FIXED_CLIENT_LOGINS.includes(login) });
+    CLIENT_NAMES[act] = name;
+    AD_ACCOUNTS[act] = adAccount;
+    if (activeClient && activeClient.account === act) {
+      activeClient.name = name;
+      document.getElementById('page-title').textContent = name;
+      updateMobileHeader();
+    }
+    renderSidebar();
+    updateSidebarForUser();
+    renderSavedList();
+    feedback('#34d399', 'Salvo!');
+    setTimeout(() => renderAdminLogins(), 1200);
+  } catch(e) {
+    feedback('#f87171', 'Erro: ' + e.message);
+  }
 }
 
 async function saveClientCredential(login) {
@@ -6047,6 +6158,7 @@ function applyProfileLocally(profile) {
   if (!profile || !profile.act) return;
   CREDENTIALS[profile.login] = { pass: null, act: profile.act };
   if (profile.name) CLIENT_NAMES[profile.act] = profile.name;
+  if (profile.adAccount !== undefined && profile.adAccount !== null) AD_ACCOUNTS[profile.act] = profile.adAccount || '';
   if (profile.layout === 'clinica' && !CLINICA_ACTS.includes(profile.act)) CLINICA_ACTS.push(profile.act);
 }
 
@@ -6171,6 +6283,7 @@ async function loadExtraClients() {
     extras.forEach(c => {
       CREDENTIALS[c.login] = { pass: null, act: c.act };
       CLIENT_NAMES[c.act] = c.name;
+      if (c.adAccount !== undefined) AD_ACCOUNTS[c.act] = c.adAccount || '';
       if (c.layout === 'clinica' && !CLINICA_ACTS.includes(c.act)) {
         CLINICA_ACTS.push(c.act);
       }
