@@ -5892,7 +5892,7 @@ async function openCadenceEditor(copyFrom, options = {}) {
     </div>
     <textarea class="field-input" id="cad-text" rows="5" style="resize:vertical;width:100%;box-sizing:border-box;" placeholder="Texto da mensagem"></textarea>
     <label id="cad-mention-box" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);margin-top:8px;cursor:pointer;">
-      <input type="checkbox" id="cad-mention" ${copyFrom && copyFrom.mentionAll ? 'checked' : ''}> Marcar todos do grupo (notifica cada participante)
+      <input type="checkbox" id="cad-mention" ${copyFrom && copyFrom.mentionAll ? 'checked' : ''}> Marcar todos do grupo (notifica cada participante) <span id="cad-mention-hint" style="color:var(--muted);font-size:11px;"></span>
     </label>
 
     <div id="cad-preview" style="margin-top:14px;padding:12px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text);"></div>
@@ -5923,7 +5923,7 @@ async function saveCadenceEdit(setFb) {
   const content = {
     type, text,
     media: type === 'text' ? null : draft.media,
-    mentionAll: type === 'text' && !!document.getElementById('cad-mention').checked
+    mentionAll: !!document.getElementById('cad-mention').checked
   };
   const updates = [];
   if (draft.mode === 'edit-item') {
@@ -6013,7 +6013,8 @@ function selectCadenceType(type, keepMedia) {
   });
   const file = document.getElementById('cad-media-file');
   document.getElementById('cad-media-box').style.display = type === 'text' ? 'none' : 'block';
-  document.getElementById('cad-mention-box').style.display = type === 'text' ? 'flex' : 'none';
+  document.getElementById('cad-mention-box').style.display = 'flex';
+  document.getElementById('cad-mention-hint').textContent = type === 'audio' ? '(no áudio, a marcação vai no texto enviado logo depois)' : '';
   file.value = '';
   file.accept = type === 'image' ? 'image/jpeg,image/png,image/webp' : type === 'video' ? 'video/mp4' : 'audio/*';
   if (!keepMedia) {
@@ -6119,7 +6120,7 @@ async function saveCadence() {
     type,
     text,
     media: type === 'text' ? null : _cadenceDraft.media,
-    mentionAll: type === 'text' && !!document.getElementById('cad-mention').checked,
+    mentionAll: !!document.getElementById('cad-mention').checked,
     sendAt: d.toISOString()
   })));
   if (items.length > CADENCE_MAX_ITEMS) { setFb('#f87171', `São ${items.length} envios; o máximo é ${CADENCE_MAX_ITEMS} por vez.`); return; }
