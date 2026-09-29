@@ -1612,7 +1612,7 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
         </div>
         <div class="nav-item" id="nav-chat" onclick="switchView('chat')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg>
-          Chat <span id="chat-nav-badge" style="display:none;margin-left:auto;background:var(--green);color:#000;font-size:10px;font-weight:700;border-radius:10px;padding:1px 6px;"></span>
+          Chat <span id="chat-nav-badge" style="display:none;margin-left:auto;background:#25d366;color:#fff;font-size:10px;font-weight:700;border-radius:10px;padding:1px 6px;"></span>
         </div>
         <div class="nav-item" id="nav-cadencia" onclick="switchView('cadencia')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 14v3l2 1"/></svg>
@@ -2443,6 +2443,7 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
           <select id="chat-client-select" class="field-input" style="display:none;margin-bottom:8px;padding:8px 10px;font-size:13px;" onchange="onChatClientChange()"></select>
           <input id="chat-search" class="field-input" placeholder="Buscar nome ou número..." oninput="renderChatList()" style="margin-bottom:8px;padding:8px 10px;font-size:13px;">
           <div id="chat-filters" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;"></div>
+          <div id="chat-tag-filter" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;"></div>
           <div id="chat-list" class="chat-list"></div>
         </div>
         <div class="chat-main" id="chat-main">
@@ -7064,7 +7065,8 @@ function chatLeadFor(c, index) {
 }
 
 function chatName(c, lead) {
-  return c.contactName || (lead && lead.name) || c.pushName || chatFormatPhone(c.phone) || 'Número oculto';
+  const contact = !lead && c.phone ? chatContactFor(c, chatContactIndex(normalizeActValue(c.act || _chatAct))) : null;
+  return c.contactName || (lead && lead.name) || (contact && contact.name) || c.pushName || chatFormatPhone(c.phone) || 'Número oculto';
 }
 
 function chatReplied(c) { return !!(c.dispatchAt && c.lastInAt && c.lastInAt > c.dispatchAt); }
@@ -7109,6 +7111,8 @@ function onChatClientChange() {
     return;
   }
   _chatAct = act;
+  if (!_contactTagsCache[act]) loadContactTags(act).then(() => { renderChatList(); renderChatHeader(); });
+  ensureImportedContacts(act, () => { renderChatList(); renderChatHeader(); });
   if (!_chatUnsub) {
     list.innerHTML = '<div class="chat-empty">Carregando conversas...</div>';
     _chatUnsub = window._fb.listenInboxChats(act, _chatLimit, (items, error) => {
@@ -7125,6 +7129,119 @@ function onChatClientChange() {
 }
 
 function setChatFilter(f) { _chatFilter = f; renderChatList(); }
+
+// ----- Etiquetas no Chat: vêm do lead, do contato da base ou da própria conversa -----
+const _chatTagFilter = new Set();
+
+let _chatContactIdxMemo = { act: null, src: null, idx: {} };
+function chatContactIndex(act) {
+  const src = _crmContactsCache[act] || null;
+  if (_chatContactIdxMemo.act === act && _chatContactIdxMemo.src === src) return _chatContactIdxMemo.idx;
+  const out = {};
+  (src || []).forEach(c => { const k = chatPhoneKey(c.phone); if (k) out[k] = c; });
+  _chatContactIdxMemo = { act, src, idx: out };
+  return out;
+}
+
+function chatContactFor(c, contactIndex) {
+  return c.phone ? contactIndex[chatPhoneKey(c.phone)] || null : null;
+}
+
+function chatTagIds(c, lead, contact) {
+  return [...new Set([...(lead && Array.isArray(lead.tags) ? lead.tags : []), ...(contact && Array.isArray(contact.tags) ? contact.tags : []), ...(Array.isArray(c.tags) ? c.tags : [])])];
+}
+
+function toggleChatTagFilter(id) {
+  if (_chatTagFilter.has(id)) _chatTagFilter.delete(id); else _chatTagFilter.add(id);
+  renderChatList();
+}
+
+function renderChatTagFilter() {
+  const box = document.getElementById('chat-tag-filter');
+  if (!box) return;
+  const tags = _chatAct ? (_contactTagsCache[_chatAct] || []) : [];
+  [..._chatTagFilter].forEach(id => { if (!tags.some(t => t.id === id)) _chatTagFilter.delete(id); });
+  box.innerHTML = tags.length ? `<span style="font-size:11.5px;color:var(--muted2);align-self:center;">Etiquetas:</span>${tagFilterChipsHtml(tags, _chatTagFilter, 'toggleChatTagFilter')}` : '';
+}
+
+async function openChatTags() {
+  const c = _chatItems.find(x => x.id === _chatOpenKey);
+  if (!c || !_chatAct) return;
+  _tagManagerAct = _chatAct;
+  await loadContactTags(_chatAct);
+  const lead = chatLeadFor(c, chatLeadIndex(_chatAct));
+  const contact = lead ? null : chatContactFor(c, chatContactIndex(_chatAct));
+  _bulkTagPicked.clear();
+  chatTagIds(c, lead, contact).forEach(id => _bulkTagPicked.add(id));
+  openHuvenModal('Etiquetas de ' + chatName(c, lead), '');
+  renderChatTagsModal();
+}
+
+function renderChatTagsModal() {
+  const body = document.getElementById('huven-modal-body');
+  if (!body) return;
+  const tags = _contactTagsCache[_tagManagerAct] || [];
+  body.innerHTML = `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Toque nas etiquetas para marcar ou desmarcar. Elas aparecem também em Contatos e servem para filtrar campanhas.</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">${tags.length ? tagFilterChipsHtml(tags, _bulkTagPicked, 'toggleChatTagPick') : '<span style="font-size:13px;color:var(--muted);">Nenhuma etiqueta ainda.</span>'}</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+      <input class="field-input" id="tag-new-name" maxlength="30" placeholder="Criar nova etiqueta" style="flex:1;min-width:140px;padding:6px 8px;font-size:13px;">
+      <div style="display:flex;gap:4px;">${colorSwatchesHtml(_tagNewColor, "(c => { _tagNewColor = c; renderChatTagsModal(); })")}</div>
+      <button class="chat-pill" onclick="createTagInChat()">Criar</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button class="btn-save" style="width:auto;padding:9px 16px;" onclick="saveChatTags()">Salvar</button>
+      <span id="chat-tags-fb" style="font-size:12px;color:var(--muted);"></span>
+    </div>`;
+}
+
+function toggleChatTagPick(id) {
+  if (_bulkTagPicked.has(id)) _bulkTagPicked.delete(id); else _bulkTagPicked.add(id);
+  renderChatTagsModal();
+}
+
+async function createTagInChat() {
+  const input = document.getElementById('tag-new-name');
+  try {
+    const tag = await createContactTag(_tagManagerAct, input ? input.value : '', _tagNewColor);
+    if (!tag) return;
+    _bulkTagPicked.add(tag.id);
+    _tagNewColor = TAG_COLORS[(TAG_COLORS.indexOf(_tagNewColor) + 1) % TAG_COLORS.length];
+    renderChatTagsModal();
+    renderChatList();
+  } catch (e) { showToast('Erro: ' + e.message, 'warning'); }
+}
+
+// Grava no lead (se houver), senão no contato da base, senão na própria conversa.
+async function saveChatTags() {
+  const c = _chatItems.find(x => x.id === _chatOpenKey);
+  if (!c) return;
+  const act = _chatAct;
+  const tags = [..._bulkTagPicked];
+  const lead = chatLeadFor(c, chatLeadIndex(act));
+  const contact = lead ? null : chatContactFor(c, chatContactIndex(act));
+  const fb = document.getElementById('chat-tags-fb');
+  if (fb) fb.textContent = 'Salvando...';
+  try {
+    if (lead && lead._docId) {
+      await window._fb.saveLeadsBatch([{ _docId: lead._docId, tags, updatedAt: new Date().toISOString() }]);
+      const cached = (_leadsCache || []).find(l => l._docId === lead._docId);
+      if (cached) cached.tags = tags;
+    } else if (contact) {
+      contact.tags = tags;
+      await window._fb.saveWhatsAppContacts(act, _crmContactsCache[act] || []);
+    }
+    // A conversa guarda uma cópia: assim o filtro do Chat funciona mesmo sem lead/contato.
+    await window._fb.updateInboxChat(act, c.id, { tags });
+    c.tags = tags;
+    if (_chatExtra[c.id]) _chatExtra[c.id].tags = tags;
+    closeHuvenModal();
+    renderChatList();
+    renderChatHeader();
+  } catch (e) {
+    if (fb) { fb.style.color = '#f87171'; fb.textContent = 'Erro: ' + e.message; }
+  }
+}
 
 function chatMatchesFilter(c, f, me) {
   if (f === 'unread') return c.unread > 0;
@@ -7147,16 +7264,20 @@ function renderChatFilters() {
 
 function renderChatList() {
   renderChatFilters();
+  renderChatTagFilter();
   const list = document.getElementById('chat-list');
   if (!list || !_chatAct) return;
   const me = chatMe();
   const index = chatLeadIndex(_chatAct);
+  const contactIndex = chatContactIndex(_chatAct);
+  const tagById = Object.fromEntries((_contactTagsCache[_chatAct] || []).map(t => [t.id, t]));
   const term = (document.getElementById('chat-search').value || '').trim().toLowerCase();
   const termDigits = term.replace(/\D/g, '');
   const rows = _chatItems.filter(c => {
     if (!chatMatchesFilter(c, _chatFilter, me)) return false;
-    if (!term) return true;
     const lead = chatLeadFor(c, index);
+    if (_chatTagFilter.size && !chatTagIds(c, lead, chatContactFor(c, contactIndex)).some(id => _chatTagFilter.has(id))) return false;
+    if (!term) return true;
     return chatName(c, lead).toLowerCase().includes(term) || (termDigits.length >= 3 && String(c.phone || '').includes(termDigits));
   });
   const totalUnread = _chatItems.reduce((s, c) => s + (c.unread > 0 ? 1 : 0), 0);
@@ -7174,6 +7295,7 @@ function renderChatList() {
     if (chatReplied(c)) tags.push('<span class="chat-tag" style="background:var(--green-dim);color:var(--green);">Respondeu</span>');
     else if (chatWaiting(c)) tags.push('<span class="chat-tag" style="background:var(--amber-dim);color:var(--amber);">Aguardando resposta</span>');
     if (c.assignedName) tags.push(`<span class="chat-tag" style="background:var(--blue-dim);color:var(--blue);">${escapeHtml(c.assignedTo === me.uid ? 'Você' : c.assignedName)}</span>`);
+    chatTagIds(c, lead, chatContactFor(c, contactIndex)).map(id => tagById[id]).filter(Boolean).forEach(t => tags.push(tagChipHtml(t)));
     return `<div class="chat-row ${c.id === _chatOpenKey ? 'active' : ''}" onclick="openChat('${escapeJsString(c.id)}')">
       <div class="chat-avatar">${escapeHtml(initials)}</div>
       <div style="flex:1;min-width:0;">
@@ -7183,7 +7305,7 @@ function renderChatList() {
         </div>
         <div style="display:flex;gap:6px;align-items:center;margin-top:2px;">
           <div style="flex:1;min-width:0;font-size:12px;color:var(--muted2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.lastFromMe ? 'Você: ' : ''}${escapeHtml(c.lastText || '')}</div>
-          ${c.unread > 0 ? `<span style="background:var(--green);color:#000;font-size:10.5px;font-weight:700;border-radius:10px;padding:1px 6px;">${c.unread}</span>` : ''}
+          ${c.unread > 0 ? `<span style="background:#25d366;color:#fff;font-size:10.5px;font-weight:700;border-radius:10px;padding:1px 6px;">${c.unread}</span>` : ''}
         </div>
         ${tags.length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;">${tags.join('')}</div>` : ''}
       </div>
@@ -7242,6 +7364,8 @@ function renderChatHeader() {
   const lead = chatLeadFor(c, chatLeadIndex(_chatAct));
   const me = chatMe();
   const stage = lead ? (getStages(lead.act).find(s => s.id === lead.stage) || {}).label : '';
+  const tagById = Object.fromEntries((_contactTagsCache[_chatAct] || []).map(t => [t.id, t]));
+  const tagChips = chatTagIds(c, lead, lead ? null : chatContactFor(c, chatContactIndex(_chatAct))).map(id => tagById[id]).filter(Boolean).map(t => tagChipHtml(t)).join('');
   const assignBtn = c.assignedTo === me.uid
     ? `<button class="chat-pill" onclick="toggleChatAssign()">Soltar conversa</button>`
     : `<button class="chat-pill active" onclick="toggleChatAssign()">${c.assignedTo ? 'Assumir' : 'Atribuir para mim'}</button>`;
@@ -7254,8 +7378,10 @@ function renderChatHeader() {
         ${stage ? `<span class="chat-tag" style="background:var(--accent-glow);color:var(--text);">Lead · ${escapeHtml(stage)}</span>` : ''}
         ${c.dispatchSource ? `<span class="chat-tag" style="background:var(--surface3);color:var(--muted2);">${escapeHtml(c.dispatchSource)}</span>` : ''}
         ${c.assignedName ? `<span class="chat-tag" style="background:var(--blue-dim);color:var(--blue);">Responsável: ${escapeHtml(c.assignedTo === me.uid ? 'você' : c.assignedName)}</span>` : '<span class="chat-tag" style="background:var(--surface3);color:var(--muted2);">Sem responsável</span>'}
+        ${tagChips}
       </div>
     </div>
+    <button class="chat-pill" onclick="openChatTags()">🏷️ Etiquetas</button>
     ${lead ? `<button class="chat-pill" onclick="openMoveModal('${escapeJsString(lead.id)}')">Mover no funil</button>` : ''}
     ${assignBtn}`;
 }
