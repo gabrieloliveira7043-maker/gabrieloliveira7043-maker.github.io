@@ -1292,6 +1292,41 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
       }
       await deleteDoc(doc(db, 'campaigns', id));
     },
+    // Base de contatos importados do WhatsApp: whatsapp_contacts/{act}__{n}, até 2.000 contatos por documento.
+    async getWhatsAppContacts(act) {
+      act = normalizeAct(act);
+      const snap = await getDocs(query(collection(db, 'whatsapp_contacts'), where('act', '==', act)));
+      const all = [];
+      snap.forEach(d => (d.data().contacts || []).forEach(c => all.push(c)));
+      return all;
+    },
+    async saveWhatsAppContacts(act, contacts) {
+      act = normalizeAct(act);
+      const old = await getDocs(query(collection(db, 'whatsapp_contacts'), where('act', '==', act)));
+      const batch = writeBatch(db);
+      const size = 2000;
+      const chunks = Math.ceil(contacts.length / size);
+      for (let i = 0; i < chunks; i++) {
+        batch.set(doc(db, 'whatsapp_contacts', `${act}__${i}`), {
+          act, index: i, contacts: contacts.slice(i * size, (i + 1) * size), updatedAt: new Date().toISOString()
+        });
+      }
+      old.forEach(d => { if ((d.data().index || 0) >= chunks) batch.delete(d.ref); });
+      await batch.commit();
+    },
+    // Envia imagem/vídeo/áudio da campanha para o Worker (fica disponível por 30 dias).
+    async uploadCampaignMedia(act, file) {
+      if (!auth.currentUser) throw new Error('Não autenticado');
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch(ADMIN_API_URL + '/media/upload', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': file.type || 'application/octet-stream', 'X-Act': normalizeAct(act), 'X-File-Name': encodeURIComponent(file.name) },
+        body: file
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || ('Erro ' + res.status));
+      return data.media;
+    },
     async adminSetPassword(login, password) {
       await callAdminApi('/set-password', { login, password });
       await saveToVault(login, password);
@@ -4545,6 +4580,25 @@ function renderContatos() {
     }
   }
 
+  // Contatos importados do WhatsApp (base separada: não são leads e não aparecem no kanban).
+  const contactsAct = !isAdmin
+    ? (activeClient && activeClient.account)
+    : ((document.getElementById('crm-client-select') || {}).value || '');
+  if (contactsAct && contactsAct !== 'all') {
+    const imported = _crmContactsCache[contactsAct];
+    if (imported === undefined) {
+      _crmContactsCache[contactsAct] = [];
+      window._fb.getWhatsAppContacts(contactsAct)
+        .then(list => { _crmContactsCache[contactsAct] = list; if (list.length) renderContatos(); })
+        .catch(e => console.warn('Base de contatos indisponível:', e));
+    } else if (imported.length) {
+      const leadPhones = new Set(leads.map(l => String(l.phone || '').replace(/\D/g, '')).filter(Boolean));
+      leads = leads.concat(imported
+        .filter(c => !leadPhones.has(String(c.phone || '').replace(/\D/g, '')))
+        .map(c => ({ name: c.name || 'Contato do WhatsApp', phone: c.phone, stage: '__wa_contact__', act: contactsAct })));
+    }
+  }
+
   const filtered = q ? leads.filter(l =>
     (l.name||'').toLowerCase().includes(q) ||
     (l.email||'').toLowerCase().includes(q) ||
@@ -4567,6 +4621,7 @@ function renderContatos() {
   const STAGE_LABELS = {};
   const allStages = [...(typeof STAGES_DEFAULT !== 'undefined' ? STAGES_DEFAULT : []), ...(typeof STAGES_CLINICA !== 'undefined' ? STAGES_CLINICA : [])];
   allStages.forEach(s => STAGE_LABELS[s.id] = s.label);
+  STAGE_LABELS.__wa_contact__ = 'Contato do WhatsApp';
   // Adicionar custom stages de todos os clientes presentes nos leads
   const actsPresentes = [...new Set(filtered.map(l => l.act).filter(Boolean))];
   actsPresentes.forEach(act => {
@@ -4822,8 +4877,13 @@ const CAMPAIGN_STATUS = {
   done: ['Concluída', '#60a5fa'],
   cancelled: ['Cancelada', '#f87171']
 };
+const CAMPAIGN_WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const CAMPAIGN_MEDIA_LABELS = { text: 'Só texto', image: 'Imagem', video: 'Vídeo', audio: 'Áudio (como gravado na hora)' };
+// Base de contatos importados do WhatsApp, por cliente (carregada sob demanda).
+const _crmContactsCache = {};
 let _campaignsUnsubscribe = null;
 let _campaignsAct = null;
+let _campaignsCache = [];
 let _campaignDraft = null;
 
 function campaignAct() {
@@ -4863,6 +4923,7 @@ function onCampaignClientChange() {
 }
 
 function renderCampaignList(campaigns) {
+  _campaignsCache = campaigns;
   const list = document.getElementById('campaign-list');
   if (!list) return;
   if (!campaigns.length) {
@@ -4884,13 +4945,14 @@ function renderCampaignList(campaigns) {
     if (c.status === 'running' || c.status === 'paused') actions.push(btn('Cancelar', 'cancelCampaign', 'background:transparent;'));
     actions.push(btn('Detalhes', 'openCampaignDetail', 'background:transparent;'));
     if (c.status !== 'running') actions.push(btn('Excluir', 'deleteCampaignConfirm', 'background:transparent;color:#f87171;border-color:#f87171;'));
+    const mediaLabel = c.media && c.media.type ? ' · ' + CAMPAIGN_MEDIA_LABELS[c.media.type] : '';
     return `
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
         <div style="font-size:14px;font-weight:600;color:var(--text);flex:1;min-width:160px;">${escapeHtml(c.name || 'Campanha')}</div>
         <span style="font-size:12px;font-weight:600;color:${color};">● ${label}</span>
       </div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">${escapeHtml(c.audienceLabel || '')} · criada em ${c.createdAt ? new Date(c.createdAt).toLocaleString('pt-BR') : '-'}</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">${escapeHtml(c.audienceLabel || '')}${mediaLabel} · criada em ${c.createdAt ? new Date(c.createdAt).toLocaleString('pt-BR') : '-'}</div>
       <div style="height:6px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:6px;"><div style="height:100%;width:${pct}%;background:#34d399;"></div></div>
       <div style="font-size:12px;color:var(--text);margin-bottom:10px;">${Number(c.sent) || 0} enviadas · ${Number(c.skipped) || 0} puladas · ${Number(c.failed) || 0} com erro · ${Math.max(total - done, 0)} na fila · total ${total}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">${actions.join('')}</div>
@@ -4898,17 +4960,18 @@ function renderCampaignList(campaigns) {
   }).join('');
 }
 
+function describeDispatch(d) {
+  const days = (d.days || []).map(i => CAMPAIGN_WEEKDAYS[i]).join(', ');
+  return `um contato por vez, com intervalo de ${d.minIntervalSec}–${d.maxIntervalSec} s, no máximo ${d.hourlyLimit} por hora e ${d.dailyLimit} por dia, das ${d.startHour}h às ${d.endHour}h (${days})`;
+}
+
 async function startCampaign(id) {
-  const act = campaignAct();
-  const s = WHATSAPP_SETTINGS[act] || {};
-  const d = { ...WHATSAPP_DISPATCH_DEFAULTS, ...(s.dispatch || {}) };
-  const ok = await showConfirm(
-    `Os envios saem um por vez, com intervalo de ${d.minIntervalSec}–${d.maxIntervalSec} s, no máximo ${d.hourlyLimit} por hora e ${d.dailyLimit} por dia, das ${d.startHour}h às ${d.endHour}h. O WhatsApp do cliente precisa estar conectado.`,
-    'Iniciar disparo', 'Iniciar'
-  );
+  const c = _campaignsCache.find(x => x.id === id) || {};
+  const d = { ...WHATSAPP_DISPATCH_DEFAULTS, ...(c.dispatch || {}) };
+  const ok = await showConfirm(`Os envios saem ${describeDispatch(d)}. O WhatsApp do cliente precisa estar conectado.`, 'Iniciar disparo', 'Iniciar');
   if (!ok) return;
   try {
-    await window._fb.updateCampaign(id, { status: 'running', startedAt: new Date().toISOString() });
+    await window._fb.updateCampaign(id, { status: 'running', startedAt: c.startedAt || new Date().toISOString() });
     showToast('Campanha iniciada.', 'success');
   } catch (e) { showToast('Erro: ' + e.message, 'warning'); }
 }
@@ -4969,14 +5032,78 @@ function normalizeCampaignPhone(value) {
   return digits.length >= 12 && digits.length <= 15 ? digits : '';
 }
 
+function leadMonthKey(lead) {
+  const iso = parseCrmDateToISO(lead.createdAt || lead.created_time || lead.data || '', '');
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function monthLabel(key) {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+}
+
+function campaignDispatchHtml() {
+  const d = WHATSAPP_DISPATCH_DEFAULTS;
+  const rowLabel = 'display:inline-block;min-width:190px;color:var(--muted);';
+  const lbl = 'display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);flex-wrap:wrap;';
+  const num = (field, value, min, max) => `<input type="number" class="field-input" id="camp-${field}" value="${value}" min="${min}" max="${max}" style="width:80px;padding:4px 8px;font-size:12px;">`;
+  return `
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <label style="${lbl}"><span style="${rowLabel}">Máximo por dia</span>${num('daily', d.dailyLimit, 1, 1000)} mensagens</label>
+      <label style="${lbl}"><span style="${rowLabel}">Máximo por hora</span>${num('hourly', d.hourlyLimit, 1, 60)} mensagens</label>
+      <label style="${lbl}"><span style="${rowLabel}">Intervalo entre envios</span>${num('minint', d.minIntervalSec, 15, 3600)} a ${num('maxint', d.maxIntervalSec, 15, 3600)} segundos (sorteado)</label>
+      <label style="${lbl}"><span style="${rowLabel}">"Digitando..." / "Gravando..."</span>${num('typmin', d.typingMinSec, 1, 30)} a ${num('typmax', d.typingMaxSec, 1, 30)} segundos</label>
+      <label style="${lbl}"><span style="${rowLabel}">Horário de envio</span>das ${num('start', d.startHour, 0, 23)} às ${num('end', d.endHour, 1, 24)} h (Brasília)</label>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--text);">
+      Dias: ${CAMPAIGN_WEEKDAYS.map((label, i) => `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="camp-day" value="${i}" ${d.days.includes(i) ? 'checked' : ''}>${label}</label>`).join('')}
+    </div>
+    <label style="${lbl}margin-top:10px;"><input type="checkbox" id="camp-check" checked> Conferir se o número tem WhatsApp antes de enviar</label>
+    <label style="${lbl}margin-top:6px;"><input type="checkbox" id="camp-warmup"> Número novo (aquecimento: 20/dia nos dias 1–3, 50/dia nos dias 4–7, 100/dia nos dias 8–14)</label>
+    <button style="${wbtn}background:transparent;margin-top:10px;" onclick="resetCampaignDispatch()">Voltar ao recomendado</button>`;
+}
+
+function resetCampaignDispatch() {
+  const d = WHATSAPP_DISPATCH_DEFAULTS;
+  const set = (f, v) => { const el = document.getElementById('camp-' + f); if (el) el.value = v; };
+  set('daily', d.dailyLimit); set('hourly', d.hourlyLimit); set('minint', d.minIntervalSec); set('maxint', d.maxIntervalSec);
+  set('typmin', d.typingMinSec); set('typmax', d.typingMaxSec); set('start', d.startHour); set('end', d.endHour);
+  document.querySelectorAll('.camp-day').forEach(cb => { cb.checked = d.days.includes(Number(cb.value)); });
+  document.getElementById('camp-check').checked = true;
+  document.getElementById('camp-warmup').checked = false;
+  renderCampaignSummary();
+}
+
+// Lê e valida as regras de disparo da campanha. Retorna { dispatch } ou { error }.
+function readCampaignDispatch() {
+  const val = f => Number(document.getElementById('camp-' + f)?.value);
+  const d = {
+    dailyLimit: val('daily'), hourlyLimit: val('hourly'),
+    minIntervalSec: val('minint'), maxIntervalSec: val('maxint'),
+    typingMinSec: val('typmin'), typingMaxSec: val('typmax'),
+    startHour: val('start'), endHour: val('end'),
+    days: [...document.querySelectorAll('.camp-day')].filter(cb => cb.checked).map(cb => Number(cb.value)),
+    checkNumber: !!document.getElementById('camp-check')?.checked,
+    warmup: !!document.getElementById('camp-warmup')?.checked
+  };
+  const nums = ['dailyLimit', 'hourlyLimit', 'minIntervalSec', 'maxIntervalSec', 'typingMinSec', 'typingMaxSec', 'startHour', 'endHour'];
+  if (nums.some(k => !Number.isFinite(d[k]) || d[k] < 0)) return { error: 'Confira os números das configurações de disparo.' };
+  if (d.maxIntervalSec < d.minIntervalSec || d.typingMaxSec < d.typingMinSec) return { error: 'Nas configurações de disparo, o máximo precisa ser maior que o mínimo.' };
+  if (d.endHour <= d.startHour) return { error: 'O horário final precisa ser depois do inicial.' };
+  if (!d.days.length) return { error: 'Escolha pelo menos um dia de envio.' };
+  return { dispatch: d };
+}
+
 function openCampaignEditor() {
   const act = campaignAct();
   if (!act) { showToast('Escolha o cliente primeiro.', 'warning'); return; }
   const editor = document.getElementById('campaign-editor');
   const stages = getStages(act) || [];
+  const months = [...new Set(getLeads().filter(l => leadMatchesClient(l, act)).map(leadMonthKey).filter(Boolean))].sort().reverse();
   const hint = 'font-size:11px;color:var(--muted);margin:4px 0 10px;line-height:1.5;';
-  const section = 'font-size:13px;font-weight:600;color:var(--text);margin:16px 0 6px;';
-  _campaignDraft = { act, source: 'crm', recipients: [], label: '' };
+  const section = 'font-size:13px;font-weight:600;color:var(--text);margin:18px 0 6px;';
+  _campaignDraft = { act, source: 'crm', recipients: [], label: '', media: null };
   editor.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
       <div style="font-size:15px;font-weight:600;color:var(--text);">Nova campanha</div>
@@ -4985,8 +5112,15 @@ function openCampaignEditor() {
     <label class="field-label">Nome da campanha</label>
     <input class="field-input" id="camp-name" placeholder="Ex.: Promoção de outubro" style="margin-bottom:6px;">
 
-    <div style="${section}">Mensagens</div>
-    <div style="${hint}">Cadastre variações: cada contato recebe uma sorteada. Use {primeiro_nome} e {nome}; se o contato não tiver nome, o marcador some.</div>
+    <div style="${section}">Conteúdo</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+      ${Object.entries(CAMPAIGN_MEDIA_LABELS).map(([k, l]) => `<button id="camp-media-${k}" style="${wbtn}" onclick="selectCampaignMediaType('${k}')">${l}</button>`).join('')}
+    </div>
+    <div id="camp-media-box" style="display:none;margin-bottom:8px;">
+      <input type="file" id="camp-media-file" class="field-input" onchange="uploadCampaignMediaFile(this)">
+      <div id="camp-media-status" style="${hint}"></div>
+    </div>
+    <div id="camp-text-hint" style="${hint}">Cadastre variações: cada contato recebe uma sorteada. Use {primeiro_nome} e {nome}; se o contato não tiver nome, o marcador some.</div>
     ${whatsappVariationsHtml('camp', [])}
 
     <div style="${section}">Para quem enviar</div>
@@ -4995,11 +5129,23 @@ function openCampaignEditor() {
         `<button id="camp-src-${k}" style="${wbtn}" onclick="selectCampaignSource('${k}')">${l}</button>`).join('')}
     </div>
     <div id="camp-src-crm-box" class="camp-src-box">
-      <label class="field-label">Coluna do CRM</label>
-      <select class="field-input" id="camp-crm-stage" onchange="buildCampaignAudience()">
-        <option value="">Todas as colunas</option>
-        ${stages.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.label)}</option>`).join('')}
-      </select>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;">
+          <label class="field-label">Coluna do CRM</label>
+          <select class="field-input" id="camp-crm-stage" onchange="buildCampaignAudience()">
+            <option value="">Todas as colunas</option>
+            ${stages.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.label)}</option>`).join('')}
+            <option value="__contacts__">Base de contatos importados do WhatsApp</option>
+          </select>
+        </div>
+        <div style="flex:1;min-width:200px;">
+          <label class="field-label">Mês de entrada</label>
+          <select class="field-input" id="camp-crm-month" onchange="buildCampaignAudience()">
+            <option value="">Geral (todos os meses)</option>
+            ${months.map(m => `<option value="${m}">${escapeHtml(monthLabel(m))}</option>`).join('')}
+          </select>
+        </div>
+      </div>
     </div>
     <div id="camp-src-sheet-box" class="camp-src-box" style="display:none;">
       <div style="${hint}">Planilha .xlsx ou .csv com uma coluna de nome e uma de telefone (com DDD). A primeira linha pode ter os títulos.</div>
@@ -5009,20 +5155,26 @@ function openCampaignEditor() {
       <div style="${hint}">Os contatos salvos no WhatsApp conectado deste cliente.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button style="${wbtn}" onclick="loadCampaignContacts()">Carregar contatos</button>
+        <button style="${wbtn}background:transparent;" onclick="importContactsToCrm()">Importar para a base de contatos do CRM</button>
         <button style="${wbtn}background:transparent;" onclick="exportCampaignAudience()">Exportar lista (CSV)</button>
       </div>
     </div>
     <div id="camp-src-groups-box" class="camp-src-box" style="display:none;">
-      <div style="${hint}">Escolha os grupos; os participantes deles entram na lista (sem repetir).</div>
+      <div style="${hint}">Escolha os grupos; os participantes entram na lista sem repetir. Carregar os participantes pode levar até 1 minuto.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
         <button style="${wbtn}" onclick="loadCampaignGroups()">Carregar grupos</button>
         <button style="${wbtn}background:transparent;" onclick="exportCampaignAudience()">Exportar lista (CSV)</button>
       </div>
-      <div id="camp-groups-list" style="max-height:240px;overflow:auto;"></div>
+      <div id="camp-groups-list" style="max-height:260px;overflow:auto;"></div>
     </div>
 
     <div id="camp-summary" style="margin-top:14px;padding:12px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text);"></div>
-    <div id="camp-risk" style="display:none;margin-top:10px;padding:10px 12px;border-radius:8px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.35);font-size:12px;color:var(--text);line-height:1.5;"></div>
+
+    <div style="${section}">Configurações de disparo</div>
+    <div style="${hint}">Já vêm com o recomendado contra bloqueio. Ajuste antes de iniciar; valem só para esta campanha.</div>
+    ${campaignDispatchHtml()}
+
+    <div id="camp-risk" style="display:none;margin-top:14px;padding:10px 12px;border-radius:8px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.35);font-size:12px;color:var(--text);line-height:1.5;"></div>
 
     <div style="display:flex;gap:8px;align-items:center;margin-top:16px;flex-wrap:wrap;">
       <button style="${wbtn}" onclick="saveCampaign(true)">Salvar e iniciar</button>
@@ -5030,6 +5182,8 @@ function openCampaignEditor() {
       <span id="camp-feedback" style="font-size:12px;"></span>
     </div>`;
   editor.style.display = 'block';
+  editor.querySelectorAll('#camp-daily,#camp-hourly,#camp-start,#camp-end,.camp-day,#camp-warmup').forEach(el => el.addEventListener('change', renderCampaignSummary));
+  selectCampaignMediaType('text');
   selectCampaignSource('crm');
 }
 
@@ -5037,6 +5191,47 @@ function closeCampaignEditor() {
   const editor = document.getElementById('campaign-editor');
   if (editor) { editor.style.display = 'none'; editor.innerHTML = ''; }
   _campaignDraft = null;
+}
+
+function selectCampaignMediaType(type) {
+  if (!_campaignDraft) return;
+  _campaignDraft.mediaType = type;
+  _campaignDraft.media = null;
+  Object.keys(CAMPAIGN_MEDIA_LABELS).forEach(k => {
+    const b = document.getElementById('camp-media-' + k);
+    if (b) b.style.background = k === type ? 'var(--accent-glow)' : 'transparent';
+  });
+  const box = document.getElementById('camp-media-box');
+  const file = document.getElementById('camp-media-file');
+  const status = document.getElementById('camp-media-status');
+  const hint = document.getElementById('camp-text-hint');
+  box.style.display = type === 'text' ? 'none' : 'block';
+  file.value = '';
+  file.accept = type === 'image' ? 'image/jpeg,image/png,image/webp' : type === 'video' ? 'video/mp4' : 'audio/*';
+  status.textContent = type === 'audio'
+    ? 'Envie o áudio (até 24 MB). Ele chega como mensagem de voz gravada na hora, não como encaminhado; enquanto isso aparece "gravando áudio...". O texto abaixo é opcional e vai logo depois do áudio.'
+    : type === 'text' ? '' : `Envie o arquivo (até 24 MB). O texto abaixo vai como legenda (opcional).`;
+  hint.textContent = type === 'text'
+    ? 'Cadastre variações: cada contato recebe uma sorteada. Use {primeiro_nome} e {nome}; se o contato não tiver nome, o marcador some.'
+    : 'Texto opcional, com variações sorteadas. Use {primeiro_nome} e {nome}.';
+}
+
+async function uploadCampaignMediaFile(input) {
+  const file = input.files && input.files[0];
+  const status = document.getElementById('camp-media-status');
+  if (!file || !_campaignDraft) return;
+  if (file.size > 24 * 1024 * 1024) { status.innerHTML = '<span style="color:#f87171;">Arquivo maior que 24 MB.</span>'; input.value = ''; return; }
+  status.textContent = 'Enviando arquivo...';
+  try {
+    const media = await window._fb.uploadCampaignMedia(_campaignDraft.act, file);
+    if (media.type !== _campaignDraft.mediaType) throw new Error('O arquivo não é do tipo escolhido.');
+    _campaignDraft.media = media;
+    status.innerHTML = `<span style="color:#34d399;">✓ ${escapeHtml(media.fileName)} (${(media.size / 1024 / 1024).toFixed(1)} MB) pronto.</span>`;
+  } catch (e) {
+    _campaignDraft.media = null;
+    input.value = '';
+    status.innerHTML = `<span style="color:#f87171;">Erro: ${escapeHtml(e.message)}</span>`;
+  }
 }
 
 function selectCampaignSource(source) {
@@ -5075,13 +5270,27 @@ function setCampaignRecipients(list, label) {
   renderCampaignSummary();
 }
 
-function buildCampaignAudience() {
+async function buildCampaignAudience() {
   if (!_campaignDraft || _campaignDraft.source !== 'crm') return;
   const act = _campaignDraft.act;
   const stage = document.getElementById('camp-crm-stage').value;
+  const month = document.getElementById('camp-crm-month').value;
+  const monthSel = document.getElementById('camp-crm-month');
+  monthSel.disabled = stage === '__contacts__';
+  if (stage === '__contacts__') {
+    document.getElementById('camp-summary').textContent = 'Carregando a base de contatos...';
+    try {
+      const contacts = await window._fb.getWhatsAppContacts(act);
+      setCampaignRecipients(contacts, 'Base de contatos do WhatsApp');
+    } catch (e) {
+      document.getElementById('camp-summary').innerHTML = `<span style="color:#f87171;">${escapeHtml(e.message)}</span>`;
+    }
+    return;
+  }
   const stageLabel = stage ? (getStages(act).find(s => s.id === stage) || {}).label || stage : 'todas as colunas';
-  const leads = getLeads().filter(l => leadMatchesClient(l, act) && (!stage || l.stage === stage) && !l.whatsappOptOut);
-  setCampaignRecipients(leads.map(l => ({ name: l.name, phone: l.phone, jid: l.whatsappJid })), `Leads do CRM (${stageLabel})`);
+  const leads = getLeads().filter(l => leadMatchesClient(l, act) && (!stage || l.stage === stage) && (!month || leadMonthKey(l) === month) && !l.whatsappOptOut);
+  setCampaignRecipients(leads.map(l => ({ name: l.name, phone: l.phone, jid: l.whatsappJid })),
+    `Leads do CRM (${stageLabel}${month ? ', ' + monthLabel(month) : ', geral'})`);
 }
 
 async function loadCampaignSheet(input) {
@@ -5127,6 +5336,34 @@ async function loadCampaignContacts() {
   }
 }
 
+// Guarda os contatos do WhatsApp na base de contatos do CRM (aparecem em Contatos; não entram no kanban).
+async function importContactsToCrm() {
+  if (!_campaignDraft) return;
+  const act = _campaignDraft.act;
+  const summary = document.getElementById('camp-summary');
+  try {
+    if (_campaignDraft.source !== 'contacts' || !_campaignDraft.recipients.length) await loadCampaignContacts();
+    const fromWhatsApp = _campaignDraft.recipients.filter(r => r.phone);
+    if (!fromWhatsApp.length) { showToast('Nenhum contato com telefone para importar.', 'warning'); return; }
+    if (!await showConfirm(`${fromWhatsApp.length} contato(s) do WhatsApp vão para a base de contatos do CRM (tela Contatos). Eles não entram no kanban nem recebem mensagem automática.`, 'Importar contatos', 'Importar')) return;
+    summary.textContent = 'Importando...';
+    const existing = await window._fb.getWhatsAppContacts(act);
+    const byPhone = new Map(existing.map(c => [c.phone, c]));
+    let added = 0;
+    fromWhatsApp.forEach(r => {
+      const phone = r.phone.startsWith('55') && r.phone.length >= 12 ? r.phone.slice(2) : r.phone;
+      if (!byPhone.has(phone)) added += 1;
+      byPhone.set(phone, { name: r.name || (byPhone.get(phone) || {}).name || '', phone });
+    });
+    await window._fb.saveWhatsAppContacts(act, [...byPhone.values()]);
+    _crmContactsCache[act] = [...byPhone.values()];
+    showToast(`${added} contato(s) novo(s) na base de contatos (total ${byPhone.size}).`, 'success');
+    renderCampaignSummary();
+  } catch (e) {
+    summary.innerHTML = `<span style="color:#f87171;">${escapeHtml(e.message)}</span>`;
+  }
+}
+
 async function loadCampaignGroups() {
   const box = document.getElementById('camp-groups-list');
   box.innerHTML = '<div style="font-size:12px;color:var(--muted);">Carregando grupos...</div>';
@@ -5134,31 +5371,44 @@ async function loadCampaignGroups() {
     const r = await window._fb.whatsapp('/whatsapp/groups', _campaignDraft.act);
     const groups = (r.groups || []).sort((a, b) => a.subject.localeCompare(b.subject, 'pt-BR'));
     if (!groups.length) { box.innerHTML = '<div style="font-size:12px;color:var(--muted);">Nenhum grupo encontrado.</div>'; return; }
-    box.innerHTML = groups.map(g => `<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);padding:4px 0;cursor:pointer;">
-      <input type="checkbox" class="camp-group" value="${escapeHtml(g.id)}" data-subject="${escapeHtml(g.subject)}" onchange="loadCampaignGroupParticipants()">
+    box.innerHTML = `<label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--text);padding:4px 0 8px;cursor:pointer;border-bottom:1px solid var(--border);margin-bottom:4px;">
+        <input type="checkbox" id="camp-groups-all" onchange="toggleAllCampaignGroups(this.checked)"> Selecionar todos os ${groups.length} grupos</label>` +
+      groups.map(g => `<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);padding:4px 0;cursor:pointer;">
+      <input type="checkbox" class="camp-group" value="${escapeHtml(g.id)}" data-subject="${escapeHtml(g.subject)}" onchange="scheduleGroupParticipants()">
       ${escapeHtml(g.subject)} <span style="color:var(--muted);font-size:11px;">(${g.size} participantes)</span></label>`).join('');
   } catch (e) {
     box.innerHTML = `<div style="font-size:12px;color:#f87171;">${escapeHtml(e.message)}</div>`;
   }
 }
 
-const _groupParticipantsCache = {};
+function toggleAllCampaignGroups(checked) {
+  document.querySelectorAll('.camp-group').forEach(cb => { cb.checked = checked; });
+  loadCampaignGroupParticipants();
+}
+
+// Espera o usuário terminar de marcar os grupos antes de buscar os participantes.
+let _groupParticipantsTimer = null;
+function scheduleGroupParticipants() {
+  const all = document.getElementById('camp-groups-all');
+  if (all) all.checked = [...document.querySelectorAll('.camp-group')].every(cb => cb.checked);
+  clearTimeout(_groupParticipantsTimer);
+  _groupParticipantsTimer = setTimeout(loadCampaignGroupParticipants, 900);
+}
+
+let _groupParticipantsRequest = 0;
 async function loadCampaignGroupParticipants() {
   const checked = [...document.querySelectorAll('.camp-group:checked')];
   const summary = document.getElementById('camp-summary');
   if (!checked.length) { setCampaignRecipients([], ''); return; }
-  summary.textContent = 'Carregando participantes...';
+  const request = ++_groupParticipantsRequest;
+  summary.textContent = `Carregando participantes de ${checked.length} grupo(s)... pode levar até 1 minuto.`;
   try {
-    const all = [];
-    for (const cb of checked) {
-      if (!_groupParticipantsCache[cb.value]) {
-        const r = await window._fb.whatsapp('/whatsapp/group-participants', _campaignDraft.act, { groupId: cb.value });
-        _groupParticipantsCache[cb.value] = r.participants || [];
-      }
-      all.push(..._groupParticipantsCache[cb.value]);
-    }
+    const r = await window._fb.whatsapp('/whatsapp/group-participants', _campaignDraft.act, { groupIds: checked.map(cb => cb.value) });
+    if (request !== _groupParticipantsRequest || !_campaignDraft) return; // seleção mudou enquanto carregava
     const names = checked.map(cb => cb.getAttribute('data-subject'));
-    setCampaignRecipients(all, `Grupos: ${names.slice(0, 3).join(', ')}${names.length > 3 ? ` e mais ${names.length - 3}` : ''}`);
+    setCampaignRecipients(r.participants || [], checked.length === document.querySelectorAll('.camp-group').length
+      ? `Todos os grupos (${checked.length})`
+      : `Grupos: ${names.slice(0, 3).join(', ')}${names.length > 3 ? ` e mais ${names.length - 3}` : ''}`);
   } catch (e) {
     summary.innerHTML = `<span style="color:#f87171;">${escapeHtml(e.message)}</span>`;
   }
@@ -5171,7 +5421,7 @@ function exportCampaignAudience() {
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `contatos-${(_campaignDraft.label || 'whatsapp').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}.csv`;
+  a.download = `contatos-${(_campaignDraft.label || 'whatsapp').toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').slice(0, 40)}.csv`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
@@ -5181,19 +5431,20 @@ function renderCampaignSummary() {
   const risk = document.getElementById('camp-risk');
   if (!summary || !_campaignDraft) return;
   const n = _campaignDraft.recipients.length;
-  const s = WHATSAPP_SETTINGS[_campaignDraft.act] || {};
-  const d = { ...WHATSAPP_DISPATCH_DEFAULTS, ...(s.dispatch || {}) };
-  const perDay = Math.max(1, Math.min(Number(d.dailyLimit) || 100, (Number(d.endHour) - Number(d.startHour)) * (Number(d.hourlyLimit) || 20)));
+  const read = readCampaignDispatch();
+  const d = read.dispatch || WHATSAPP_DISPATCH_DEFAULTS;
+  const perDay = Math.max(1, Math.min(d.warmup ? 20 : Number(d.dailyLimit) || 100, (Number(d.endHour) - Number(d.startHour)) * (Number(d.hourlyLimit) || 20)));
   const days = Math.ceil(n / perDay);
   const hidden = _campaignDraft.recipients.filter(r => !r.phone).length;
   summary.innerHTML = n
     ? `<b>${n} contato(s)</b> na lista${_campaignDraft.duplicates ? ` · ${_campaignDraft.duplicates} repetido(s) removido(s)` : ''}${_campaignDraft.invalid ? ` · ${_campaignDraft.invalid} sem telefone válido` : ''}${hidden ? ` · ${hidden} com número oculto` : ''}.
-       <div style="color:var(--muted);font-size:12px;margin-top:4px;">No ritmo seguro deste número (até ${perDay} por dia), leva cerca de ${days} dia(s) útil(eis).</div>`
+       <div style="color:var(--muted);font-size:12px;margin-top:4px;">Com as configurações abaixo (até ${perDay} por dia${d.warmup ? ' no início do aquecimento' : ''}), leva cerca de ${days} dia(s) de envio.</div>`
     : '<span style="color:var(--muted);">Nenhum contato na lista ainda.</span>';
   const source = _campaignDraft.source;
   const warnings = [];
   if (source === 'groups' || source === 'contacts') warnings.push('Mandar mensagem para quem não pediu contato (participantes de grupos, contatos antigos) é o que mais leva o WhatsApp a bloquear números. Prefira pessoas que conhecem a empresa e costumam responder.');
-  if (n > 300) warnings.push('Lista grande: se o número for novo, ligue o aquecimento em WhatsApp → Configurações.');
+  if (read.dispatch && (d.minIntervalSec < 30 || d.hourlyLimit > 30)) warnings.push('Intervalos abaixo de 30 s ou mais de 30 mensagens por hora aumentam bastante o risco de bloqueio.');
+  if (n > 300 && !d.warmup) warnings.push('Lista grande: se o número for novo, marque "Número novo (aquecimento)".');
   warnings.push('Ofereça uma saída na mensagem, por exemplo: "Se não quiser receber, responda SAIR". Quem responder é removido das próximas campanhas.');
   risk.innerHTML = warnings.map(w => '⚠️ ' + escapeHtml(w)).join('<br>');
   risk.style.display = 'block';
@@ -5204,16 +5455,25 @@ async function saveCampaign(start) {
   const setFb = (color, text) => { fb.style.color = color; fb.textContent = text; };
   const name = document.getElementById('camp-name').value.trim();
   const templates = readWhatsAppVariations('camp');
+  const mediaType = _campaignDraft.mediaType || 'text';
   if (!name) { setFb('#f87171', 'Dê um nome à campanha.'); return; }
-  if (!templates.length) { setFb('#f87171', 'Escreva pelo menos uma mensagem.'); return; }
+  if (mediaType === 'text' && !templates.length) { setFb('#f87171', 'Escreva pelo menos uma mensagem.'); return; }
+  if (mediaType !== 'text' && !_campaignDraft.media) { setFb('#f87171', 'Envie o arquivo de ' + CAMPAIGN_MEDIA_LABELS[mediaType].toLowerCase() + '.'); return; }
   if (!_campaignDraft.recipients.length) { setFb('#f87171', 'A lista de contatos está vazia.'); return; }
-  if (start && !await showConfirm(`Enviar para ${_campaignDraft.recipients.length} contato(s), no ritmo seguro do número?`, 'Iniciar disparo', 'Iniciar')) return;
+  const read = readCampaignDispatch();
+  if (read.error) { setFb('#f87171', read.error); return; }
+  if (start && !await showConfirm(`Enviar para ${_campaignDraft.recipients.length} contato(s): ${describeDispatch(read.dispatch)}.`, 'Iniciar disparo', 'Iniciar')) return;
   setFb('var(--muted)', 'Salvando...');
   try {
     const id = await window._fb.createCampaign({
       act: _campaignDraft.act,
       name,
       templates,
+      media: _campaignDraft.media ? {
+        type: _campaignDraft.media.type, url: _campaignDraft.media.url, mimetype: _campaignDraft.media.mimetype,
+        fileName: _campaignDraft.media.fileName
+      } : null,
+      dispatch: read.dispatch,
       audienceType: _campaignDraft.source,
       audienceLabel: _campaignDraft.label
     }, _campaignDraft.recipients);
