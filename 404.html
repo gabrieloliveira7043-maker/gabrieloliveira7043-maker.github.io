@@ -1084,6 +1084,11 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
     return snap.empty ? null : snap.docs[0].id;
   }
 
+  // Cofre de senhas: só o admin lê (ver firestore.rules).
+  async function saveToVault(login, password) {
+    await setDoc(doc(db, 'admin_vault', login), { password, updatedAt: new Date().toISOString() });
+  }
+
   async function callAdminApi(path, body) {
     if (!auth.currentUser) throw new Error('Não autenticado');
     const token = await auth.currentUser.getIdToken();
@@ -1146,6 +1151,16 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
       if (!user) throw new Error('Não autenticado');
       await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, currentPassword));
       await updatePassword(user, newPassword);
+      if (currentProfile && currentProfile.role === 'client') {
+        await saveToVault(currentProfile.login, newPassword).catch(e => console.warn('Cofre não atualizado:', e));
+      }
+    },
+    // Só admin: senhas dos clientes guardadas no cofre (login -> senha).
+    async getVault() {
+      const snap = await getDocs(collection(db, 'admin_vault'));
+      const vault = {};
+      snap.forEach(d => { vault[d.id] = d.data().password || ''; });
+      return vault;
     },
 
     async getLeads() {
@@ -1205,6 +1220,7 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
       }
       await setDoc(doc(db, 'users', uid), { login, act, adAccount, role: 'client', name, layout: layout || 'default' });
       await setDoc(doc(db, 'extra_clients', login), { name, act, adAccount, layout: layout || 'default', uid });
+      if (pass) await saveToVault(login, pass);
     },
     // Só admin. Muda nome e conta de anúncios; a chave "act" (que liga o cliente aos leads) não muda.
     async updateClientInfo(login, { act, name, adAccount, fixed }) {
@@ -1217,6 +1233,7 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
     },
     async adminSetPassword(login, password) {
       await callAdminApi('/set-password', { login, password });
+      await saveToVault(login, password);
     },
     async deleteExtraClient(login) {
       const uid = await findUidByLogin(login);
@@ -1225,6 +1242,7 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
         await deleteDoc(doc(db, 'users', uid));
       }
       await deleteDoc(doc(db, 'extra_clients', login));
+      await deleteDoc(doc(db, 'admin_vault', login)).catch(() => {});
     }
   };
   window._fbReady = true;
@@ -4537,6 +4555,8 @@ async function renderAdminLogins() {
 
   // Garante que clientes criados pelo painel e edições já salvas estejam carregados.
   await loadExtraClients();
+  let vault = {};
+  try { vault = await window._fb.getVault(); } catch(e) { console.warn('Cofre de senhas indisponível:', e); }
 
   const todos = Object.entries(CREDENTIALS)
     .filter(([login, cred]) => login !== 'admin' && cred && cred.act)
@@ -4544,7 +4564,8 @@ async function renderAdminLogins() {
       login,
       act: cred.act,
       name: getClientDisplayName(cred.act),
-      adAccount: getAdAccountFor(cred.act)
+      adAccount: getAdAccountFor(cred.act),
+      password: vault[login] || ''
     }))
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
@@ -4576,6 +4597,14 @@ async function renderAdminLogins() {
         </label>
         <button onclick="saveClientInfo('${jsLogin}')" style="${buttonStyle}">Salvar dados</button>
         <span id="client-info-feedback-${id}" style="font-size:11px;display:none;"></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="${labelStyle}">Senha atual:</span>
+        ${c.password ? `
+        <input id="client-current-pass-${id}" class="field-input mono" style="${inputStyle}width:150px;" type="password" value="${escapeHtml(c.password)}" readonly>
+        <button onclick="toggleClientPassword('${jsLogin}', this)" style="${buttonStyle}">Mostrar</button>
+        <button onclick="copyClientPassword('${jsLogin}', this)" style="${buttonStyle}">Copiar</button>` : `
+        <span style="font-size:11px;color:var(--muted);">não registrada — defina uma nova abaixo</span>`}
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <span style="${labelStyle}">Nova senha:</span>
@@ -4627,6 +4656,28 @@ async function saveClientInfo(login) {
   }
 }
 
+function toggleClientPassword(login, btn) {
+  const input = document.getElementById('client-current-pass-' + login);
+  if (!input) return;
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  btn.textContent = show ? 'Ocultar' : 'Mostrar';
+}
+
+async function copyClientPassword(login, btn) {
+  const input = document.getElementById('client-current-pass-' + login);
+  if (!input) return;
+  try {
+    await navigator.clipboard.writeText(input.value);
+  } catch(e) {
+    const type = input.type;
+    input.type = 'text'; input.select(); document.execCommand('copy'); input.type = type;
+  }
+  const label = btn.textContent;
+  btn.textContent = 'Copiada!';
+  setTimeout(() => { btn.textContent = label; }, 1500);
+}
+
 async function saveClientCredential(login) {
   const input = document.getElementById('login-pass-' + login);
   const newPass = input?.value.trim();
@@ -4637,7 +4688,7 @@ async function saveClientCredential(login) {
     await window._fb.adminSetPassword(login, newPass);
     if (input) input.value = '';
     feedback('#34d399', 'Senha trocada!');
-    setTimeout(() => { if (fb) fb.style.display = 'none'; }, 2500);
+    setTimeout(() => renderAdminLogins(), 1500);
   } catch(e) {
     feedback('#f87171', 'Erro: ' + e.message);
   }
