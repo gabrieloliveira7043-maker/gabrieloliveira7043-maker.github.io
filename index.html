@@ -924,7 +924,6 @@ body { transition: background 0.2s ease, color 0.2s ease; }
 .sidebar-footer .huven-theme-toggle { justify-content: flex-start; height: auto; padding: 8px 12px; }
 html[data-theme="light"] .sidebar, html[data-theme="light"] .topbar { background: #FFFFFF; }
 html[data-theme="light"] .login-overlay { background: var(--paper); }
-#nav-integracoes, #mnav-integracoes { display: none !important; }
 
 /* Mobile CRM readability fixes */
 @media (max-width: 768px) {
@@ -1058,6 +1057,47 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
 .chat-input textarea { flex:1; resize:none; max-height:140px; min-height:40px; }
 .chat-back { display:none; }
 .contatos-bulk { position:sticky; top:0; }
+/* Integrações */
+.integ-page-title { font-size:24px; font-weight:700; color:var(--text); margin-bottom:4px; }
+.integ-h2 { font-size:15px; font-weight:700; color:var(--text); margin-bottom:4px; }
+.integ-muted { font-size:12.5px; color:var(--muted2); line-height:1.55; }
+.integ-error { font-size:13px; color:var(--red); padding:10px 0; }
+.integ-empty { font-size:13px; color:var(--muted2); padding:18px; border:1px dashed var(--border2); border-radius:12px; text-align:center; }
+.integ-intro { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+.integ-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.integ-select { width:auto; min-width:200px; padding:8px 10px; }
+.integ-tabs { display:flex; gap:6px; flex-wrap:wrap; }
+.integ-tab { background:var(--surface); border:1px solid var(--border2); color:var(--text); border-radius:20px; padding:7px 14px; font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit; }
+.integ-tab.active { background:var(--text); color:var(--bg); border-color:var(--text); }
+.integ-card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 18px; margin-bottom:12px; }
+.integ-card-head { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+.integ-title { font-size:14.5px; font-weight:800; color:var(--text); }
+.integ-chip { font-size:11.5px; font-weight:800; border-radius:20px; padding:4px 10px; white-space:nowrap; }
+.integ-chip.ok { background:var(--green-dim); color:var(--green); }
+.integ-chip.off { background:var(--surface3); color:var(--muted2); }
+.integ-url { display:flex; align-items:center; gap:8px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:6px 6px 6px 12px; margin:8px 0; }
+.integ-url code { flex:1; min-width:0; font-size:12px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:'JetBrains Mono', monospace; }
+.integ-stats { display:flex; gap:16px; font-size:12.5px; color:var(--muted2); margin-bottom:10px; flex-wrap:wrap; }
+.integ-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px; }
+.integ-btn { background:var(--surface); border:1px solid var(--border2); color:var(--text); border-radius:9px; padding:7px 12px; font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit; white-space:nowrap; }
+.integ-btn:hover { border-color:var(--accent); }
+.integ-btn.primary { background:var(--text); color:var(--bg); border-color:var(--text); }
+.integ-btn.danger { color:var(--red); border-color:var(--red); }
+.integ-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px; margin:6px 0 4px; }
+.integ-grid label { display:flex; flex-direction:column; gap:5px; font-size:11.5px; font-weight:700; color:var(--muted2); }
+.integ-code { width:100%; height:300px; resize:vertical; font-family:'JetBrains Mono', monospace; font-size:12px; line-height:1.5; white-space:pre; }
+.integ-steps { margin:10px 0 0 18px; display:flex; flex-direction:column; gap:10px; font-size:13px; color:var(--text); line-height:1.55; }
+.integ-steps a { color:var(--accent); }
+.integ-check { display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; color:var(--muted2); }
+.integ-check.ok { color:var(--green); }
+.integ-forms { margin-top:12px; border-top:1px solid var(--border); padding-top:10px; }
+.integ-form-row { display:grid; grid-template-columns:2fr 1.3fr 1.3fr 1.3fr; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid var(--border); }
+.integ-form-row .field-input { padding:6px 8px; font-size:12px; }
+.integ-toggle { display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; color:var(--text); }
+@media (max-width: 768px) {
+  #integracoes-view { padding:16px !important; }
+  .integ-form-row { grid-template-columns:1fr; }
+}
 .wa-alert { position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:9000; width:min(680px, calc(100% - 24px)); box-sizing:border-box; background:#3a1218; border:1px solid #f87171; color:#fff; border-radius:12px; padding:12px 40px 12px 14px; font-size:13px; line-height:1.5; box-shadow:0 8px 30px rgba(0,0,0,.35); }
 [data-theme="light"] .wa-alert { background:#fff1f1; color:#7f1d1d; }
 .wa-alert-row { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:6px; flex-wrap:wrap; }
@@ -1262,6 +1302,27 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
       }
       return ids;
     },
+    // Integrações: chaves de landing page (inbound_keys) e páginas do Facebook (meta_pages).
+    async listInboundKeys() {
+      if (!currentProfile) return [];
+      const q = currentProfile.role === 'admin' ? collection(db, 'inbound_keys') : query(collection(db, 'inbound_keys'), where('act', '==', currentProfile.act || ''));
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    },
+    async saveInboundKey(key, data) {
+      await setDoc(doc(db, 'inbound_keys', key), { ...data, updatedAt: new Date().toISOString() }, { merge: true });
+    },
+    async deleteInboundKey(key) {
+      await deleteDoc(doc(db, 'inbound_keys', key));
+    },
+    async listMetaPages() {
+      const snap = await getDocs(collection(db, 'meta_pages'));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    },
+    async saveMetaPage(pageId, data) {
+      await setDoc(doc(db, 'meta_pages', pageId), { ...data, updatedAt: new Date().toISOString() }, { merge: true });
+    },
+    adminApi(path, body) { return callAdminApi(path, body || {}); },
     // Etiquetas do cliente: contact_tags/{act} = { act, tags: [{ id, name, color }] }.
     async getContactTags(act) {
       const snap = await getDoc(doc(db, 'contact_tags', normalizeAct(act)));
@@ -1639,6 +1700,10 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
         <div class="nav-item" id="nav-contatos" onclick="if(window.abrirContatos) abrirContatos(); else switchView('contatos')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/><line x1="20" y1="8" x2="20" y2="14"/></svg>
           Contatos
+        </div>
+        <div class="nav-item" id="nav-integracoes" onclick="switchView('integracoes')" style="display:none;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4"/></svg>
+          Integrações
         </div>
 
       </div>
@@ -2447,6 +2512,20 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
         </div>
         <div id="campaign-editor" style="display:none; background:var(--surface); border:1px solid var(--border); border-radius:var(--r2); padding:22px; margin-bottom:20px;"></div>
         <div id="campaign-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+      </div>
+    </div>
+
+    <!-- Integrações View -->
+    <div id="integracoes-view" style="display:none; padding:28px 32px;">
+      <div style="max-width:980px;">
+        <div class="integ-page-title">Integrações</div>
+        <div class="integ-muted" style="margin-bottom:16px;">Traga leads de landing pages e dos formulários da Meta direto para o funil de cada cliente.</div>
+        <div class="integ-tabs" style="margin-bottom:18px;">
+          <button class="integ-tab active" data-tab="lp" onclick="setIntegTab('lp')">Landing pages</button>
+          <button class="integ-tab" data-tab="meta" onclick="setIntegTab('meta')">Formulários da Meta</button>
+          <button class="integ-tab" data-tab="sheets" onclick="setIntegTab('sheets')">Planilhas (Apps Script)</button>
+        </div>
+        <div id="integ-body"></div>
       </div>
     </div>
 
@@ -4137,7 +4216,7 @@ window.abrirContatos = function abrirContatos() {
     if(topbar) topbar.style.display = 'none';
     const contentEl = document.querySelector('.content');
     if(contentEl) contentEl.style.display = 'none';
-    ['crm-view','conta-view','whatsapp-view','campanhas-view','chat-view','cadencia-view'].forEach(id => {
+    ['crm-view','conta-view','whatsapp-view','campanhas-view','chat-view','cadencia-view','integracoes-view'].forEach(id => {
       const el = document.getElementById(id); if(el) el.style.display = 'none';
     });
     const v = document.getElementById('contatos-view');
@@ -5365,6 +5444,9 @@ function switchView(view) {
   if (view === 'campanhas') renderCampaignsView();
   const chatView = document.getElementById('chat-view');
   if (chatView) chatView.style.display = view === 'chat' ? 'block' : 'none';
+  const integView = document.getElementById('integracoes-view');
+  if (integView) integView.style.display = view === 'integracoes' ? 'block' : 'none';
+  if (view === 'integracoes') renderIntegracoesView();
   if (view === 'chat') renderChatView();
   const cadenciaView = document.getElementById('cadencia-view');
   if (cadenciaView) cadenciaView.style.display = view === 'cadencia' ? 'block' : 'none';
@@ -7010,6 +7092,452 @@ async function createCadenceItems(items, setFb) {
   } catch (e) {
     setFb('#f87171', 'Erro: ' + e.message);
   }
+}
+
+// ===== INTEGRAÇÕES: landing pages e formulários da Meta =====
+const CRM_API_BASE = 'https://huven-crm-admin.gabrieloliveira7043.workers.dev';
+const INBOUND_BASE_URL = CRM_API_BASE + '/inbound/';
+const META_WEBHOOK_URL = CRM_API_BASE + '/meta/webhook';
+const META_PERMISSIONS = ['leads_retrieval', 'pages_show_list', 'pages_read_engagement', 'pages_manage_metadata', 'pages_manage_ads', 'ads_management', 'business_management'];
+let _integTab = 'lp';
+let _integAct = '';
+let _inboundKeys = [];
+let _metaSaved = [];
+let _metaLive = null;
+let _metaStatus = null;
+let _metaForms = {};
+
+function integClientOptions(selected, allLabel) {
+  const entries = Object.entries(CREDENTIALS)
+    .filter(([login, cred]) => login !== 'admin' && cred && cred.act)
+    .map(([, cred]) => [cred.act, getClientDisplayName(cred.act)])
+    .sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
+  return (allLabel ? `<option value="">${escapeHtml(allLabel)}</option>` : '') +
+    entries.map(([act, name]) => `<option value="${escapeHtml(act)}" ${act === selected ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('');
+}
+
+function integStageOptions(act, selected) {
+  const stages = act ? getStages(act) : STAGES_DEFAULT;
+  return stages.map(s => `<option value="${escapeHtml(s.id)}" ${s.id === (selected || 'novo') ? 'selected' : ''}>${escapeHtml(s.label)}</option>`).join('');
+}
+
+function integWhen(iso) {
+  if (!iso) return 'nunca';
+  const d = new Date(iso);
+  return isNaN(d) ? '—' : d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function copyText(text, label) {
+  const done = () => showToast((label || 'Copiado') + '.', 'success');
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(() => fallback());
+  else fallback();
+  function fallback() {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { showToast('Não consegui copiar; selecione e copie à mão.', 'warning'); }
+    ta.remove();
+  }
+}
+
+function renderIntegracoesView() {
+  document.querySelectorAll('.integ-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === _integTab));
+  if (_integTab === 'lp') renderIntegLp();
+  else if (_integTab === 'meta') renderIntegMeta();
+  else renderIntegSheets();
+}
+
+function setIntegTab(tab) { _integTab = tab; renderIntegracoesView(); }
+
+// ----- Landing pages -----
+async function renderIntegLp(skipLoad) {
+  const body = document.getElementById('integ-body');
+  if (!body) return;
+  if (!skipLoad) {
+    body.innerHTML = '<div class="integ-muted">Carregando...</div>';
+    try { _inboundKeys = await window._fb.listInboundKeys(); } catch (e) { body.innerHTML = `<div class="integ-error">Erro: ${escapeHtml(e.message)}</div>`; return; }
+  }
+  const keys = _inboundKeys.filter(k => !_integAct || k.act === _integAct).sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  body.innerHTML = `
+    <div class="integ-intro">
+      <div>
+        <div class="integ-h2">Formulários de landing page</div>
+        <div class="integ-muted">Cada integração gera um endereço exclusivo. O formulário da LP envia os dados para ele e o lead cai direto no funil do cliente, com a 1ª mensagem do WhatsApp (se estiver ligada).</div>
+      </div>
+      <div class="integ-actions">
+        ${isAdmin ? `<select class="field-input integ-select" onchange="_integAct = this.value; renderIntegLp(true)">${integClientOptions(_integAct, 'Todos os clientes')}</select>` : ''}
+        ${isAdmin ? `<button class="integ-btn primary" onclick="openNewInboundKey()">+ Nova integração</button>` : ''}
+      </div>
+    </div>
+    <div id="integ-new"></div>
+    ${keys.length ? keys.map(inboundKeyCardHtml).join('') : `<div class="integ-empty">Nenhuma integração de landing page ${_integAct ? 'para este cliente' : 'ainda'}.${isAdmin ? ' Clique em "+ Nova integração" para criar o endereço e o código prontos.' : ''}</div>`}`;
+}
+
+function inboundKeyCardHtml(k) {
+  const url = INBOUND_BASE_URL + k.id;
+  const id = escapeJsString(k.id);
+  const stage = (getStages(k.act).find(s => s.id === k.stage) || {}).label || k.stage || 'Novo lead';
+  const on = k.active !== false;
+  return `<div class="integ-card">
+    <div class="integ-card-head">
+      <div style="flex:1;min-width:0;">
+        <div class="integ-title">${escapeHtml(k.name || 'Landing page')}</div>
+        <div class="integ-muted">${escapeHtml(getClientDisplayName(k.act) || k.act)} · entra em <b>${escapeHtml(stage)}</b> · origem "${escapeHtml(k.origem || ('Landing page - ' + (k.name || '')))}"</div>
+      </div>
+      <span class="integ-chip ${on ? 'ok' : 'off'}">${on ? 'Ativa' : 'Desativada'}</span>
+    </div>
+    <div class="integ-url"><code>${escapeHtml(url)}</code><button class="integ-btn" onclick="copyText('${escapeJsString(url)}', 'Endereço copiado')">Copiar</button></div>
+    <div class="integ-stats"><span><b>${Number(k.count) || 0}</b> leads recebidos</span><span>Último: ${escapeHtml(integWhen(k.lastAt))}</span></div>
+    <div class="integ-row">
+      <button class="integ-btn primary" onclick="openInboundCode('${id}')">Código pronto</button>
+      <button class="integ-btn" onclick="sendInboundTest('${id}')">Enviar lead de teste</button>
+      ${isAdmin ? `<button class="integ-btn" onclick="toggleInboundKey('${id}')">${on ? 'Desativar' : 'Ativar'}</button>
+      <button class="integ-btn danger" onclick="deleteInboundKeyConfirm('${id}')">Excluir</button>` : ''}
+    </div>
+  </div>`;
+}
+
+function openNewInboundKey() {
+  const box = document.getElementById('integ-new');
+  const act = _integAct || '';
+  box.innerHTML = `<div class="integ-card" style="border-color:var(--accent);">
+    <div class="integ-title" style="margin-bottom:10px;">Nova integração de landing page</div>
+    <div class="integ-grid">
+      <label>Cliente<select class="field-input" id="inb-act" onchange="document.getElementById('inb-stage').innerHTML = integStageOptions(this.value)">${integClientOptions(act, 'Escolha o cliente')}</select></label>
+      <label>Nome da LP<input class="field-input" id="inb-name" placeholder="Ex.: LP Implante outubro"></label>
+      <label>Coluna onde o lead entra<select class="field-input" id="inb-stage">${integStageOptions(act)}</select></label>
+      <label>Origem no card (opcional)<input class="field-input" id="inb-origem" placeholder="Landing page - nome da LP"></label>
+    </div>
+    <div class="integ-row"><button class="integ-btn primary" onclick="createInboundKey()">Criar endereço</button><button class="integ-btn" onclick="document.getElementById('integ-new').innerHTML=''">Cancelar</button></div>
+  </div>`;
+}
+
+function randomKey(len) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  const bytes = crypto.getRandomValues(new Uint8Array(len));
+  return [...bytes].map(b => chars[b % chars.length]).join('');
+}
+
+async function createInboundKey() {
+  const act = document.getElementById('inb-act').value;
+  const name = document.getElementById('inb-name').value.trim();
+  if (!act) { showToast('Escolha o cliente.', 'warning'); return; }
+  if (!name) { showToast('Dê um nome para a LP.', 'warning'); return; }
+  const key = randomKey(28);
+  const data = { act, name, stage: document.getElementById('inb-stage').value || 'novo', origem: document.getElementById('inb-origem').value.trim(), active: true, count: 0, createdAt: new Date().toISOString() };
+  try {
+    await window._fb.saveInboundKey(key, data);
+    _inboundKeys.push({ id: key, ...data });
+    _integAct = act;
+    showToast('Integração criada. Copie o endereço ou o código pronto.', 'success');
+    renderIntegLp(true);
+  } catch (e) { showToast('Erro: ' + e.message, 'warning'); }
+}
+
+async function toggleInboundKey(key) {
+  const k = _inboundKeys.find(x => x.id === key);
+  if (!k) return;
+  const active = k.active === false;
+  try { await window._fb.saveInboundKey(key, { active }); k.active = active; renderIntegLp(true); }
+  catch (e) { showToast('Erro: ' + e.message, 'warning'); }
+}
+
+async function deleteInboundKeyConfirm(key) {
+  const k = _inboundKeys.find(x => x.id === key);
+  if (!k) return;
+  if (!await showConfirm(`O endereço de "${k.name}" para de funcionar. Se a LP ainda estiver no ar, os leads dela deixam de chegar.`, 'Excluir integração', 'Excluir', true)) return;
+  try { await window._fb.deleteInboundKey(key); _inboundKeys = _inboundKeys.filter(x => x.id !== key); renderIntegLp(true); }
+  catch (e) { showToast('Erro: ' + e.message, 'warning'); }
+}
+
+async function sendInboundTest(key) {
+  const k = _inboundKeys.find(x => x.id === key);
+  if (!k) return;
+  if (!await showConfirm(`Cria um lead "Teste da integração" no funil de ${getClientDisplayName(k.act) || k.act}. Ele não recebe mensagem no WhatsApp. Depois é só excluir o card.`, 'Enviar lead de teste', 'Enviar', false)) return;
+  try {
+    const res = await fetch(INBOUND_BASE_URL + key, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome: 'Teste da integração', telefone: '11900000000', email: 'teste@huven.com.br', 'Pergunta de exemplo': 'Resposta de exemplo', _test: '1' }) });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok || !out.ok) throw new Error(out.error || ('Erro ' + res.status));
+    showToast('Lead de teste criado. Confira no funil do cliente.', 'success');
+    setTimeout(() => renderIntegLp(), 1200);
+  } catch (e) { showToast('O teste falhou: ' + e.message, 'warning', 6000); }
+}
+
+function inboundSnippets(url) {
+  const html = `<!-- Formulário pronto: os leads caem direto no CRM Huven -->
+<form action="${url}" method="POST">
+  <input name="nome" placeholder="Seu nome" required>
+  <input name="telefone" placeholder="WhatsApp com DDD" required>
+  <input name="email" type="email" placeholder="Seu e-mail">
+
+  <!-- Perguntas extras: qualquer outro campo vai para as observações do lead -->
+  <input name="Qual procedimento te interessa?" placeholder="Ex.: implante">
+
+  <!-- Página que abre depois do envio (troque pelo seu link) -->
+  <input type="hidden" name="_redirect" value="https://SEU-SITE.com.br/obrigado">
+
+  <!-- Anti-spam: deixe este campo escondido e vazio -->
+  <input name="website" style="display:none" tabindex="-1" autocomplete="off">
+
+  <!-- Guarda as UTMs do anúncio -->
+  <input type="hidden" name="utm_source"><input type="hidden" name="utm_medium">
+  <input type="hidden" name="utm_campaign"><input type="hidden" name="utm_content">
+
+  <button type="submit">Quero ser atendido</button>
+</form>
+<script>
+  new URLSearchParams(location.search).forEach(function (v, k) {
+    var campo = document.querySelector('input[name="' + k + '"]');
+    if (campo) campo.value = v;
+  });
+<\/script>`;
+  const js = `<!-- Para um formulário que já existe na LP: cole antes de </body> -->
+<script>
+(function () {
+  var CRM = "${url}";
+  var form = document.querySelector("form"); // troque pelo seletor do seu formulário, ex.: "#form-contato"
+  if (!form) return;
+  form.addEventListener("submit", function () {
+    var dados = {};
+    new FormData(form).forEach(function (v, k) { dados[k] = v; });
+    new URLSearchParams(location.search).forEach(function (v, k) {
+      if (/^utm_|^gclid$|^fbclid$/.test(k)) dados[k] = v;
+    });
+    dados.page_url = location.href;
+    var corpo = new Blob([JSON.stringify(dados)], { type: "text/plain" });
+    if (!navigator.sendBeacon || !navigator.sendBeacon(CRM, corpo)) {
+      fetch(CRM, { method: "POST", body: JSON.stringify(dados), keepalive: true });
+    }
+  });
+})();
+<\/script>`;
+  const platforms = `ENDEREÇO (webhook): ${url}
+
+Elementor Pro (WordPress)
+  Formulário > Ações após o envio > adicione "Webhook" > cole o endereço acima.
+  Nos campos, use como ID: nome, telefone, email (os outros viram observações).
+
+Webflow / Framer / Wix / RD Station / Leadlovers / Hotmart / Typebot
+  Procure "Webhook", "Integração por URL" ou "Enviar para URL" e cole o endereço acima (método POST).
+
+Zapier / Make / n8n
+  Ação "Webhook" > POST > formato JSON com os campos nome, telefone e email.
+
+Campos que o CRM entende sozinho
+  Nome: nome, name, full_name, first_name + last_name
+  Telefone: telefone, whatsapp, celular, phone, phone_number
+  E-mail: email, e-mail
+  UTMs: utm_source, utm_medium, utm_campaign, utm_content, utm_term, gclid, fbclid
+  Qualquer outro campo vira "pergunta: resposta" nas observações do lead.
+
+Regras
+  Precisa ter telefone ou e-mail.
+  O mesmo telefone no mesmo cliente em até 30 minutos não cria card repetido.
+  Campo "website" preenchido é tratado como robô e descartado.`;
+  const curl = `curl -X POST "${url}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"nome":"Teste","telefone":"11900000000","email":"teste@email.com","_test":"1"}'`;
+  return { html, js, platforms, curl };
+}
+
+let _integCodeTab = 'html';
+function openInboundCode(key) {
+  const k = _inboundKeys.find(x => x.id === key);
+  if (!k) return;
+  _integCodeTab = 'html';
+  openHuvenModal('Código pronto — ' + (k.name || 'Landing page'), `<div id="integ-code" data-key="${escapeHtml(key)}"></div>`, 780);
+  renderInboundCode();
+}
+
+function renderInboundCode() {
+  const box = document.getElementById('integ-code');
+  if (!box) return;
+  const url = INBOUND_BASE_URL + box.dataset.key;
+  const s = inboundSnippets(url);
+  const tabs = [['html', 'Formulário HTML pronto'], ['js', 'Formulário que já existe'], ['platforms', 'Elementor e plataformas'], ['curl', 'Teste técnico']];
+  const text = s[_integCodeTab];
+  box.innerHTML = `
+    <div class="integ-muted" style="margin-bottom:10px;">Escolha como a LP foi feita. Tudo já vem com o endereço exclusivo desta integração.</div>
+    <div class="integ-tabs" style="margin-bottom:10px;">${tabs.map(([k, l]) => `<button class="integ-tab ${k === _integCodeTab ? 'active' : ''}" onclick="_integCodeTab='${k}'; renderInboundCode()">${l}</button>`).join('')}</div>
+    <textarea class="field-input integ-code" readonly>${escapeHtml(text)}</textarea>
+    <div class="integ-row"><button class="integ-btn primary" onclick="copyText(document.querySelector('#integ-code textarea').value, 'Código copiado')">Copiar código</button></div>`;
+}
+
+// ----- Formulários da Meta (Lead Ads) -----
+async function renderIntegMeta() {
+  const body = document.getElementById('integ-body');
+  if (!body) return;
+  if (!isAdmin) { body.innerHTML = '<div class="integ-empty">Somente o admin configura os formulários da Meta.</div>'; return; }
+  body.innerHTML = '<div class="integ-muted">Carregando...</div>';
+  try {
+    const [status, saved] = await Promise.all([window._fb.adminApi('/meta/status').catch(() => ({ configured: false })), window._fb.listMetaPages()]);
+    _metaStatus = status; _metaSaved = saved;
+  } catch (e) { body.innerHTML = `<div class="integ-error">Erro: ${escapeHtml(e.message)}</div>`; return; }
+  const st = _metaStatus || {};
+  const check = (ok, label) => `<div class="integ-check ${ok ? 'ok' : ''}"><span>${ok ? '✓' : '•'}</span>${label}</div>`;
+  body.innerHTML = `
+    <div class="integ-intro">
+      <div>
+        <div class="integ-h2">Formulários da Meta direto no CRM</div>
+        <div class="integ-muted">A Meta avisa o CRM na hora em que alguém preenche o formulário do anúncio. O lead cai em segundos, sem planilha no meio.</div>
+      </div>
+      <span class="integ-chip ${st.configured ? 'ok' : 'off'}">${st.configured ? 'Conectado à Meta' : 'Falta configurar'}</span>
+    </div>
+    <details class="integ-card" ${st.configured ? '' : 'open'}>
+      <summary class="integ-title" style="cursor:pointer;">Passo a passo da configuração (uma vez só)</summary>
+      <ol class="integ-steps">
+        <li>Em <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener">developers.facebook.com/apps</a>, abra o app da Huven (ou crie um app do tipo <b>Empresa</b>) ligado ao Business verificado.</li>
+        <li>No app, adicione o produto <b>Webhooks</b>, escolha o objeto <b>Page</b> e clique em "Assinar este objeto":
+          <div class="integ-url"><code>${META_WEBHOOK_URL}</code><button class="integ-btn" onclick="copyText('${META_WEBHOOK_URL}', 'Endereço copiado')">Copiar</button></div>
+          Em "Verificar token", escreva uma palavra secreta sua (ex.: uma senha forte) e guarde. Depois assine o campo <b>leadgen</b>.</li>
+        <li>No <a href="https://business.facebook.com/settings/system-users" target="_blank" rel="noopener">Business Manager > Usuários do sistema</a>: crie (ou use) um usuário do sistema <b>Admin</b>, atribua a ele as <b>páginas dos clientes</b> (com acesso a leads) e o app, e gere um token sem validade com as permissões:
+          <div class="integ-url"><code>${META_PERMISSIONS.join(', ')}</code><button class="integ-btn" onclick="copyText('${META_PERMISSIONS.join(', ')}', 'Permissões copiadas')">Copiar</button></div></li>
+        <li>No app, em <b>Configurações > Básico</b>, copie a <b>Chave secreta do app</b>. Deixe o app no modo <b>Ao vivo</b>. Se a Meta pedir, solicite o acesso avançado de <b>leads_retrieval</b> em "Análise do app".</li>
+        <li>Salve os 3 dados no servidor rodando no terminal, dentro da pasta <code>huven-crm-backend\\worker-admin</code>:
+          <div class="integ-url"><code>node salvar-secrets-meta.js</code><button class="integ-btn" onclick="copyText('node salvar-secrets-meta.js', 'Comando copiado')">Copiar</button></div>
+          Ele pede o token, a chave secreta e a palavra do webhook sem mostrar na tela.</li>
+        <li>Volte aqui, clique em <b>Carregar páginas</b>, ligue cada página ao cliente e teste na <a href="https://developers.facebook.com/tools/lead-ads-testing" target="_blank" rel="noopener">Ferramenta de teste de Lead Ads</a>.</li>
+      </ol>
+      <div class="integ-row" style="gap:14px;">${check(st.hasToken, 'Token do Business')}${check(st.hasSecret, 'Chave secreta do app')}${check(st.hasVerify, 'Palavra do webhook')}</div>
+    </details>
+    <div class="integ-intro" style="margin-top:18px;">
+      <div class="integ-h2">Páginas do Facebook</div>
+      <button class="integ-btn primary" onclick="loadMetaPages()">Carregar páginas</button>
+    </div>
+    <div id="meta-pages">${metaPagesHtml()}</div>`;
+}
+
+function metaPagesHtml() {
+  const saved = Object.fromEntries(_metaSaved.map(p => [p.id, p]));
+  const ids = [...new Set([...(_metaLive || []).map(p => p.id), ..._metaSaved.map(p => p.id)])];
+  if (!ids.length) return `<div class="integ-empty">${_metaLive ? 'O token não tem acesso a nenhuma página. Atribua as páginas ao usuário do sistema no Business Manager.' : 'Clique em "Carregar páginas" depois de configurar o token.'}</div>`;
+  return ids.map(id => {
+    const live = (_metaLive || []).find(p => p.id === id) || {};
+    const s = saved[id] || {};
+    const name = live.name || s.pageName || id;
+    const act = s.act || '';
+    const on = s.active !== false && !!s.subscribedAt && !!act;
+    const pid = escapeJsString(id);
+    const forms = _metaForms[id];
+    return `<div class="integ-card">
+      <div class="integ-card-head">
+        ${live.picture ? `<img src="${escapeHtml(live.picture)}" alt="" style="width:36px;height:36px;border-radius:8px;">` : ''}
+        <div style="flex:1;min-width:0;"><div class="integ-title">${escapeHtml(name)}</div><div class="integ-muted">Página ${escapeHtml(id)} · ${Number(s.count) || 0} leads recebidos · último: ${escapeHtml(integWhen(s.lastAt))}</div></div>
+        <span class="integ-chip ${on ? 'ok' : 'off'}">${on ? 'Recebendo leads' : 'Desligada'}</span>
+      </div>
+      <div class="integ-grid">
+        <label>Cliente<select class="field-input" id="mp-act-${id}" onchange="document.getElementById('mp-stage-${id}').innerHTML = integStageOptions(this.value)">${integClientOptions(act, 'Escolha o cliente')}</select></label>
+        <label>Coluna onde o lead entra<select class="field-input" id="mp-stage-${id}">${integStageOptions(act, s.stage)}</select></label>
+        <label>Origem no card (opcional)<input class="field-input" id="mp-origem-${id}" value="${escapeHtml(s.origem || '')}" placeholder="Meta Ads - nome do formulário"></label>
+      </div>
+      <div class="integ-row">
+        <button class="integ-btn primary" onclick="connectMetaPage('${pid}', '${escapeJsString(name)}')">${on ? 'Salvar' : 'Ligar e salvar'}</button>
+        ${on ? `<button class="integ-btn" onclick="disconnectMetaPage('${pid}')">Desligar</button>` : ''}
+        <button class="integ-btn" onclick="loadMetaForms('${pid}')">${forms ? 'Atualizar formulários' : 'Ver formulários'}</button>
+      </div>
+      ${forms ? metaFormsHtml(id, forms, s) : ''}
+    </div>`;
+  }).join('');
+}
+
+function metaFormsHtml(pageId, forms, saved) {
+  if (!forms.length) return '<div class="integ-muted" style="margin-top:10px;">Nenhum formulário nesta página.</div>';
+  const cfg = saved.forms || {};
+  return `<div class="integ-forms">
+    <div class="integ-muted" style="margin-bottom:6px;">Por padrão todos os formulários seguem a configuração da página. Ajuste só o que for diferente.</div>
+    ${forms.map(f => {
+      const c = cfg[f.id] || {};
+      const fid = escapeHtml(f.id);
+      return `<div class="integ-form-row" data-form="${fid}" data-name="${escapeHtml(f.name)}">
+        <label class="integ-toggle"><input type="checkbox" class="mf-active" ${c.active === false ? '' : 'checked'}> ${escapeHtml(f.name)} <span class="integ-muted">(${f.status === 'ACTIVE' ? 'ativo' : 'arquivado'} · ${f.leads} leads)</span></label>
+        <select class="field-input mf-act">${integClientOptions(c.act || '', 'Mesmo cliente da página')}</select>
+        <select class="field-input mf-stage"><option value="">Mesma coluna da página</option>${integStageOptions(c.act || saved.act, '__none__')}</select>
+        <input class="field-input mf-origem" value="${escapeHtml(c.origem || '')}" placeholder="Origem (opcional)">
+      </div>`;
+    }).join('')}
+    <div class="integ-row"><button class="integ-btn primary" onclick="saveMetaForms('${escapeJsString(pageId)}')">Salvar formulários</button></div>
+  </div>`;
+}
+
+async function loadMetaPages() {
+  const box = document.getElementById('meta-pages');
+  box.innerHTML = '<div class="integ-muted">Buscando as páginas na Meta...</div>';
+  try { const r = await window._fb.adminApi('/meta/pages'); _metaLive = r.pages || []; }
+  catch (e) { box.innerHTML = `<div class="integ-error">${escapeHtml(e.message)}</div>`; return; }
+  box.innerHTML = metaPagesHtml();
+}
+
+async function loadMetaForms(pageId) {
+  try {
+    const r = await window._fb.adminApi('/meta/forms', { pageId });
+    _metaForms[pageId] = r.forms || [];
+    document.getElementById('meta-pages').innerHTML = metaPagesHtml();
+    const saved = _metaSaved.find(p => p.id === pageId) || {};
+    // Deixa os selects dos formulários com o que já estava salvo.
+    document.querySelectorAll(`.integ-card [data-form]`).forEach(row => {
+      const c = ((saved.forms || {})[row.dataset.form]) || {};
+      if (c.stage) row.querySelector('.mf-stage').value = c.stage;
+    });
+  } catch (e) { showToast(e.message, 'warning', 6000); }
+}
+
+async function connectMetaPage(pageId, pageName) {
+  const act = document.getElementById('mp-act-' + pageId).value;
+  if (!act) { showToast('Escolha o cliente desta página.', 'warning'); return; }
+  const data = { pageId, pageName, act, stage: document.getElementById('mp-stage-' + pageId).value || 'novo', origem: document.getElementById('mp-origem-' + pageId).value.trim(), active: true };
+  try {
+    const r = await window._fb.adminApi('/meta/subscribe', { pageId });
+    if (!r.subscribed) throw new Error('A Meta não confirmou a ligação da página.');
+    data.subscribedAt = new Date().toISOString();
+    await window._fb.saveMetaPage(pageId, data);
+    const i = _metaSaved.findIndex(p => p.id === pageId);
+    if (i >= 0) Object.assign(_metaSaved[i], data); else _metaSaved.push({ id: pageId, ...data });
+    showToast(`Página ligada a ${getClientDisplayName(act) || act}. Os próximos leads caem direto no CRM.`, 'success', 6000);
+    document.getElementById('meta-pages').innerHTML = metaPagesHtml();
+  } catch (e) { showToast('Não foi possível ligar: ' + e.message, 'warning', 7000); }
+}
+
+async function disconnectMetaPage(pageId) {
+  if (!await showConfirm('Os formulários desta página deixam de criar leads no CRM.', 'Desligar página', 'Desligar', true)) return;
+  try {
+    await window._fb.saveMetaPage(pageId, { active: false });
+    const p = _metaSaved.find(x => x.id === pageId); if (p) p.active = false;
+    document.getElementById('meta-pages').innerHTML = metaPagesHtml();
+  } catch (e) { showToast('Erro: ' + e.message, 'warning'); }
+}
+
+async function saveMetaForms(pageId) {
+  const forms = {};
+  document.querySelectorAll('.integ-card [data-form]').forEach(row => {
+    if (!(_metaForms[pageId] || []).some(f => f.id === row.dataset.form)) return;
+    forms[row.dataset.form] = {
+      name: row.dataset.name,
+      active: row.querySelector('.mf-active').checked,
+      act: row.querySelector('.mf-act').value,
+      stage: row.querySelector('.mf-stage').value,
+      origem: row.querySelector('.mf-origem').value.trim()
+    };
+  });
+  try {
+    await window._fb.saveMetaPage(pageId, { forms });
+    const p = _metaSaved.find(x => x.id === pageId); if (p) p.forms = forms; else _metaSaved.push({ id: pageId, forms });
+    showToast('Formulários salvos.', 'success');
+  } catch (e) { showToast('Erro: ' + e.message, 'warning'); }
+}
+
+// ----- Planilhas (Apps Script) -----
+function renderIntegSheets() {
+  const body = document.getElementById('integ-body');
+  body.innerHTML = `
+    <div class="integ-h2" style="margin-bottom:6px;">Planilhas com Apps Script</div>
+    <div class="integ-muted" style="margin-bottom:14px;">A automação atual (formulário da Meta → planilha → Apps Script → CRM) continua funcionando enquanto você migra.</div>
+    <div class="integ-card">
+      <ol class="integ-steps">
+        <li>Ligue a página do cliente na aba <b>Formulários da Meta</b> e faça um lead de teste.</li>
+        <li>Quando o lead de teste cair no CRM, abra a planilha de configuração (aba <b>Config_CRM</b>) e mude a coluna <b>ativo</b> daquele cliente para <b>NÃO</b>. Assim o mesmo lead não entra duas vezes.</li>
+        <li>Depois que todos os clientes estiverem ligados direto, apague o gatilho do Apps Script (Acionadores > excluir "syncNovosLeadsParaCrm").</li>
+      </ol>
+      <div class="integ-muted" style="margin-top:10px;">O Apps Script usa uma senha fixa escrita no código para falar com o servidor de planilhas. Quando a migração terminar, desligue esse servidor ou troque a senha.</div>
+    </div>`;
 }
 
 // ===== CHAT (conversas do WhatsApp) =====
@@ -9752,6 +10280,8 @@ async function doLogout() {
 function updateSidebarForUser() {
   const configBtn = document.getElementById('btn-config');
   if (configBtn) configBtn.style.display = isAdmin ? 'flex' : 'none';
+  const integNav = document.getElementById('nav-integracoes');
+  if (integNav) integNav.style.display = isAdmin ? 'flex' : 'none';
   const camposBtn = document.getElementById('btn-cfg-campos');
   if (camposBtn) camposBtn.style.display = isAdmin ? 'inline-flex' : 'none';
   const limparBtn2 = document.getElementById('btn-limpar-crm');
