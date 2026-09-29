@@ -5609,7 +5609,15 @@ async function saveCampaign(start) {
 }
 
 // ===== CADÊNCIA: MENSAGENS PROGRAMADAS EM GRUPOS =====
-const CADENCE_TYPES = { text: 'Texto', image: 'Imagem', video: 'Vídeo', audio: 'Áudio (voz)' };
+const CADENCE_TYPES = { text: 'Texto', image: 'Imagem', video: 'Vídeo', audio: 'Áudio (voz)', poll: 'Enquete', event: 'Evento (com lembretes)' };
+// Lembretes do tipo "Evento": minutos antes do início (null = anúncio no dia/hora escolhidos em "Quando").
+const CADENCE_EVENT_REMINDERS = [
+  { key: 'announce', label: 'Anúncio no dia e hora escolhidos em "Quando"', minutes: null, checked: true, title: '📅 *{nome}*' },
+  { key: 'd1', label: '1 dia antes', minutes: 1440, checked: true, title: '⏰ *Amanhã: {nome}*' },
+  { key: 'h1', label: '1 hora antes', minutes: 60, checked: true, title: '⏰ *Falta 1 hora: {nome}*' },
+  { key: 'm10', label: '10 minutos antes', minutes: 10, checked: false, title: '🔔 *Em 10 minutos: {nome}*' },
+  { key: 'start', label: 'Na hora de começar', minutes: 0, checked: true, title: '🔴 *Começou: {nome}*' }
+];
 const CADENCE_STATUS = {
   scheduled: ['Agendada', '#60a5fa'],
   sent: ['Enviada', '#34d399'],
@@ -5720,7 +5728,9 @@ function renderCadenceList() {
     const when = new Date(i.sendAt);
     const late = i.status === 'scheduled' && when.getTime() < Date.now() - 90000;
     const id = escapeJsString(i.id);
-    const preview = i.text ? escapeHtml(i.text.length > 140 ? i.text.slice(0, 140) + '…' : i.text) : '<span style="color:var(--muted);">(sem texto)</span>';
+    const preview = i.type === 'poll' && i.poll
+      ? `📊 ${escapeHtml(i.poll.question || '')}<div style="font-size:12px;color:var(--muted);margin-top:2px;">${(i.poll.options || []).map(o => '○ ' + escapeHtml(o)).join('  ')}${i.poll.multiple ? ' · várias respostas' : ''}</div>`
+      : i.text ? escapeHtml(i.text.length > 140 ? i.text.slice(0, 140) + '…' : i.text) : '<span style="color:var(--muted);">(sem texto)</span>';
     const actions = i.status === 'scheduled'
       ? `<button style="${wbtn}" onclick="editCadenceItem('${id}')">Editar</button><button style="${wbtn}background:transparent;" onclick="duplicateCadenceItem('${id}')">Duplicar</button><button style="${wbtn}background:transparent;" onclick="cancelCadenceItem('${id}')">Cancelar</button>`
       : `<button style="${wbtn}" onclick="duplicateCadenceItem('${id}')">Duplicar</button><button style="${wbtn}background:transparent;color:#f87171;border-color:#f87171;" onclick="deleteCadenceItem('${id}')">Excluir</button>`;
@@ -5729,7 +5739,7 @@ function renderCadenceList() {
         <input type="checkbox" style="margin-top:4px;cursor:pointer;" ${_cadenceSelected.has(i.id) ? 'checked' : ''} onchange="toggleCadenceSelected('${id}', this.checked)">
         <div style="font-size:15px;font-weight:600;color:var(--text);min-width:52px;">${when.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div>
         <div style="flex:1;min-width:0;">
-          <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">${escapeHtml(i.groupName || i.groupId)} · ${CADENCE_TYPES[i.type] || 'Texto'}${i.mentionAll ? ' · marca todos' : ''}${i.media && i.media.fileName ? ' · ' + escapeHtml(i.media.fileName) : ''}</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">${escapeHtml(i.groupName || i.groupId)} · ${i.eventName ? '📅 Evento: ' + escapeHtml(i.eventName) + (i.eventStep ? ' (' + escapeHtml(i.eventStep) + ')' : '') : (CADENCE_TYPES[i.type] || 'Texto')}${i.mentionAll ? ' · marca todos' : ''}${i.media && i.media.fileName ? ' · ' + escapeHtml(i.media.fileName) : ''}</div>
           <div style="font-size:13px;color:var(--text);white-space:pre-wrap;word-break:break-word;">${preview}</div>
           ${i.error ? `<div style="font-size:11px;color:#f87171;margin-top:4px;">${escapeHtml(i.error)}</div>` : ''}
         </div>
@@ -5850,6 +5860,7 @@ async function openCadenceEditor(copyFrom, options = {}) {
     act, mode, editIds: options.ids || (copyFrom && mode === 'edit-item' ? [copyFrom.id] : []),
     type: copyFrom ? copyFrom.type || 'text' : 'text',
     media: copyFrom && copyFrom.media ? copyFrom.media : null,
+    pollSeed: copyFrom && copyFrom.poll ? copyFrom.poll.options : null,
     preselect: copyFrom ? [...new Set((options.groupIds || [copyFrom.groupId]))] : []
   };
   const title = mode === 'edit-item' ? 'Editar envio' : mode === 'edit-series' ? `Editar série (${_cadenceDraft.editIds.length} envios)` : copyFrom ? 'Duplicar envio' : 'Programar envio';
@@ -5884,11 +5895,35 @@ async function openCadenceEditor(copyFrom, options = {}) {
 
     <div style="${section}">Conteúdo</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
-      ${Object.entries(CADENCE_TYPES).map(([k, l]) => `<button id="cad-type-${k}" style="${wbtn}" onclick="selectCadenceType('${k}')">${l}</button>`).join('')}
+      ${Object.entries(CADENCE_TYPES).filter(([k]) => mode === 'new' || k !== 'event').map(([k, l]) => `<button id="cad-type-${k}" style="${wbtn}" onclick="selectCadenceType('${k}')">${l}</button>`).join('')}
     </div>
     <div id="cad-media-box" style="display:none;margin-bottom:8px;">
       <input type="file" id="cad-media-file" class="field-input" onchange="uploadCadenceMedia(this)">
       <div id="cad-media-status" style="${hint}"></div>
+    </div>
+    <div id="cad-poll-box" style="display:none;margin-bottom:8px;">
+      <label class="field-label">Pergunta da enquete</label>
+      <input class="field-input" id="cad-poll-question" placeholder="Ex.: Qual horário você prefere para a live?" value="${escapeHtml(copyFrom && copyFrom.poll ? copyFrom.poll.question || '' : '')}">
+      <label class="field-label" style="margin-top:10px;">Opções (de 2 a 12)</label>
+      <div id="cad-poll-options"></div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px;">
+        <button style="${wbtn}background:transparent;" onclick="addCadencePollOption('')">+ Adicionar opção</button>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);cursor:pointer;"><input type="checkbox" id="cad-poll-multiple" ${copyFrom && copyFrom.poll && copyFrom.poll.multiple ? 'checked' : ''}> Permitir escolher mais de uma opção</label>
+      </div>
+    </div>
+    <div id="cad-event-box" style="display:none;margin-bottom:8px;">
+      <div style="${hint}">O sistema programa sozinho o anúncio e os lembretes do evento no grupo, já formatados.</div>
+      <label class="field-label">Nome do evento</label>
+      <input class="field-input" id="cad-event-name" oninput="renderCadencePreview()" placeholder="Ex.: Aula ao vivo — Como vender todos os dias">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
+        <div><label class="field-label">Data do evento</label><input type="date" class="field-input" id="cad-event-date" onchange="renderCadencePreview()"></div>
+        <div><label class="field-label">Hora do evento</label><input type="time" class="field-input" id="cad-event-time" value="20:00" onchange="renderCadencePreview()"></div>
+        <div style="flex:1;min-width:200px;"><label class="field-label">Local ou link</label><input class="field-input" id="cad-event-place" placeholder="Ex.: https://meet.google.com/... ou endereço"></div>
+      </div>
+      <label class="field-label" style="margin-top:8px;">Descrição (opcional)</label>
+      <textarea class="field-input" id="cad-event-desc" rows="3" style="resize:vertical;width:100%;box-sizing:border-box;"></textarea>
+      <label class="field-label" style="margin-top:8px;">Mensagens que serão enviadas</label>
+      ${CADENCE_EVENT_REMINDERS.map(r => `<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);cursor:pointer;margin:3px 0;"><input type="checkbox" class="cad-event-reminder" value="${r.key}" ${r.checked ? 'checked' : ''} onchange="renderCadencePreview()"> ${escapeHtml(r.label)}</label>`).join('')}
     </div>
     <textarea class="field-input" id="cad-text" rows="5" style="resize:vertical;width:100%;box-sizing:border-box;" placeholder="Texto da mensagem" oninput="updateCadenceMentionState()"></textarea>
     <label id="cad-mention-box" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);margin-top:8px;cursor:pointer;">
@@ -5915,16 +5950,23 @@ async function saveCadenceEdit(setFb) {
   const draft = _cadenceDraft;
   const text = document.getElementById('cad-text').value.trim();
   const type = draft.type;
-  if (type === 'text' && !text) { setFb('#f87171', 'Escreva a mensagem.'); return; }
-  if (type !== 'text' && !draft.media) { setFb('#f87171', 'Envie o arquivo.'); return; }
+  let content;
+  if (type === 'poll') {
+    const p = readCadencePoll();
+    if (p.error) { setFb('#f87171', p.error); return; }
+    content = { type, text: p.poll.question, poll: p.poll, media: null, mentionAll: false };
+  } else {
+    if (type === 'text' && !text) { setFb('#f87171', 'Escreva a mensagem.'); return; }
+    if (type !== 'text' && !draft.media) { setFb('#f87171', 'Envie o arquivo.'); return; }
+    content = {
+      type, text, poll: null,
+      media: type === 'text' ? null : draft.media,
+      mentionAll: !!document.getElementById('cad-mention').checked && !!text
+    };
+  }
   const time = document.getElementById('cad-time').value;
   if (!/^\d{2}:\d{2}$/.test(time)) { setFb('#f87171', 'Escolha a hora.'); return; }
   const [hh, mm] = time.split(':').map(Number);
-  const content = {
-    type, text,
-    media: type === 'text' ? null : draft.media,
-    mentionAll: !!document.getElementById('cad-mention').checked && !!text
-  };
   const updates = [];
   if (draft.mode === 'edit-item') {
     const when = new Date(`${document.getElementById('cad-date').value}T${time}`);
@@ -6012,9 +6054,25 @@ function selectCadenceType(type, keepMedia) {
     if (b) b.style.background = k === type ? 'var(--accent-glow)' : 'transparent';
   });
   const file = document.getElementById('cad-media-file');
-  document.getElementById('cad-media-box').style.display = type === 'text' ? 'none' : 'block';
-  document.getElementById('cad-mention-box').style.display = 'flex';
+  const isMedia = type === 'image' || type === 'video' || type === 'audio';
+  document.getElementById('cad-media-box').style.display = isMedia ? 'block' : 'none';
+  document.getElementById('cad-poll-box').style.display = type === 'poll' ? 'block' : 'none';
+  document.getElementById('cad-event-box').style.display = type === 'event' ? 'block' : 'none';
+  document.getElementById('cad-text').style.display = type === 'poll' || type === 'event' ? 'none' : 'block';
+  document.getElementById('cad-mention-box').style.display = type === 'poll' ? 'none' : 'flex';
+  // Evento: o "Quando" é o dia/hora do anúncio; os lembretes são calculados pela data do evento (sem "Repetir").
+  const repeat = document.getElementById('cad-repeat');
+  if (repeat && repeat.parentElement && _cadenceDraft.mode === 'new') repeat.parentElement.style.display = type === 'event' ? 'none' : '';
+  if (type === 'event' && repeat) repeat.value = 'none';
+  if (type === 'poll' && !document.querySelectorAll('.cad-poll-option').length) {
+    const saved = _cadenceDraft.pollSeed || ['', ''];
+    saved.forEach(v => addCadencePollOption(v));
+  }
+  if (type === 'event' && !document.getElementById('cad-event-date').value) {
+    document.getElementById('cad-event-date').value = document.getElementById('cad-date').value;
+  }
   updateCadenceMentionState();
+  renderCadencePreview();
   file.value = '';
   file.accept = type === 'image' ? 'image/jpeg,image/png,image/webp' : type === 'video' ? 'video/mp4' : 'audio/*';
   if (!keepMedia) {
@@ -6025,11 +6083,59 @@ function selectCadenceType(type, keepMedia) {
   document.getElementById('cad-text').placeholder = type === 'text' ? 'Texto da mensagem' : 'Texto opcional';
 }
 
+function addCadencePollOption(value) {
+  const box = document.getElementById('cad-poll-options');
+  if (!box) return;
+  if (box.querySelectorAll('.cad-poll-option').length >= 12) { showToast('A enquete aceita no máximo 12 opções.', 'warning'); return; }
+  box.insertAdjacentHTML('beforeend', `<div style="display:flex;gap:6px;margin-bottom:6px;">
+    <input class="field-input cad-poll-option" style="padding:6px 8px;font-size:13px;" placeholder="Opção" value="${escapeHtml(value || '')}">
+    <button style="${wbtn}background:transparent;color:#f87171;border-color:#f87171;" onclick="this.parentElement.remove()">✕</button></div>`);
+}
+
+function readCadencePoll() {
+  const question = (document.getElementById('cad-poll-question')?.value || '').trim();
+  const options = [...document.querySelectorAll('.cad-poll-option')].map(i => i.value.trim()).filter(Boolean);
+  const multiple = !!document.getElementById('cad-poll-multiple')?.checked;
+  if (!question) return { error: 'Escreva a pergunta da enquete.' };
+  if (options.length < 2) return { error: 'A enquete precisa de pelo menos 2 opções.' };
+  if (new Set(options.map(o => o.toLowerCase())).size !== options.length) return { error: 'As opções da enquete não podem se repetir.' };
+  return { poll: { question, options, multiple } };
+}
+
+// Evento: monta o anúncio e os lembretes a partir da data/hora do evento. Retorna { messages: [{ at, text }] } ou { error }.
+function buildCadenceEventMessages() {
+  const name = (document.getElementById('cad-event-name')?.value || '').trim();
+  const date = document.getElementById('cad-event-date')?.value;
+  const time = document.getElementById('cad-event-time')?.value;
+  const place = (document.getElementById('cad-event-place')?.value || '').trim();
+  const desc = (document.getElementById('cad-event-desc')?.value || '').trim();
+  if (!name) return { error: 'Dê um nome ao evento.' };
+  const start = new Date(`${date}T${time}`);
+  if (!date || !time || isNaN(start.getTime())) return { error: 'Escolha a data e a hora do evento.' };
+  const chosen = new Set([...document.querySelectorAll('.cad-event-reminder:checked')].map(cb => cb.value));
+  if (!chosen.size) return { error: 'Marque pelo menos uma mensagem do evento.' };
+  const whenLabel = start.toLocaleString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const body = [`🗓️ ${whenLabel.charAt(0).toUpperCase() + whenLabel.slice(1)}`, place ? `📍 ${place}` : '', desc ? `\n${desc}` : ''].filter(Boolean).join('\n');
+  const announceAt = new Date(`${document.getElementById('cad-date').value}T${document.getElementById('cad-time').value}`);
+  const messages = [];
+  CADENCE_EVENT_REMINDERS.forEach(r => {
+    if (!chosen.has(r.key)) return;
+    const at = r.minutes === null ? announceAt : new Date(start.getTime() - r.minutes * 60000);
+    if (isNaN(at.getTime())) return;
+    const title = r.title.split('{nome}').join(name);
+    const text = r.key === 'start' ? `${title}\n${place ? `📍 ${place}` : ''}`.trim() : `${title}\n${body}`;
+    messages.push({ key: r.key, label: r.label, at, text });
+  });
+  messages.sort((a, b) => a.at - b.at);
+  return { messages, name };
+}
+
 // "Marcar todos" usa o texto: legenda da imagem/vídeo, o próprio texto, ou o texto enviado depois do áudio.
 function updateCadenceMentionState() {
   const box = document.getElementById('cad-mention');
   const hint = document.getElementById('cad-mention-hint');
   if (!box || !hint || !_cadenceDraft) return;
+  if (_cadenceDraft.type === 'event') { box.disabled = false; hint.textContent = '(a marcação vai em cada mensagem do evento)'; return; }
   const hasText = !!document.getElementById('cad-text').value.trim();
   const type = _cadenceDraft.type;
   box.disabled = !hasText;
@@ -6084,6 +6190,15 @@ function cadenceOccurrences() {
 function renderCadencePreview() {
   const box = document.getElementById('cad-preview');
   if (!box || !_cadenceDraft) return;
+  if (_cadenceDraft.mode === 'new' && _cadenceDraft.type === 'event') {
+    const groupsCount = document.querySelectorAll('.cad-group:checked').length;
+    const ev = buildCadenceEventMessages();
+    if (ev.error) { box.innerHTML = `<span style="color:var(--muted);">${escapeHtml(ev.error)}</span>`; return; }
+    const fmt = d => d.toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    box.innerHTML = `<b>${ev.messages.filter(m => m.at > new Date()).length * Math.max(groupsCount, 1)} envio(s)</b> para ${groupsCount || 'nenhum'} grupo(s):
+      ${ev.messages.map(m => `<div style="font-size:12px;margin-top:4px;${m.at <= new Date() ? 'color:#f87171;text-decoration:line-through;' : 'color:var(--muted);'}">${escapeHtml(fmt(m.at))} · ${escapeHtml(m.label)}${m.at <= new Date() ? ' (já passou)' : ''}</div>`).join('')}`;
+    return;
+  }
   if (_cadenceDraft.mode === 'edit-series') {
     const time = document.getElementById('cad-time').value;
     box.innerHTML = `<b>${_cadenceDraft.editIds.length} envio(s)</b> desta série serão atualizados${time ? `, todos às ${escapeHtml(time)}` : ''}.`;
@@ -6116,16 +6231,46 @@ async function saveCadence() {
   const setFb = (color, text) => { fb.style.color = color; fb.textContent = text; };
   if (_cadenceDraft.mode === 'edit-item' || _cadenceDraft.mode === 'edit-series') return saveCadenceEdit(setFb);
   const groups = [...document.querySelectorAll('.cad-group:checked')].map(cb => ({ id: cb.value, name: cb.getAttribute('data-subject') }));
+  const type = _cadenceDraft.type;
+  const seriesId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
+  if (!groups.length) { setFb('#f87171', 'Escolha pelo menos um grupo.'); return; }
+  const mentionChecked = !!document.getElementById('cad-mention').checked;
+
+  // Evento: anúncio + lembretes calculados pela data do evento.
+  if (type === 'event') {
+    const ev = buildCadenceEventMessages();
+    if (ev.error) { setFb('#f87171', ev.error); return; }
+    const future = ev.messages.filter(m => m.at > new Date());
+    if (!future.length) { setFb('#f87171', 'Todas as mensagens do evento ficariam no passado. Confira as datas.'); return; }
+    const items = [];
+    future.forEach(m => groups.forEach(g => items.push({
+      seriesId, act: _cadenceDraft.act, groupId: g.id, groupName: g.name,
+      type: 'text', text: m.text, media: null, mentionAll: mentionChecked,
+      eventName: ev.name, eventStep: m.key === 'announce' ? 'Anúncio' : m.label, sendAt: m.at.toISOString()
+    })));
+    return await createCadenceItems(items, setFb);
+  }
+
   const dates = cadenceOccurrences().filter(d => d > new Date());
   const text = document.getElementById('cad-text').value.trim();
-  const type = _cadenceDraft.type;
-  if (!groups.length) { setFb('#f87171', 'Escolha pelo menos um grupo.'); return; }
   if (!dates.length) { setFb('#f87171', 'Escolha uma data e hora no futuro.'); return; }
+  if (document.getElementById('cad-repeat').value !== 'none' && !document.getElementById('cad-until').value) { setFb('#f87171', 'Escolha até quando repetir.'); return; }
+
+  // Enquete: pergunta + opções.
+  if (type === 'poll') {
+    const p = readCadencePoll();
+    if (p.error) { setFb('#f87171', p.error); return; }
+    const items = [];
+    dates.forEach(d => groups.forEach(g => items.push({
+      seriesId, act: _cadenceDraft.act, groupId: g.id, groupName: g.name,
+      type: 'poll', text: p.poll.question, poll: p.poll, media: null, mentionAll: false, sendAt: d.toISOString()
+    })));
+    return await createCadenceItems(items, setFb);
+  }
+
   if (type === 'text' && !text) { setFb('#f87171', 'Escreva a mensagem.'); return; }
   if (type !== 'text' && !_cadenceDraft.media) { setFb('#f87171', 'Envie o arquivo.'); return; }
-  if (document.getElementById('cad-repeat').value !== 'none' && !document.getElementById('cad-until').value) { setFb('#f87171', 'Escolha até quando repetir.'); return; }
   const items = [];
-  const seriesId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
   dates.forEach(d => groups.forEach(g => items.push({
     seriesId,
     act: _cadenceDraft.act,
@@ -6134,9 +6279,13 @@ async function saveCadence() {
     type,
     text,
     media: type === 'text' ? null : _cadenceDraft.media,
-    mentionAll: !!document.getElementById('cad-mention').checked && !!text,
+    mentionAll: mentionChecked && !!text,
     sendAt: d.toISOString()
   })));
+  return await createCadenceItems(items, setFb);
+}
+
+async function createCadenceItems(items, setFb) {
   if (items.length > CADENCE_MAX_ITEMS) { setFb('#f87171', `São ${items.length} envios; o máximo é ${CADENCE_MAX_ITEMS} por vez.`); return; }
   setFb('var(--muted)', 'Programando...');
   try {
