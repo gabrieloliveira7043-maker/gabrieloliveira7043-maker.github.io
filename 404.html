@@ -1057,8 +1057,9 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
 
   let currentProfile = null;
 
+  // Remove acentos (ex: "tráfegogb" -> "trafegogb"): o e-mail interno do Firebase Auth não aceita acento.
   function loginToEmail(login) {
-    return String(login || '').trim().toLowerCase() + '@' + LOGIN_EMAIL_DOMAIN;
+    return String(login || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '') + '@' + LOGIN_EMAIL_DOMAIN;
   }
 
   function normalizeAct(value) {
