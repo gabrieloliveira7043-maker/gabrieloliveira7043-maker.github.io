@@ -7444,7 +7444,7 @@ async function loadCampaignContacts() {
   const summary = document.getElementById('camp-summary');
   summary.textContent = 'Carregando contatos do WhatsApp...';
   try {
-    const r = await window._fb.whatsapp('/whatsapp/contacts', _campaignDraft.act, { line: (readWaLinePicker('camp-lines') || [WA_MAIN])[0] });
+    const r = await window._fb.whatsapp('/whatsapp/contacts', _campaignDraft.act, { line: (readWaLinePicker('camp-lines') || [waDefaultLine(_campaignDraft.act)])[0] });
     setCampaignRecipients(r.contacts || [], 'Contatos do WhatsApp');
   } catch (e) {
     summary.innerHTML = `<span style="color:#f87171;">${escapeHtml(e.message)}</span>`;
@@ -7488,7 +7488,7 @@ async function loadCampaignGroups(refresh) {
   const box = document.getElementById('camp-groups-list');
   box.innerHTML = '<div style="font-size:12px;color:var(--muted);">Carregando grupos... na primeira vez pode levar até 1 minuto.</div>';
   try {
-    const r = await window._fb.whatsapp('/whatsapp/groups', _campaignDraft.act, { refresh: !!refresh, line: (readWaLinePicker('camp-lines') || [WA_MAIN])[0] });
+    const r = await window._fb.whatsapp('/whatsapp/groups', _campaignDraft.act, { refresh: !!refresh, line: (readWaLinePicker('camp-lines') || [waDefaultLine(_campaignDraft.act)])[0] });
     const groups = (r.groups || []).sort((a, b) => a.subject.localeCompare(b.subject, 'pt-BR'));
     if (!groups.length) { box.innerHTML = '<div style="font-size:12px;color:var(--muted);">Nenhum grupo encontrado.</div>'; return; }
     box.innerHTML = groupsCacheNote(r, 'loadCampaignGroups(true)') + `<label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--text);padding:4px 0 8px;cursor:pointer;border-bottom:1px solid var(--border);margin-bottom:4px;">
@@ -7523,7 +7523,7 @@ async function loadCampaignGroupParticipants() {
   const request = ++_groupParticipantsRequest;
   summary.textContent = `Carregando participantes de ${checked.length} grupo(s)... pode levar até 1 minuto.`;
   try {
-    const r = await window._fb.whatsapp('/whatsapp/group-participants', _campaignDraft.act, { groupIds: checked.map(cb => cb.value), line: (readWaLinePicker('camp-lines') || [WA_MAIN])[0] });
+    const r = await window._fb.whatsapp('/whatsapp/group-participants', _campaignDraft.act, { groupIds: checked.map(cb => cb.value), line: (readWaLinePicker('camp-lines') || [waDefaultLine(_campaignDraft.act)])[0] });
     if (request !== _groupParticipantsRequest || !_campaignDraft) return; // seleção mudou enquanto carregava
     const names = checked.map(cb => cb.getAttribute('data-subject'));
     setCampaignRecipients(r.participants || [], checked.length === document.querySelectorAll('.camp-group').length
@@ -7599,7 +7599,7 @@ async function saveCampaign(start) {
         fileName: _campaignDraft.media.fileName
       } : null,
       dispatch: read.dispatch,
-      lines: campLines || [WA_MAIN],
+      lines: campLines || [waDefaultLine(_campaignDraft.act)],
       startAt: startInfo.startAt,
       audienceType: _campaignDraft.source,
       audienceLabel: _campaignDraft.label
@@ -7933,7 +7933,7 @@ async function openCadenceEditor(copyFrom, options = {}) {
     media: copyFrom && copyFrom.media ? copyFrom.media : null,
     pollSeed: copyFrom && copyFrom.poll ? copyFrom.poll.options : null,
     preselect: copyFrom ? [...new Set((options.groupIds || [copyFrom.groupId]))] : [],
-    line: (copyFrom && copyFrom.line) || WA_MAIN
+    line: (copyFrom && copyFrom.line) || waDefaultLine(act)
   };
   const title = mode === 'edit-item' ? 'Editar envio' : mode === 'edit-series' ? `Editar série (${_cadenceDraft.editIds.length} envios)` : copyFrom ? 'Duplicar envio' : 'Programar envio';
   editor.innerHTML = `
@@ -8369,7 +8369,7 @@ async function saveCadence() {
 }
 
 async function createCadenceItems(items, setFb) {
-  items.forEach(i => { if (!i.line) i.line = (_cadenceDraft && _cadenceDraft.line) || WA_MAIN; });
+  items.forEach(i => { if (!i.line) i.line = (_cadenceDraft && _cadenceDraft.line) || waDefaultLine(_cadenceDraft.act); });
   if (items.length > CADENCE_MAX_ITEMS) { setFb('#f87171', `São ${items.length} envios; o máximo é ${CADENCE_MAX_ITEMS} por vez.`); return; }
   setFb('var(--muted)', 'Programando...');
   try {
@@ -9809,7 +9809,7 @@ function renderFlowInspector() {
   if (n.type === 'trigger') {
     html += `<label class="auto-label">Quando o lead entrar na coluna<select class="field-input" onchange="setFlowData('stage', this.value)">${autoStageOptions(act, d.stage)}</select></label>
       <div class="integ-muted" style="margin-top:8px;">Vale para leads novos e para cards arrastados ou movidos para essa coluna depois que a automação for salva.</div>
-      <div style="margin-top:12px;" onchange="_flow.lines = readWaLinePicker('flow-lines') || ['main']; _flow._dirty = true;">${waLinePickerHtml(act, 'flow-lines', _flow.lines, 'Enviar as mensagens por qual WhatsApp?')}</div>`;
+      <div style="margin-top:12px;" onchange="_flow.lines = readWaLinePicker('flow-lines') || [waDefaultLine(_flow.act)]; _flow._dirty = true;">${waLinePickerHtml(act, 'flow-lines', _flow.lines, 'Enviar as mensagens por qual WhatsApp?')}</div>`;
   } else if (n.type === 'wait') {
     html += `<label class="auto-label">Esperar</label><div style="display:flex;gap:6px;"><input type="number" min="0" class="field-input" value="${Number(d.amount) || 0}" style="width:90px;" oninput="setFlowData('amount', Math.max(0, Number(this.value) || 0))"><select class="field-input" onchange="setFlowData('unit', this.value)">${Object.entries(FLOW_UNITS).map(([k, l]) => `<option value="${k}" ${d.unit === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
       <div class="integ-muted" style="margin-top:8px;">Se cair fora do horário comercial do fluxo, a espera termina no começo do próximo horário.</div>`;
@@ -9882,7 +9882,7 @@ async function saveFlow() {
     stopOnReply: f.stopOnReply !== false,
     onReply: { moveTo: (f.onReply || {}).moveTo || '', moveToLabel: (f.onReply || {}).moveTo ? autoStageLabel(act, f.onReply.moveTo) : '' },
     hours: { enabled: !!(f.hours && f.hours.enabled), start: Number((f.hours || {}).start ?? 8), end: Number((f.hours || {}).end ?? 20) },
-    lines: Array.isArray(f.lines) && f.lines.length ? f.lines : [WA_MAIN],
+    lines: Array.isArray(f.lines) && f.lines.length ? f.lines : [waDefaultLine(act)],
     nodes: f.nodes.map(n => ({ id: n.id, type: n.type, x: n.x, y: n.y, data: JSON.parse(JSON.stringify(n.data || {})) })),
     edges: f.edges.map(e => ({ from: e.from, port: e.port || 'out', to: e.to })),
     steps: []
@@ -11412,7 +11412,7 @@ async function sendNewChat() {
   const btn = document.getElementById('chat-new-btn');
   btn.disabled = true; fb.style.color = 'var(--muted2)'; fb.textContent = 'Enviando...';
   try {
-    const line = document.getElementById('chat-new-line') ? document.getElementById('chat-new-line').value : WA_MAIN;
+    const line = document.getElementById('chat-new-line') ? document.getElementById('chat-new-line').value : waDefaultLine(_chatAct);
     const r = await window._fb.whatsapp('/whatsapp/chat-send', _chatAct, { phone, name, text, line });
     const me = chatMe();
     await window._fb.updateInboxChat(_chatAct, r.chatKey, { assignedTo: me.uid, assignedName: me.name, assignedAt: new Date().toISOString() }).catch(() => {});
@@ -11437,9 +11437,10 @@ const WA_MAIN = 'main';
 
 function waLines(act) {
   const s = WHATSAPP_SETTINGS[normalizeActValue(act)] || {};
-  return [{ id: WA_MAIN, label: s.mainLabel || 'Principal' }]
-    .concat((Array.isArray(s.lines) ? s.lines : []).filter(l => l && l.id && l.id !== WA_MAIN).map(l => ({ id: l.id, label: l.label || l.id })));
+  const extra = (Array.isArray(s.lines) ? s.lines : []).filter(l => l && l.id && l.id !== WA_MAIN).map(l => ({ id: l.id, label: l.label || l.id }));
+  return (s.mainRemoved && extra.length ? [] : [{ id: WA_MAIN, label: s.mainLabel || 'Principal' }]).concat(extra);
 }
+const waDefaultLine = act => waLines(act)[0].id;
 const waHasMultiple = act => waLines(act).length > 1;
 const waLineLabel = (act, id) => (waLines(act).find(l => l.id === (id || WA_MAIN)) || { label: 'Principal' }).label;
 const waLineOfKey = key => (String(key || '').match(/^([a-z0-9]{1,12})__/) || [])[1] || WA_MAIN;
@@ -11454,7 +11455,7 @@ async function ensureWaSettings(act) {
 function waLinePickerHtml(act, name, selected, title) {
   const lines = waLines(act);
   if (lines.length < 2) return '';
-  const sel = new Set((Array.isArray(selected) && selected.length ? selected : [WA_MAIN]));
+  const sel = new Set((Array.isArray(selected) && selected.length ? selected : [lines[0].id]));
   return `<div class="wa-line-picker">
     <div class="wa-line-picker-title">${escapeHtml(title || 'Por qual WhatsApp enviar?')}</div>
     ${lines.map(l => `<label class="integ-toggle"><input type="checkbox" name="${escapeHtml(name)}" value="${escapeHtml(l.id)}" ${sel.has(l.id) ? 'checked' : ''}> ${escapeHtml(l.label)}</label>`).join('')}
@@ -11494,7 +11495,7 @@ async function renderWaLinesBox(act, el) {
       <div style="flex:1;min-width:0;"><div class="wa-line-name">${escapeHtml(l.label)}</div><div class="wa-line-sub">${whatsappStateBadge(st)}${num ? ' · ' + escapeHtml(num) : ''}</div></div>
       ${st.state === 'open' ? `<button style="${wbtn}" onclick="disconnectWhatsApp('${a}','${id}')">Desconectar</button>` : `<button style="${wbtn}" onclick="openWhatsAppConnect('${a}','${escapeJsString(getClientDisplayName(act) + ' · ' + l.label)}','${id}')">Conectar</button>`}
       <button class="chat-pill" onclick="renameWaLine('${a}','${id}')">Renomear</button>
-      ${l.id !== WA_MAIN ? `<button class="chat-pill" style="color:var(--red);border-color:rgba(248,113,113,.4);" onclick="removeWaLine('${a}','${id}')">Excluir</button>` : ''}
+      ${waLines(act).length > 1 ? `<button class="chat-pill" style="color:var(--red);border-color:rgba(248,113,113,.4);" onclick="removeWaLine('${a}','${id}')">Excluir</button>` : ''}
     </div>`;
   }).join('') + `<button class="chat-pill" style="margin-top:6px;" onclick="addWaLine('${a}')">+ Conectar outro WhatsApp</button>`;
 }
@@ -11539,13 +11540,15 @@ async function deleteWaLineFromQr() {
 }
 
 async function removeWaLine(act, id) {
-  if (!await showConfirm(`O número "${waLineLabel(act, id)}" será desconectado e removido deste cliente. As conversas dele continuam no Chat.`, 'Remover WhatsApp', 'Remover', true)) return;
+  if (waLines(act).length < 2) { showToast('Conecte outro WhatsApp antes de excluir este.', 'warning'); return; }
+  const next = waLines(act).find(l => l.id !== id);
+  if (!await showConfirm(`O número "${waLineLabel(act, id)}" será desconectado e removido deste cliente. As conversas dele continuam no Chat. Os envios passam a sair por "${next.label}" quando nada for escolhido.`, 'Excluir WhatsApp', 'Excluir', true)) return;
   const s = WHATSAPP_SETTINGS[act] || {};
   try {
-    await window._fb.whatsapp('/whatsapp/delete-line', act, { line: id }).catch(() => null);
-    const lines = (s.lines || []).filter(l => l.id !== id);
-    await window._fb.saveWhatsAppSettings(act, { lines });
-    WHATSAPP_SETTINGS[act] = { ...s, lines };
+    await window._fb.whatsapp('/whatsapp/delete-line', act, { line: id });
+    const data = id === WA_MAIN ? { mainRemoved: true } : { lines: (s.lines || []).filter(l => l.id !== id) };
+    await window._fb.saveWhatsAppSettings(act, data);
+    WHATSAPP_SETTINGS[act] = { ...s, ...data };
     refreshWaLinesFor(act);
     showToast('WhatsApp removido.', 'success');
   } catch (e) { showToast('Erro: ' + e.message, 'error'); }
@@ -13561,7 +13564,14 @@ function startWhatsAppStatusWatch() {
 
 // Só avisa de números que já estiveram conectados (clientes que nunca conectaram não entram).
 function whatsappDownList() {
-  return _waStatusList.filter(s => s.id !== '__server' && s.ok === false && (s.paired || s.lastOpenAt));
+  return _waStatusList.filter(s => {
+    if (s.id === '__server' || s.ok !== false || !(s.paired || s.lastOpenAt)) return false;
+    const act = s.act || String(s.id).split('__')[0];
+    const cfg = WHATSAPP_SETTINGS[act];
+    if (cfg && (s.line || 'main') === 'main' && cfg.mainRemoved) return false;
+    if (cfg && (s.line || 'main') !== 'main' && !(cfg.lines || []).some(l => l.id === s.line)) return false;
+    return true;
+  });
 }
 
 function waAlertTime(iso) {
