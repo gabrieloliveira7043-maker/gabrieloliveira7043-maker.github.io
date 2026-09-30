@@ -1464,6 +1464,20 @@ td { font-family: var(--font); font-size: 13px; }
 .ads-row { display: grid; grid-template-columns: 1.4fr 2fr auto; gap: 12px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
 .ads-row:last-child { border-bottom: none; }
 
+/* Automações do funil */
+.crm-actions > button.crm-auto-btn { background: var(--accent-glow); border-color: var(--accent); color: var(--text); }
+.kc-chip.kc-auto { background: var(--amber-dim); color: var(--amber); }
+.auto-steps { display: flex; flex-direction: column; gap: 10px; margin: 12px 0 10px; }
+.auto-step { border: 1px solid var(--border2); border-radius: 12px; padding: 12px; background: var(--surface2); display: flex; flex-direction: column; gap: 8px; }
+.auto-step-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; font-weight: 700; color: var(--text); }
+.auto-step-head .field-input { padding: 6px 8px; }
+.auto-step-num { width: 24px; height: 24px; border-radius: 50%; background: var(--btn-bg); color: var(--btn-text); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; }
+.auto-step textarea { width: 100%; resize: vertical; font-size: 13px; }
+.auto-label { font-size: 12.5px; font-weight: 700; color: var(--muted2); }
+.auto-box { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
+.auto-box .field-input { padding: 6px 8px; }
+.auto-steps-summary { margin: 4px 0 8px 18px; font-size: 12.5px; color: var(--text); display: flex; flex-direction: column; gap: 3px; }
+
 /* Clientes (admin) */
 .huv-view { padding: 28px 36px; }
 .huv-header { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
@@ -1656,7 +1670,7 @@ td { font-family: var(--font); font-size: 13px; }
     async saveLead(lead) {
       if (lead._docId) {
         const ref = doc(db, 'leads', lead._docId);
-        const { _docId, ...data } = lead;
+        const { _docId, automation, ...data } = lead;
         await updateDoc(ref, data);
         return lead._docId;
       } else {
@@ -1708,6 +1722,20 @@ td { font-family: var(--font); font-size: 13px; }
       await setDoc(doc(db, 'meta_pages', pageId), { ...data, updatedAt: new Date().toISOString() }, { merge: true });
     },
     adminApi(path, body) { return callAdminApi(path, body || {}); },
+    // Automações do funil: automations/{id} = { act, name, active, triggerStage, steps, onReply, hours }.
+    async listAutomations(act) {
+      const snap = await getDocs(query(collection(db, 'automations'), where('act', '==', normalizeAct(act))));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+    },
+    async saveAutomation(id, data) {
+      const now = new Date().toISOString();
+      if (id) { await setDoc(doc(db, 'automations', id), { ...data, updatedAt: now }, { merge: true }); return id; }
+      const ref = await addDoc(collection(db, 'automations'), { ...data, act: normalizeAct(data.act), createdAt: now, updatedAt: now, createdBy: currentProfile ? currentProfile.login : '' });
+      return ref.id;
+    },
+    async deleteAutomation(id) {
+      await deleteDoc(doc(db, 'automations', id));
+    },
     // Etiquetas do cliente: contact_tags/{act} = { act, tags: [{ id, name, color }] }.
     async getContactTags(act) {
       const snap = await getDoc(doc(db, 'contact_tags', normalizeAct(act)));
@@ -2387,6 +2415,7 @@ td { font-family: var(--font); font-size: 13px; }
           <div style="font-size:12px; color:var(--muted); margin-top:2px;" id="crm-subtitle">Selecione um cliente na barra lateral</div>
         </div>
         <div class="crm-actions">
+          <button type="button" class="crm-auto-btn" onclick="openAutomations()" title="Follow-up automático por coluna">⚡ Automações</button>
           <select class="crm-client-select" id="crm-client-select" onchange="onCrmClientChange()" style="display:none;">
             <option value="all">Todos os clientes</option>
           </select>
@@ -5790,7 +5819,7 @@ async function applySendToFunnel() {
       const lead = {
         id: Date.now().toString() + '_' + i,
         name: e.name, phone: String(e.phone || ''), email: '',
-        stage, act, tags: e.tags || [],
+        stage, act, tags: e.tags || [], stageChangedAt: nowIso,
         origem: 'Base de contatos', source: 'contatos',
         history: [historyItem],
         createdAt, updatedAt: nowIso
@@ -5799,7 +5828,7 @@ async function applySendToFunnel() {
       items.push(lead);
     } else if (e.lead._docId) {
       const upd = { _docId: e.lead._docId, updatedAt: nowIso };
-      if (e.lead.stage !== stage) { upd.stage = stage; upd.history = [...(e.lead.history || []), historyItem]; }
+      if (e.lead.stage !== stage) { upd.stage = stage; upd.stageChangedAt = nowIso; upd.history = [...(e.lead.history || []), historyItem]; }
       if (moveMonth) upd.createdAt = createdAt;
       if (Object.keys(upd).length > 2) items.push(upd);
     }
@@ -7834,6 +7863,208 @@ function renderClientesView() {
       </div>
     </article>`;
   }).join('') : '<div class="integ-empty" style="grid-column:1/-1;">Nenhum cliente neste filtro.</div>';
+}
+
+// ===== AUTOMAÇÕES DO FUNIL (follow-up por coluna) =====
+// O Worker executa: espera, confere se o lead respondeu, envia a mensagem e/ou move de coluna.
+let _autoList = [];
+let _autoDraft = null;
+const AUTO_UNITS = { min: 'minutos', h: 'horas', d: 'dias' };
+
+function automationAct() {
+  if (!isAdmin) return window._fb && window._fb.getProfile() ? normalizeActValue(window._fb.getProfile().act) : '';
+  const sel = document.getElementById('crm-client-select');
+  const fromSel = sel && sel.value && sel.value !== 'all' ? sel.value : '';
+  return normalizeActValue(fromSel || crmClientFilter || (activeClient && activeClient.account) || '');
+}
+
+function autoStageLabel(act, id) {
+  return ((getStages(act) || []).find(s => s.id === id) || {}).label || id || '—';
+}
+
+function autoStageOptions(act, selected, emptyLabel) {
+  return (emptyLabel ? `<option value="">${escapeHtml(emptyLabel)}</option>` : '') +
+    (getStages(act) || []).map(s => `<option value="${escapeHtml(s.id)}" ${s.id === selected ? 'selected' : ''}>${escapeHtml(s.label)}</option>`).join('');
+}
+
+function autoStepSummary(act, st) {
+  const parts = [];
+  if ((st.templates || []).some(Boolean)) parts.push('envia mensagem');
+  if (st.moveTo) parts.push('move para ' + autoStageLabel(act, st.moveTo));
+  return `espera ${st.amount} ${AUTO_UNITS[st.unit] || 'horas'} → ${parts.join(' e ') || 'nada'}`;
+}
+
+async function openAutomations() {
+  const act = automationAct();
+  if (!act) { showToast('Escolha o cliente no topo do menu para ver as automações do funil dele.', 'warning'); return; }
+  openHuvenModal('Automações do funil — ' + (getClientDisplayName(act) || act), '<div class="integ-muted">Carregando...</div>', 820);
+  try { _autoList = await window._fb.listAutomations(act); } catch (e) { document.getElementById('huven-modal-body').innerHTML = `<div class="integ-error">Erro: ${escapeHtml(e.message)}</div>`; return; }
+  renderAutomationList();
+}
+
+function renderAutomationList() {
+  const body = document.getElementById('huven-modal-body');
+  if (!body) return;
+  const act = automationAct();
+  const leads = (_leadsCache || []).filter(l => leadMatchesClient(l, act));
+  body.innerHTML = `
+    <div class="integ-muted" style="margin-bottom:12px;">Quando um lead entra na coluna escolhida, a automação espera o tempo de cada passo e, se ele não tiver respondido no WhatsApp, envia a mensagem e/ou move o card. Se o lead responder ou for movido à mão, ela para.</div>
+    <div class="integ-row" style="margin:0 0 12px;"><button class="integ-btn primary" onclick="editAutomation(null)">+ Nova automação</button></div>
+    ${_autoList.length ? _autoList.map(a => {
+      const running = leads.filter(l => l.automation && l.automation.id === a.id && l.automation.status === 'running').length;
+      const id = escapeJsString(a.id);
+      return `<div class="integ-card">
+        <div class="integ-card-head">
+          <div style="flex:1;min-width:0;">
+            <div class="integ-title">⚡ ${escapeHtml(a.name || 'Automação')}</div>
+            <div class="integ-muted">Quando o lead entrar em <b>${escapeHtml(autoStageLabel(act, a.triggerStage))}</b> · ${running} lead(s) no fluxo agora</div>
+          </div>
+          <label class="integ-toggle" title="Ligar ou desligar"><input type="checkbox" ${a.active ? 'checked' : ''} onchange="toggleAutomation('${id}', this.checked)"> ${a.active ? 'Ligada' : 'Desligada'}</label>
+        </div>
+        <ol class="auto-steps-summary">${(a.steps || []).map(st => `<li>${escapeHtml(autoStepSummary(act, st))}</li>`).join('')}</ol>
+        <div class="integ-muted">${a.onReply && a.onReply.moveTo ? `Se responder: para e move para <b>${escapeHtml(autoStageLabel(act, a.onReply.moveTo))}</b>` : 'Se responder: para'}${a.hours && a.hours.enabled ? ` · envia só das ${a.hours.start}h às ${a.hours.end}h` : ''}</div>
+        <div class="integ-row"><button class="integ-btn" onclick="editAutomation('${id}')">Editar</button><button class="integ-btn danger" onclick="deleteAutomationConfirm('${id}')">Excluir</button></div>
+      </div>`;
+    }).join('') : '<div class="integ-empty">Nenhuma automação neste funil ainda.</div>'}`;
+}
+
+function editAutomation(id) {
+  const act = automationAct();
+  const src = id ? _autoList.find(a => a.id === id) : null;
+  const stages = getStages(act) || [];
+  _autoDraft = src ? JSON.parse(JSON.stringify(src)) : {
+    act, name: '', active: true, triggerStage: stages[0] ? stages[0].id : 'novo',
+    steps: [{ amount: 2, unit: 'h', templates: [''], moveTo: '' }],
+    onReply: { moveTo: '' }, hours: { enabled: true, start: 8, end: 20 }
+  };
+  _autoDraft.steps = (_autoDraft.steps || []).map(s => ({ ...s, templates: (s.templates && s.templates.length ? s.templates : ['']) }));
+  renderAutomationEditor();
+}
+
+function renderAutomationEditor() {
+  const body = document.getElementById('huven-modal-body');
+  const d = _autoDraft;
+  if (!body || !d) return;
+  const act = d.act;
+  body.innerHTML = `
+    <div class="integ-grid">
+      <label>Nome da automação<input class="field-input" id="au-name" value="${escapeHtml(d.name || '')}" placeholder="Ex.: Follow-up de novo lead"></label>
+      <label>Quando o lead entrar na coluna<select class="field-input" id="au-trigger">${autoStageOptions(act, d.triggerStage)}</select></label>
+    </div>
+    <div class="auto-steps">
+      ${d.steps.map((st, i) => `
+      <div class="auto-step">
+        <div class="auto-step-head">
+          <span class="auto-step-num">${i + 1}</span>
+          <span>Esperar</span>
+          <input type="number" min="0" class="field-input au-amount" value="${Number(st.amount) || 0}" style="width:80px;">
+          <select class="field-input au-unit" style="width:auto;">${Object.entries(AUTO_UNITS).map(([k, l]) => `<option value="${k}" ${st.unit === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+          <span class="integ-muted">${i === 0 ? 'depois que entrar na coluna' : 'depois do passo anterior'}, e se não tiver respondido:</span>
+          ${d.steps.length > 1 ? `<button class="integ-btn danger" style="margin-left:auto;" onclick="removeAutomationStep(${i})">Remover</button>` : ''}
+        </div>
+        <label class="auto-label">Enviar mensagem no WhatsApp <span class="integ-muted">(deixe vazio para não enviar; várias versões são sorteadas)</span></label>
+        ${st.templates.map((t, j) => `<textarea class="field-input au-template" data-step="${i}" rows="2" placeholder="${j === 0 ? 'Ex.: Oi {primeiro_nome}, conseguiu ver minha mensagem?' : 'Outra versão (opcional)'}">${escapeHtml(t || '')}</textarea>`).join('')}
+        ${st.templates.length < 3 ? `<button class="ci-add" onclick="addAutomationVariation(${i})">+ versão da mensagem</button>` : ''}
+        <label class="auto-label">Mover o card para <select class="field-input au-move" style="width:auto;display:inline-block;margin-left:6px;">${autoStageOptions(act, st.moveTo, 'Não mover')}</select></label>
+      </div>`).join('')}
+    </div>
+    <button class="integ-btn" onclick="addAutomationStep()">+ Adicionar passo</button>
+    <div class="auto-box">
+      <label class="auto-label">Se o lead responder: parar a automação e mover para <select class="field-input" id="au-reply" style="width:auto;display:inline-block;margin-left:6px;">${autoStageOptions(act, d.onReply && d.onReply.moveTo, 'Não mover')}</select></label>
+      <label class="integ-toggle" style="margin-top:8px;"><input type="checkbox" id="au-hours" ${d.hours && d.hours.enabled ? 'checked' : ''}> Enviar só em horário comercial, das
+        <input type="number" id="au-start" class="field-input" min="0" max="23" value="${d.hours ? d.hours.start : 8}" style="width:64px;"> às
+        <input type="number" id="au-end" class="field-input" min="1" max="24" value="${d.hours ? d.hours.end : 20}" style="width:64px;"> h</label>
+      <div class="integ-muted" style="margin-top:6px;">Use {primeiro_nome} e {nome} nas mensagens. Os envios respeitam os limites por hora e por dia do número.</div>
+    </div>
+    <div class="integ-row" style="margin-top:14px;">
+      <button class="integ-btn primary" onclick="saveAutomationDraft()">Salvar automação</button>
+      <button class="integ-btn" onclick="renderAutomationList()">Voltar</button>
+      <span id="au-fb" class="integ-muted"></span>
+    </div>`;
+}
+
+// Copia o que está na tela para o rascunho (antes de adicionar/remover passos e ao salvar).
+function readAutomationForm() {
+  const d = _autoDraft;
+  if (!d) return;
+  d.name = document.getElementById('au-name').value.trim();
+  d.triggerStage = document.getElementById('au-trigger').value;
+  const amounts = document.querySelectorAll('.au-amount');
+  const units = document.querySelectorAll('.au-unit');
+  const moves = document.querySelectorAll('.au-move');
+  d.steps = d.steps.map((st, i) => ({
+    amount: Math.max(0, Number(amounts[i].value) || 0),
+    unit: units[i].value,
+    templates: [...document.querySelectorAll(`.au-template[data-step="${i}"]`)].map(t => t.value),
+    moveTo: moves[i].value
+  }));
+  d.onReply = { moveTo: document.getElementById('au-reply').value };
+  d.hours = { enabled: document.getElementById('au-hours').checked, start: Number(document.getElementById('au-start').value) || 0, end: Number(document.getElementById('au-end').value) || 24 };
+}
+
+function addAutomationStep() { readAutomationForm(); _autoDraft.steps.push({ amount: 4, unit: 'h', templates: [''], moveTo: '' }); renderAutomationEditor(); }
+function removeAutomationStep(i) { readAutomationForm(); _autoDraft.steps.splice(i, 1); renderAutomationEditor(); }
+function addAutomationVariation(i) { readAutomationForm(); _autoDraft.steps[i].templates.push(''); renderAutomationEditor(); }
+
+async function saveAutomationDraft() {
+  readAutomationForm();
+  const d = _autoDraft;
+  const fb = document.getElementById('au-fb');
+  const fail = msg => { fb.style.color = 'var(--red)'; fb.textContent = msg; };
+  if (!d.name) return fail('Dê um nome à automação.');
+  if (!d.triggerStage) return fail('Escolha a coluna.');
+  const steps = d.steps.map(st => ({ ...st, templates: st.templates.map(t => t.trim()).filter(Boolean) }));
+  const bad = steps.findIndex(st => !st.templates.length && !st.moveTo);
+  if (bad !== -1) return fail(`O passo ${bad + 1} não faz nada: escreva uma mensagem ou escolha para onde mover.`);
+  if (d.hours.enabled && d.hours.end <= d.hours.start) return fail('O horário final precisa ser depois do inicial.');
+  const other = _autoList.find(a => a.id !== d.id && a.active && a.triggerStage === d.triggerStage);
+  if (other && d.active) return fail(`Já existe a automação "${other.name}" ligada nessa coluna. Desligue ela antes.`);
+  const act = d.act;
+  const data = {
+    act, name: d.name, active: d.active !== false,
+    triggerStage: d.triggerStage, triggerStageLabel: autoStageLabel(act, d.triggerStage),
+    steps: steps.map(st => ({ amount: st.amount, unit: st.unit, templates: st.templates, moveTo: st.moveTo || '', moveToLabel: st.moveTo ? autoStageLabel(act, st.moveTo) : '' })),
+    onReply: { moveTo: d.onReply.moveTo || '', moveToLabel: d.onReply.moveTo ? autoStageLabel(act, d.onReply.moveTo) : '' },
+    hours: d.hours
+  };
+  fb.style.color = 'var(--muted)'; fb.textContent = 'Salvando...';
+  try {
+    await window._fb.saveAutomation(d.id || null, data);
+    _autoList = await window._fb.listAutomations(act);
+    showToast('Automação salva. Vale para os leads que entrarem na coluna a partir de agora.', 'success', 5000);
+    renderAutomationList();
+  } catch (e) { fail('Erro: ' + e.message); }
+}
+
+async function toggleAutomation(id, on) {
+  const a = _autoList.find(x => x.id === id);
+  if (!a) return;
+  if (on && _autoList.some(x => x.id !== id && x.active && x.triggerStage === a.triggerStage)) {
+    showToast('Já tem outra automação ligada nessa coluna. Desligue ela antes.', 'warning');
+    renderAutomationList();
+    return;
+  }
+  try { await window._fb.saveAutomation(id, { active: on }); a.active = on; renderAutomationList(); }
+  catch (e) { showToast('Erro: ' + e.message, 'warning'); }
+}
+
+async function deleteAutomationConfirm(id) {
+  const a = _autoList.find(x => x.id === id);
+  if (!a) return;
+  closeHuvenModal();
+  if (await showConfirm(`A automação "${a.name}" será excluída. Os leads que estão no fluxo param de receber os próximos passos.`, 'Excluir automação', 'Excluir', true)) {
+    try { await window._fb.deleteAutomation(id); } catch (e) { showToast('Erro: ' + e.message, 'warning'); }
+  }
+  openAutomations();
+}
+
+// Selo no card do funil enquanto o lead está numa automação.
+function automationCardChip(lead) {
+  const a = lead.automation;
+  if (!a || a.status !== 'running') return '';
+  const when = a.nextAt ? new Date(a.nextAt) : null;
+  const txt = when ? when.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+  return `<span class="kc-chip kc-auto" title="${escapeHtml((a.name || 'Automação') + (txt ? ' · próximo passo em ' + txt : '') + (a.waiting ? ' · ' + a.waiting : ''))}">⚡ ${escapeHtml(limitText(a.name || 'Automação', 22))} · passo ${(Number(a.step) || 0) + 1}</span>`;
 }
 
 // ===== INTEGRAÇÕES: landing pages e formulários da Meta =====
@@ -10085,6 +10316,8 @@ function renderKanban() {
       const chips = [];
       if (lead.origem) chips.push(`<span class="kc-chip kc-origin" title="${escapeHtml(limitText(lead.origem, 300))}">${escapeHtml(limitText(lead.origem, 42))}</span>`);
       (Array.isArray(lead.tags) ? lead.tags : []).map(id => leadTagsById[id]).filter(Boolean).forEach(t => chips.push(tagChipHtml(t)));
+      const autoChip = automationCardChip(lead);
+      if (autoChip) chips.push(autoChip);
       if (lead.redeSocial && !String(lead.origem || '').toLowerCase().includes(String(lead.redeSocial).toLowerCase())) chips.push(`<span class="kc-chip">${escapeHtml(limitText(lead.redeSocial, 30))}</span>`);
       if (chips.length) cardHTML += `<div class="kc-chips">${chips.join('')}</div>`;
       cardHTML += `<div class="kc-top"><div class="card-name">${escapeHtml(limitText(lead.name || 'Lead sem nome', 120))}</div>${lead.valor ? `<span class="card-valor">R$ ${escapeHtml(limitText(lead.valor, 40))}</span>` : ''}</div>`;
@@ -10274,6 +10507,7 @@ function dropCard(stageId, targetId = null, placement = 'after') {
   if (targetAct && !movedLead.act) movedLead.act = targetAct;
   leads[idx].stage = stageId;
   leads[idx].updatedAt = new Date().toISOString();
+  if (!isSameStage) leads[idx].stageChangedAt = leads[idx].updatedAt;
   if (!isSameStage) {
     if (!leads[idx].history) leads[idx].history = [];
     leads[idx].history.push({ stage: stageLabel, at: new Date().toLocaleString('pt-BR') });
@@ -10394,6 +10628,7 @@ async function saveLead() {
     proximaData: document.getElementById('lead-proxima-data') ? document.getElementById('lead-proxima-data').value : (existing ? existing.proximaData || '' : ''),
     stage: newStage,
     act, history,
+    ...((!existing || existing.stage !== newStage) ? { stageChangedAt: new Date().toISOString() } : (existing.stageChangedAt ? { stageChangedAt: existing.stageChangedAt } : {})),
     createdAt: createdAtFromDateInput(document.getElementById('lead-created-at') ? document.getElementById('lead-created-at').value : '', existing ? existing.createdAt : null),
     updatedAt: new Date().toISOString(),
     _docId: existing ? (existing._docId || null) : null
@@ -10580,6 +10815,8 @@ function moveLeadTo(id, stageId) {
     const STAGES = getStages(targetAct);
     const stageLabel = STAGES.find(s => s.id === stageId)?.label || stageId;
     leads[idx].stage = stageId;
+    leads[idx].updatedAt = new Date().toISOString();
+    leads[idx].stageChangedAt = leads[idx].updatedAt;
     const targetStageLeads = sortCrmLeadsForKanban(
       leads.filter(l => leadMatchesClient(l, targetAct) && getArteAzulejoStageForBoard(l, targetAct) === stageId),
       targetAct
