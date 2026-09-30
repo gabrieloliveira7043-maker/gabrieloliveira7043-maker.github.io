@@ -1054,6 +1054,24 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
 .chat-day { align-self:center; font-size:11px; color:var(--muted2); background:var(--surface2); border-radius:8px; padding:3px 10px; margin:8px 0; }
 .chat-input { display:flex; gap:8px; align-items:flex-end; padding:10px 12px; border-top:1px solid var(--border); }
 .chat-input textarea { flex:1; resize:none; max-height:140px; min-height:40px; }
+.chat-input .chat-tool { padding:9px 10px; font-size:14px; line-height:1; border-radius:10px; }
+.chat-compose { position:relative; }
+.chat-qr-pop { display:none; position:absolute; left:12px; right:12px; bottom:100%; margin-bottom:6px; background:var(--surface); border:1px solid var(--border2); border-radius:12px; box-shadow:0 12px 32px rgba(0,0,0,.22); max-height:300px; overflow-y:auto; z-index:30; scrollbar-width:none; }
+.chat-qr-pop.open { display:block; }
+.chat-qr-item { padding:9px 12px; border-bottom:1px solid var(--border); cursor:pointer; }
+.chat-qr-item:hover, .chat-qr-item.sel { background:var(--surface2); }
+.chat-qr-item b { font-size:12.5px; color:var(--text); }
+.chat-qr-item div { font-size:12px; color:var(--muted2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.chat-note { align-self:center; width:min(520px, 92%); background:rgba(224,164,58,.13); border:1px solid rgba(224,164,58,.45); border-radius:10px; padding:8px 11px; font-size:13px; color:var(--text); white-space:pre-wrap; word-break:break-word; }
+.chat-note-head { display:flex; gap:6px; align-items:center; font-size:11px; font-weight:700; color:#B7791F; margin-bottom:3px; flex-wrap:wrap; }
+.chat-note-head .sp { flex:1; }
+.chat-note-head button { background:none; border:none; color:var(--muted2); cursor:pointer; font-size:11px; padding:0 2px; font-weight:700; }
+.chat-sched { align-self:flex-end; max-width:70%; border:1px dashed var(--blue); background:var(--blue-dim); border-radius:10px; padding:8px 11px; font-size:13px; color:var(--text); white-space:pre-wrap; word-break:break-word; }
+.chat-sched.failed { border-color:var(--red); background:rgba(248,113,113,.1); }
+.rem-stack { position:fixed; right:16px; bottom:16px; z-index:9500; display:flex; flex-direction:column; gap:8px; width:min(360px, calc(100% - 32px)); }
+.rem-card { background:var(--surface); border:1px solid #E0A43A; border-left:4px solid #E0A43A; border-radius:12px; padding:10px 12px; box-shadow:0 12px 32px rgba(0,0,0,.25); font-size:13px; color:var(--text); }
+.rem-card .rem-actions { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+@media (max-width: 768px) { .rem-stack { bottom:80px; } }
 .chat-back { display:none; }
 .contatos-bulk { position:sticky; top:0; }
 /* Integrações */
@@ -1988,6 +2006,48 @@ td { font-family: var(--font); font-size: 13px; }
     },
     async updateInboxChat(act, chatKey, data) {
       await updateDoc(doc(db, 'inbox', normalizeAct(act), 'chats', chatKey), data);
+    },
+    // Chat: respostas prontas (quick_replies/{act} = { items: [{ id, title, text }] }).
+    async getQuickReplies(act) {
+      const snap = await getDoc(doc(db, 'quick_replies', normalizeAct(act)));
+      return snap.exists() && Array.isArray(snap.data().items) ? snap.data().items : [];
+    },
+    async saveQuickReplies(act, items) {
+      await setDoc(doc(db, 'quick_replies', normalizeAct(act)), { act: normalizeAct(act), items, updatedAt: new Date().toISOString() });
+    },
+    // Chat: notas internas e lembretes (chat_notes). Só a equipe vê; não vão para o WhatsApp.
+    listenChatNotes(act, chatKey, callback) {
+      return onSnapshot(query(collection(db, 'chat_notes'), where('act', '==', normalizeAct(act)), where('chatKey', '==', chatKey)), snap => {
+        callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }, error => console.warn('Notas indisponíveis:', error));
+    },
+    listenOpenReminders(callback) {
+      if (!currentProfile) return null;
+      const q = currentProfile.role === 'admin'
+        ? query(collection(db, 'chat_notes'), where('done', '==', false))
+        : query(collection(db, 'chat_notes'), where('act', '==', normalizeAct(currentProfile.act)), where('done', '==', false));
+      return onSnapshot(q, snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(n => n.remindAt)), error => console.warn('Lembretes indisponíveis:', error));
+    },
+    async addChatNote(data) {
+      return (await addDoc(collection(db, 'chat_notes'), { ...data, act: normalizeAct(data.act) })).id;
+    },
+    async updateChatNote(id, data) {
+      await updateDoc(doc(db, 'chat_notes', id), data);
+    },
+    async deleteChatNote(id) {
+      await deleteDoc(doc(db, 'chat_notes', id));
+    },
+    // Chat: mensagens agendadas (o Worker envia no horário).
+    listenChatScheduled(act, chatKey, callback) {
+      return onSnapshot(query(collection(db, 'scheduled_messages'), where('act', '==', normalizeAct(act)), where('chatKey', '==', chatKey)), snap => {
+        callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }, error => console.warn('Agendadas indisponíveis:', error));
+    },
+    async addScheduledMessage(data) {
+      return (await addDoc(collection(db, 'scheduled_messages'), { ...data, act: normalizeAct(data.act), status: 'pending' })).id;
+    },
+    async cancelScheduledMessage(id, byName) {
+      await updateDoc(doc(db, 'scheduled_messages', id), { status: 'canceled', canceledAt: new Date().toISOString(), canceledBy: byName || '' });
     },
     // Cadência: mensagens programadas em grupos (group_schedules). "dueAt" existe só enquanto está agendada.
     listenGroupSchedules(act, callback) {
@@ -9815,6 +9875,13 @@ let _chatMedia = {};
 let _chatPendingMedia = null;
 let _chatSending = false;
 let _chatExtra = {}; // conversas abertas pelo card/contato que não estão entre as mais recentes
+let _chatNotes = [];          // notas internas da conversa aberta
+let _chatNotesUnsub = null;
+let _chatSched = [];          // mensagens agendadas da conversa aberta
+let _chatSchedUnsub = null;
+let _qrCache = {};            // respostas prontas por cliente
+let _qrBySlash = false;
+let _qrSel = 0;
 
 const CHAT_FILTERS = [
   ['all', 'Todas'],
@@ -10102,6 +10169,8 @@ function renderChatList() {
     if (chatReplied(c)) tags.push('<span class="chat-tag" style="background:var(--green-dim);color:var(--green);">Respondeu</span>');
     else if (chatWaiting(c)) tags.push('<span class="chat-tag" style="background:var(--amber-dim);color:var(--amber);">Aguardando resposta</span>');
     if (c.assignedName) tags.push(`<span class="chat-tag" style="background:var(--blue-dim);color:var(--blue);">${escapeHtml(c.assignedTo === me.uid ? 'Você' : c.assignedName)}</span>`);
+    const rem = chatReminderFor(_chatAct, c.id);
+    if (rem) tags.push(`<span class="chat-tag" style="background:rgba(224,164,58,.2);color:#B7791F;">🔔 ${new Date(rem.remindAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>`);
     chatTagIds(c, lead, chatContactFor(c, contactIndex)).map(id => tagById[id]).filter(Boolean).forEach(t => tags.push(tagChipHtml(t)));
     return `<div class="chat-row ${c.id === _chatOpenKey ? 'active' : ''}" onclick="openChat('${escapeJsString(c.id)}')">
       <div class="chat-avatar">${escapeHtml(initials)}</div>
@@ -10126,8 +10195,15 @@ function loadMoreChats() {
   onChatClientChange();
 }
 
+function stopChatExtras() {
+  if (_chatNotesUnsub) { _chatNotesUnsub(); _chatNotesUnsub = null; }
+  if (_chatSchedUnsub) { _chatSchedUnsub(); _chatSchedUnsub = null; }
+  _chatNotes = []; _chatSched = [];
+}
+
 function closeChat() {
   if (_chatMsgUnsub) { _chatMsgUnsub(); _chatMsgUnsub = null; }
+  stopChatExtras();
   _chatOpenKey = null; _chatMsgs = []; _chatPendingMedia = null;
   renderChatInfo();
   const wrap = document.getElementById('chat-wrap');
@@ -10146,14 +10222,24 @@ function openChat(key) {
     <div class="chat-head" id="chat-head"></div>
     <div class="chat-msgs" id="chat-msgs"><div class="chat-empty">Carregando mensagens...</div></div>
     <div id="chat-media-chip" style="display:none;padding:6px 14px;font-size:12px;color:var(--text);border-top:1px solid var(--border);"></div>
-    <div class="chat-input">
-      <label class="chat-pill" style="padding:9px 11px;" title="Enviar foto, vídeo ou áudio">📎<input type="file" accept="image/jpeg,image/png,image/webp,video/mp4,audio/*" style="display:none;" onchange="attachChatMedia(this)"></label>
-      <textarea id="chat-text" class="field-input" rows="1" placeholder="Mensagem (Enter envia, Shift+Enter pula linha)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage();}" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,140)+'px'"></textarea>
-      <button class="btn-save" id="chat-send-btn" style="width:auto;padding:10px 16px;" onclick="sendChatMessage()">Enviar</button>
+    <div class="chat-compose">
+      <div class="chat-qr-pop" id="chat-qr-pop"></div>
+      <div class="chat-input">
+        <label class="chat-pill chat-tool" title="Enviar foto, vídeo ou áudio">📎<input type="file" accept="image/jpeg,image/png,image/webp,video/mp4,audio/*" style="display:none;" onchange="attachChatMedia(this)"></label>
+        <button class="chat-pill chat-tool" title="Respostas prontas (ou digite / no começo da mensagem)" onclick="toggleQuickReplies()">⚡</button>
+        <textarea id="chat-text" class="field-input" rows="1" placeholder="Mensagem ( / respostas prontas)" onkeydown="chatTextKey(event)" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,140)+'px';chatQrInput(this)" onblur="setTimeout(() => { if (_qrBySlash) closeQuickReplies(); }, 200)"></textarea>
+        <button class="chat-pill chat-tool" title="Nota interna ou lembrete (só a equipe vê)" onclick="openChatNote()">📝</button>
+        <button class="chat-pill chat-tool" title="Agendar mensagem" onclick="openScheduleMessage()">🕐</button>
+        <button class="btn-save" id="chat-send-btn" style="width:auto;padding:10px 16px;" onclick="sendChatMessage()">Enviar</button>
+      </div>
     </div>`;
   renderChatHeader();
   renderChatList();
   const act = _chatAct;
+  stopChatExtras();
+  _chatNotesUnsub = window._fb.listenChatNotes(act, key, notes => { if (_chatOpenKey !== key) return; _chatNotes = notes; renderChatMessages(); });
+  _chatSchedUnsub = window._fb.listenChatScheduled(act, key, list => { if (_chatOpenKey !== key) return; _chatSched = list; renderChatMessages(); });
+  if (!_qrCache[act]) window._fb.getQuickReplies(act).then(items => { _qrCache[act] = items; }).catch(() => {});
   _chatMsgUnsub = window._fb.listenInboxMessages(act, key, _chatMsgLimit, (msgs, error) => {
     if (_chatOpenKey !== key) return;
     if (!msgs) { document.getElementById('chat-msgs').innerHTML = `<div class="chat-empty" style="color:var(--red);">Erro: ${escapeHtml(error && error.message || '')}</div>`; return; }
@@ -10287,17 +10373,22 @@ function renderChatMessages() {
   const box = document.getElementById('chat-msgs');
   if (!box) return;
   const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 120 || !box.dataset.loaded;
-  if (!_chatMsgs.length) { box.innerHTML = '<div class="chat-empty">Nenhuma mensagem ainda.</div>'; box.dataset.loaded = '1'; return; }
+  const pendingSched = _chatSched.filter(s => ['pending', 'sending', 'failed'].includes(s.status)).sort((a, b) => String(a.sendAt).localeCompare(String(b.sendAt)));
+  if (!_chatMsgs.length && !_chatNotes.length && !pendingSched.length) { box.innerHTML = '<div class="chat-empty">Nenhuma mensagem ainda.</div>'; box.dataset.loaded = '1'; return; }
   let lastDay = '';
   const parts = [];
   if (_chatMsgs.length >= _chatMsgLimit) parts.push(`<button class="chat-pill" style="align-self:center;" onclick="loadOlderChatMessages()">Carregar mensagens anteriores</button>`);
-  _chatMsgs.forEach(m => {
-    const d = new Date(m.at);
+  // Mensagens e notas internas na mesma linha do tempo.
+  const timeline = _chatMsgs.map(m => ({ at: m.at, m })).concat(_chatNotes.map(n => ({ at: n.at, n })))
+    .sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  timeline.forEach(({ m, n }) => {
+    const d = new Date((m || n).at);
     const day = d.toDateString();
     if (day !== lastDay) {
       lastDay = day;
       parts.push(`<div class="chat-day">${escapeHtml(cadenceDayLabel(d))}</div>`);
     }
+    if (n) { parts.push(chatNoteHtml(n)); return; }
     let media = '';
     if (['image', 'video', 'audio', 'document', 'sticker'].includes(m.type)) {
       const loaded = _chatMedia[m.id];
@@ -10314,6 +10405,12 @@ function renderChatMessages() {
     }
     const who = m.fromMe ? [m.source, m.sentBy].filter(Boolean).join(' · ') : '';
     parts.push(`<div class="chat-bubble ${m.fromMe ? 'out' : 'in'}">${media}${escapeHtml(m.text || '')}<div class="chat-meta">${who ? escapeHtml(who) + ' · ' : ''}${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div></div>`);
+  });
+  pendingSched.forEach(s => {
+    const when = new Date(s.sendAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    const head = s.status === 'failed' ? `⚠️ Agendada para ${when} não foi enviada: ${escapeHtml(s.error || '')}`
+      : s.status === 'sending' ? `🕐 Enviando agora...` : `🕐 Agendada para ${when}${s.lastError ? ' · ' + escapeHtml(s.lastError) : ''}`;
+    parts.push(`<div class="chat-sched ${s.status === 'failed' ? 'failed' : ''}"><div style="font-size:11px;font-weight:700;color:var(--muted2);margin-bottom:3px;">${head}</div>${s.media && s.media.fileName ? `📎 ${escapeHtml(s.media.fileName)}<br>` : ''}${escapeHtml(s.text || '')}<div class="chat-meta">${escapeHtml(s.createdByName || '')}${['pending', 'failed'].includes(s.status) ? ` · <a href="#" onclick="cancelScheduled('${escapeJsString(s.id)}');return false;" style="color:var(--red);">${s.status === 'failed' ? 'dispensar' : 'cancelar'}</a>` : ''}</div></div>`);
   });
   box.innerHTML = parts.join('');
   box.dataset.loaded = '1';
@@ -10391,9 +10488,310 @@ async function sendChatMessage() {
   }
 }
 
+// ===== CHAT: RESPOSTAS PRONTAS =====
+// Uma lista por cliente, usada por toda a equipe. {nome} vira o primeiro nome do contato.
+function chatFirstName() {
+  const c = _chatItems.find(x => x.id === _chatOpenKey) || {};
+  const name = chatName(c, chatLeadFor(c, chatLeadIndex(_chatAct)));
+  return /\d{4}/.test(name) || name === 'Número oculto' ? '' : name.trim().split(/\s+/)[0];
+}
+
+function quickReplyMatches(term) {
+  const items = _qrCache[_chatAct] || [];
+  const t = prosNorm(term || '');
+  return t ? items.filter(q => prosNorm(q.title + ' ' + q.text).includes(t)) : items;
+}
+
+function renderQuickReplies(term) {
+  const pop = document.getElementById('chat-qr-pop');
+  if (!pop) return;
+  const items = quickReplyMatches(term);
+  _qrSel = Math.min(_qrSel, Math.max(items.length - 1, 0));
+  pop.innerHTML = (items.length
+    ? items.map((q, i) => `<div class="chat-qr-item ${i === _qrSel ? 'sel' : ''}" onmousedown="event.preventDefault();pickQuickReply('${escapeJsString(q.id)}')"><b>/${escapeHtml(q.title)}</b><div>${escapeHtml(q.text)}</div></div>`).join('')
+    : `<div class="chat-qr-item" style="cursor:default;"><div>${(_qrCache[_chatAct] || []).length ? 'Nenhuma resposta pronta com esse nome.' : 'Ainda não há respostas prontas.'}</div></div>`)
+    + `<div class="chat-qr-item" style="text-align:center;" onmousedown="event.preventDefault();openQuickRepliesManager()"><b style="color:var(--accent2);">⚙ Gerenciar respostas prontas</b></div>`;
+  pop.classList.add('open');
+}
+
+async function toggleQuickReplies() {
+  const pop = document.getElementById('chat-qr-pop');
+  if (pop && pop.classList.contains('open')) return closeQuickReplies();
+  if (!_qrCache[_chatAct]) _qrCache[_chatAct] = await window._fb.getQuickReplies(_chatAct).catch(() => []);
+  _qrBySlash = false; _qrSel = 0;
+  renderQuickReplies('');
+}
+
+function closeQuickReplies() {
+  const pop = document.getElementById('chat-qr-pop');
+  if (pop) pop.classList.remove('open');
+  _qrBySlash = false;
+}
+
+// Digitar "/" no começo da mensagem abre a lista filtrada pelo que vem depois.
+function chatQrInput(ta) {
+  const v = ta.value;
+  if (v.startsWith('/') && !v.includes('\n')) { _qrBySlash = true; _qrSel = 0; renderQuickReplies(v.slice(1)); }
+  else if (_qrBySlash) closeQuickReplies();
+}
+
+function chatTextKey(event) {
+  const pop = document.getElementById('chat-qr-pop');
+  const open = pop && pop.classList.contains('open');
+  if (open && ['ArrowDown', 'ArrowUp'].includes(event.key)) {
+    event.preventDefault();
+    const n = quickReplyMatches(_qrBySlash ? event.target.value.slice(1) : '').length;
+    _qrSel = (_qrSel + (event.key === 'ArrowDown' ? 1 : -1) + n) % Math.max(n, 1);
+    renderQuickReplies(_qrBySlash ? event.target.value.slice(1) : '');
+    return;
+  }
+  if (open && event.key === 'Escape') { closeQuickReplies(); return; }
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    if (open && _qrBySlash) {
+      const items = quickReplyMatches(event.target.value.slice(1));
+      if (items[_qrSel]) return pickQuickReply(items[_qrSel].id);
+    }
+    sendChatMessage();
+  }
+}
+
+function pickQuickReply(id) {
+  const q = (_qrCache[_chatAct] || []).find(x => x.id === id);
+  const ta = document.getElementById('chat-text');
+  if (!q || !ta) return;
+  const text = q.text.replace(/\{nome\}/gi, chatFirstName());
+  ta.value = _qrBySlash || !ta.value.trim() ? text : ta.value.replace(/\s*$/, ' ') + text;
+  closeQuickReplies();
+  ta.focus();
+  ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
+}
+
+let _qrEditing = null;
+async function openQuickRepliesManager() {
+  closeQuickReplies();
+  if (!_chatAct) return;
+  _qrCache[_chatAct] = await window._fb.getQuickReplies(_chatAct).catch(() => _qrCache[_chatAct] || []);
+  _qrEditing = null;
+  openHuvenModal('Respostas prontas', '', 560);
+  renderQuickRepliesManager();
+}
+
+function renderQuickRepliesManager() {
+  const body = document.getElementById('huven-modal-body');
+  if (!body) return;
+  const items = _qrCache[_chatAct] || [];
+  const ed = _qrEditing;
+  body.innerHTML = `
+    <div class="integ-muted" style="margin-bottom:12px;font-size:12.5px;">Toda a equipe deste cliente usa estas respostas. No chat, clique em ⚡ ou digite <b>/</b> e o atalho. Use <b>{nome}</b> para colocar o primeiro nome do contato.</div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;">
+      ${items.map(q => `<div style="display:flex;gap:8px;align-items:flex-start;border:1px solid var(--border);border-radius:10px;padding:8px 10px;">
+        <div style="flex:1;min-width:0;"><b style="font-size:13px;color:var(--text);">/${escapeHtml(q.title)}</b><div style="font-size:12.5px;color:var(--muted2);white-space:pre-wrap;">${escapeHtml(q.text)}</div></div>
+        <button class="chat-pill" onclick="editQuickReply('${escapeJsString(q.id)}')">Editar</button>
+        <button class="chat-pill" style="color:var(--red);" onclick="deleteQuickReply('${escapeJsString(q.id)}')">Excluir</button>
+      </div>`).join('') || '<div class="integ-muted">Nenhuma resposta pronta ainda.</div>'}
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:12px;">
+      <label class="field-label">${ed ? 'Editar resposta' : 'Nova resposta'}</label>
+      <input class="field-input" id="qr-title" maxlength="40" placeholder="Atalho, ex.: preco, endereco, horario" value="${escapeHtml(ed ? ed.title : '')}" style="margin-bottom:8px;">
+      <textarea class="field-input" id="qr-text" rows="4" maxlength="2000" placeholder="Oi {nome}! Nosso horário é..." style="width:100%;box-sizing:border-box;resize:vertical;margin-bottom:8px;">${escapeHtml(ed ? ed.text : '')}</textarea>
+      <button class="btn-save" style="width:auto;padding:9px 16px;" onclick="saveQuickReply()">${ed ? 'Salvar alteração' : 'Adicionar'}</button>
+      ${ed ? '<button class="chat-pill" onclick="_qrEditing=null;renderQuickRepliesManager()">Cancelar</button>' : ''}
+      <span id="qr-fb" class="integ-muted" style="margin-left:6px;"></span>
+    </div>`;
+}
+
+function editQuickReply(id) { _qrEditing = (_qrCache[_chatAct] || []).find(q => q.id === id) || null; renderQuickRepliesManager(); }
+
+async function saveQuickReply() {
+  const title = document.getElementById('qr-title').value.trim().replace(/^\/+/, '').replace(/\s+/g, '-').toLowerCase();
+  const text = document.getElementById('qr-text').value.trim();
+  const fb = document.getElementById('qr-fb');
+  if (!title || !text) { fb.textContent = 'Preencha o atalho e o texto.'; return; }
+  const items = [...(_qrCache[_chatAct] || [])];
+  if (items.some(q => q.title === title && (!_qrEditing || q.id !== _qrEditing.id))) { fb.textContent = 'Já existe uma resposta com esse atalho.'; return; }
+  if (_qrEditing) Object.assign(items.find(q => q.id === _qrEditing.id) || {}, { title, text });
+  else items.push({ id: 'q' + Date.now().toString(36), title, text });
+  items.sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'));
+  fb.textContent = 'Salvando...';
+  try {
+    await window._fb.saveQuickReplies(_chatAct, items);
+    _qrCache[_chatAct] = items;
+    _qrEditing = null;
+    renderQuickRepliesManager();
+  } catch (e) { fb.textContent = 'Erro: ' + e.message; }
+}
+
+async function deleteQuickReply(id) {
+  if (!confirm('Excluir esta resposta pronta?')) return;
+  const items = (_qrCache[_chatAct] || []).filter(q => q.id !== id);
+  try {
+    await window._fb.saveQuickReplies(_chatAct, items);
+    _qrCache[_chatAct] = items;
+    renderQuickRepliesManager();
+  } catch (e) { showToast('Erro: ' + e.message, 'error'); }
+}
+
+// ===== CHAT: NOTAS INTERNAS E LEMBRETES =====
+// Ficam na linha do tempo da conversa em amarelo; não vão para o WhatsApp.
+function chatDateTimeLocal(date) {
+  const d = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return d.toISOString().slice(0, 16);
+}
+
+function chatNoteHtml(n) {
+  const time = new Date(n.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const rem = n.remindAt ? new Date(n.remindAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+  const id = escapeJsString(n.id);
+  return `<div class="chat-note"><div class="chat-note-head">📝 Nota interna · ${escapeHtml(n.by || '')} · ${time}
+    ${rem ? `<span class="chat-tag" style="background:${n.done ? 'var(--surface3)' : 'rgba(224,164,58,.25)'};color:${n.done ? 'var(--muted2)' : '#B7791F'};">🔔 ${n.done ? 'concluído' : 'lembrete'} ${rem}</span>` : ''}
+    <span class="sp"></span>
+    ${rem && !n.done ? `<button onclick="finishReminder('${id}')">Concluir</button>` : ''}
+    <button onclick="deleteChatNoteUi('${id}')">Excluir</button></div>${escapeHtml(n.text || '')}</div>`;
+}
+
+function openChatNote() {
+  if (!_chatAct || !_chatOpenKey) return;
+  const soon = new Date(Date.now() + 60 * 60000); soon.setMinutes(0, 0, 0);
+  openHuvenModal('Nota interna ou lembrete', `
+    <div class="integ-muted" style="margin-bottom:10px;font-size:12.5px;">Só a equipe vê. Não é enviada ao contato.</div>
+    <textarea class="field-input" id="note-text" rows="4" maxlength="2000" placeholder="Ex.: pediu orçamento do plano anual, ligar de novo na sexta" style="width:100%;box-sizing:border-box;resize:vertical;margin-bottom:10px;"></textarea>
+    <label class="integ-toggle" style="margin-bottom:8px;"><input type="checkbox" id="note-remind" onchange="document.getElementById('note-when').style.display=this.checked?'block':'none'"> Me lembrar</label>
+    <input type="datetime-local" class="field-input" id="note-when" value="${chatDateTimeLocal(soon)}" style="display:none;margin-bottom:10px;">
+    <button class="btn-save" style="width:auto;padding:9px 16px;" onclick="saveChatNote()">Salvar nota</button> <span id="note-fb" class="integ-muted"></span>`, 480);
+  setTimeout(() => { const t = document.getElementById('note-text'); if (t) t.focus(); }, 50);
+}
+
+async function saveChatNote() {
+  const text = document.getElementById('note-text').value.trim();
+  const fb = document.getElementById('note-fb');
+  if (!text) { fb.textContent = 'Escreva a nota.'; return; }
+  let remindAt = '';
+  if (document.getElementById('note-remind').checked) {
+    const d = new Date(document.getElementById('note-when').value);
+    if (isNaN(d)) { fb.textContent = 'Escolha a data do lembrete.'; return; }
+    remindAt = d.toISOString();
+  }
+  const c = _chatItems.find(x => x.id === _chatOpenKey) || {};
+  const me = chatMe();
+  fb.textContent = 'Salvando...';
+  try {
+    await window._fb.addChatNote({ act: _chatAct, chatKey: _chatOpenKey, chatName: chatName(c, chatLeadFor(c, chatLeadIndex(_chatAct))), text, by: me.name, byUid: me.uid, at: new Date().toISOString(), remindAt, done: !remindAt });
+    closeHuvenModal();
+    showToast(remindAt ? 'Lembrete salvo.' : 'Nota salva.', 'success', 1800);
+  } catch (e) { fb.textContent = 'Erro: ' + e.message; }
+}
+
+async function finishReminder(id) {
+  try { await window._fb.updateChatNote(id, { done: true, doneAt: new Date().toISOString(), doneBy: chatMe().name }); }
+  catch (e) { showToast('Erro: ' + e.message, 'error'); }
+}
+
+async function deleteChatNoteUi(id) {
+  if (!confirm('Excluir esta nota?')) return;
+  try { await window._fb.deleteChatNote(id); } catch (e) { showToast('Erro: ' + e.message, 'error'); }
+}
+
+// Lembretes vencidos aparecem num cartão no canto da tela, em qualquer aba do CRM.
+let _reminders = [];
+let _remUnsub = null;
+let _remShown = new Set();
+function startReminderWatch() {
+  if (_remUnsub || !window._fb || typeof window._fb.listenOpenReminders !== 'function') return;
+  _remUnsub = window._fb.listenOpenReminders(list => { _reminders = list || []; renderReminders(); renderChatList(); });
+  setInterval(renderReminders, 30000);
+}
+
+function dueReminders() {
+  const now = Date.now();
+  return _reminders.filter(n => !n.done && Date.parse(n.remindAt) <= now).sort((a, b) => String(a.remindAt).localeCompare(String(b.remindAt)));
+}
+
+function chatReminderFor(act, key) {
+  return _reminders.filter(n => !n.done && normalizeActValue(n.act) === normalizeActValue(act) && n.chatKey === key).sort((a, b) => String(a.remindAt).localeCompare(String(b.remindAt)))[0] || null;
+}
+
+function renderReminders() {
+  const due = dueReminders().filter(n => !_remShown.has(n.id + ':hidden'));
+  let el = document.getElementById('rem-stack');
+  if (!due.length) { if (el) el.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'rem-stack'; el.className = 'rem-stack'; document.body.appendChild(el); }
+  due.forEach(n => { if (!_remShown.has(n.id)) { _remShown.add(n.id); if (typeof playLeadNotificationSound === 'function') try { playLeadNotificationSound(); } catch (e) {} } });
+  el.innerHTML = due.slice(0, 4).map(n => `<div class="rem-card">
+    <button class="wa-alert-close" style="position:static;float:right;font-size:16px;line-height:1;" title="Esconder" onclick="_remShown.add('${escapeJsString(n.id)}:hidden');renderReminders()">×</button><div style="font-size:11px;font-weight:800;color:#B7791F;margin-bottom:3px;">🔔 LEMBRETE${isAdmin ? ' · ' + escapeHtml(getClientDisplayName(n.act) || '') : ''} · ${escapeHtml(n.chatName || '')}</div>
+    <div style="white-space:pre-wrap;">${escapeHtml(limitText(n.text || '', 240))}</div>
+    <div class="rem-actions">
+      <button class="chat-pill active" onclick="openChatByKey('${escapeJsString(n.act)}','${escapeJsString(n.chatKey)}')">Abrir conversa</button>
+      <button class="chat-pill" onclick="finishReminder('${escapeJsString(n.id)}')">Concluir</button>
+      <button class="chat-pill" onclick="snoozeReminder('${escapeJsString(n.id)}')">Adiar 1 h</button>
+    </div></div>`).join('') + (due.length > 4 ? `<div class="rem-card" style="text-align:center;">+${due.length - 4} lembretes</div>` : '');
+}
+
+async function snoozeReminder(id) {
+  try { await window._fb.updateChatNote(id, { remindAt: new Date(Date.now() + 3600000).toISOString() }); _remShown.delete(id); }
+  catch (e) { showToast('Erro: ' + e.message, 'error'); }
+}
+
+async function openChatByKey(act, key) {
+  act = normalizeActValue(act);
+  switchView('chat');
+  if (typeof setMobileNav === 'function') setMobileNav('chat');
+  if (isAdmin) {
+    const sel = document.getElementById('chat-client-select');
+    if (sel.value !== act) { sel.value = act; onChatClientChange(); }
+  }
+  if (!_chatItems.some(c => c.id === key)) {
+    const chat = await window._fb.getInboxChat(act, key).catch(() => null);
+    if (chat) { _chatExtra[chat.id] = chat; _chatItems = _chatItems.concat(chat); }
+  }
+  openChat(key);
+}
+
+// ===== CHAT: MENSAGEM AGENDADA =====
+function openScheduleMessage() {
+  if (!_chatAct || !_chatOpenKey) return;
+  const ta = document.getElementById('chat-text');
+  const soon = new Date(Date.now() + 60 * 60000); soon.setMinutes(0, 0, 0);
+  openHuvenModal('Agendar mensagem', `
+    <div class="integ-muted" style="margin-bottom:10px;font-size:12.5px;">A mensagem sai sozinha no horário, por este WhatsApp, mesmo com o CRM fechado.</div>
+    <textarea class="field-input" id="sched-text" rows="4" maxlength="4000" style="width:100%;box-sizing:border-box;resize:vertical;margin-bottom:10px;">${escapeHtml(ta ? ta.value : '')}</textarea>
+    ${_chatPendingMedia ? `<div style="font-size:12.5px;margin-bottom:10px;">📎 ${escapeHtml(_chatPendingMedia.fileName)} vai junto (o texto vira legenda).</div>` : ''}
+    <label class="field-label">Quando enviar</label>
+    <input type="datetime-local" class="field-input" id="sched-when" value="${chatDateTimeLocal(soon)}" style="margin-bottom:12px;">
+    <button class="btn-save" style="width:auto;padding:9px 16px;" onclick="saveScheduleMessage()">Agendar</button> <span id="sched-fb" class="integ-muted"></span>`, 480);
+}
+
+async function saveScheduleMessage() {
+  const text = document.getElementById('sched-text').value.trim();
+  const when = new Date(document.getElementById('sched-when').value);
+  const fb = document.getElementById('sched-fb');
+  if (!text && !_chatPendingMedia) { fb.textContent = 'Escreva a mensagem.'; return; }
+  if (isNaN(when) || when.getTime() < Date.now() + 30000) { fb.textContent = 'Escolha um horário no futuro.'; return; }
+  const me = chatMe();
+  fb.textContent = 'Agendando...';
+  try {
+    const data = { act: _chatAct, chatKey: _chatOpenKey, text, sendAt: when.toISOString(), createdBy: me.uid, createdByName: me.name, createdAt: new Date().toISOString() };
+    if (_chatPendingMedia) data.media = _chatPendingMedia;
+    await window._fb.addScheduledMessage(data);
+    const ta = document.getElementById('chat-text');
+    if (ta) { ta.value = ''; ta.style.height = 'auto'; }
+    clearChatMedia();
+    closeHuvenModal();
+    showToast('Mensagem agendada para ' + when.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + '.', 'success');
+  } catch (e) { fb.textContent = 'Erro: ' + e.message; }
+}
+
+async function cancelScheduled(id) {
+  const s = _chatSched.find(x => x.id === id);
+  if (s && s.status === 'pending' && !confirm('Cancelar esta mensagem agendada?')) return;
+  try { await window._fb.cancelScheduledMessage(id, chatMe().name); }
+  catch (e) { showToast('Erro: ' + e.message, 'error'); }
+}
+
 function openNewChat(prefill) {
   if (!_chatAct) { showToast('Escolha o cliente primeiro.', 'warning'); return; }
   if (_chatMsgUnsub) { _chatMsgUnsub(); _chatMsgUnsub = null; }
+  stopChatExtras();
   _chatOpenKey = null;
   document.getElementById('chat-wrap').classList.add('open');
   document.getElementById('chat-main').innerHTML = `
@@ -12614,6 +13012,7 @@ function startLeadNotifier() {
   const realtimeStarted = startLeadRealtimeListener();
   startWhatsAppStatusWatch();
   startR2UsageWatch();
+  startReminderWatch();
   if (!realtimeStarted) checkForNewLeads().catch(e => console.warn('Lead notifier prime error:', e));
   setInterval(() => {
     if (!_leadRealtimeUnsubscribe) checkForNewLeads().catch(e => console.warn('Lead notifier error:', e));
