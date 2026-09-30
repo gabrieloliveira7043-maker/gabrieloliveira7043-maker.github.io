@@ -1478,6 +1478,56 @@ td { font-family: var(--font); font-size: 13px; }
 .auto-box .field-input { padding: 6px 8px; }
 .auto-steps-summary { margin: 4px 0 8px 18px; font-size: 12.5px; color: var(--text); display: flex; flex-direction: column; gap: 3px; }
 
+/* Automações: editor visual */
+#automacoes-view.editing { padding: 12px 16px; }
+.flow-editor { display: flex; flex-direction: column; height: calc(100vh - 24px); background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+.flow-top { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.flow-name { max-width: 320px; font-weight: 800; font-size: 15px; }
+.flow-body { display: flex; flex: 1; min-height: 0; }
+.flow-palette { width: 220px; flex-shrink: 0; border-right: 1px solid var(--border); padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.flow-add { display: flex; align-items: center; gap: 9px; width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 9px 10px; font-size: 13px; font-weight: 700; color: var(--text); cursor: pointer; text-align: left; }
+.flow-add:hover { border-color: var(--accent); }
+.flow-canvas { flex: 1; position: relative; overflow: hidden; background-color: var(--bg); background-image: radial-gradient(var(--border2) 1px, transparent 1px); background-size: 22px 22px; cursor: grab; touch-action: none; }
+.flow-canvas:active { cursor: grabbing; }
+.flow-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.flow-edges { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.flow-edge-del { pointer-events: all; cursor: pointer; }
+.flow-node { position: absolute; width: 240px; background: var(--surface); border: 1.5px solid var(--border2); border-radius: 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.08); cursor: move; user-select: none; }
+.flow-node.selected { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+.flow-node-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); border-left: 4px solid; border-radius: 13px 13px 0 0; font-size: 13px; font-weight: 800; color: var(--text); }
+.flow-node-icon { width: 26px; height: 26px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.flow-node-body { padding: 10px 12px 12px; font-size: 12.5px; color: var(--muted2); line-height: 1.45; min-height: 20px; }
+.flow-node-body b { color: var(--text); }
+.flow-file { font-size: 12px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.flow-port { position: absolute; width: 14px; height: 14px; border-radius: 50%; background: var(--surface); border: 2.5px solid var(--muted); }
+.flow-port.in { left: -8px; top: 19px; }
+.flow-port.out { right: -8px; top: 19px; cursor: crosshair; border-color: var(--accent); }
+.flow-port.out:hover { background: var(--accent); }
+.flow-port.out.yes { top: auto; bottom: 34px; border-color: #1FA855; }
+.flow-port.out.no { top: auto; bottom: 10px; border-color: #D5563F; }
+.flow-port-label { position: absolute; right: 12px; font-size: 10.5px; font-weight: 800; }
+.flow-port-label.yes { bottom: 33px; color: #1FA855; }
+.flow-port-label.no { bottom: 9px; color: #D5563F; }
+.flow-node[data-node] .flow-node-body { padding-right: 40px; }
+.flow-zoom { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 4px; }
+.flow-zoom button { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--border2); background: var(--surface); color: var(--text); font-size: 17px; font-weight: 800; cursor: pointer; }
+.flow-inspector { width: 300px; flex-shrink: 0; border-left: 1px solid var(--border); padding: 14px; overflow-y: auto; }
+.flow-insp-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 14px; color: var(--text); }
+.flow-inspector .field-input { width: 100%; margin-top: 4px; }
+.flow-inspector textarea { resize: vertical; font-size: 13px; }
+.flow-kinds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 4px; }
+.flow-kinds button { border: 1px solid var(--border2); background: var(--surface); color: var(--text); border-radius: 9px; padding: 7px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.flow-kinds button.active { background: var(--btn-bg); color: var(--btn-text); border-color: var(--btn-bg); }
+@media (max-width: 900px) {
+  .flow-editor { height: calc(100vh - 150px); }
+  .flow-body { flex-direction: column; }
+  .flow-palette { width: 100%; flex-direction: row; flex-wrap: wrap; border-right: none; border-bottom: 1px solid var(--border); max-height: 150px; }
+  .flow-add { width: auto; }
+  .flow-palette .ci-label, .flow-palette .integ-muted, .flow-palette label, .flow-palette > div[style] { display: none; }
+  .flow-inspector { display: none; width: 100%; border-left: none; border-top: 1px solid var(--border); max-height: 45%; }
+  .flow-inspector.open { display: block; }
+}
+
 /* Clientes (admin) */
 .huv-view { padding: 28px 36px; }
 .huv-header { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
@@ -1939,12 +1989,12 @@ td { font-family: var(--font); font-size: 13px; }
       await batch.commit();
     },
     // Envia imagem/vídeo/áudio da campanha para o Worker (fica disponível por 30 dias).
-    async uploadCampaignMedia(act, file) {
+    async uploadCampaignMedia(act, file, keep) {
       if (!auth.currentUser) throw new Error('Não autenticado');
       const token = await auth.currentUser.getIdToken();
       const res = await fetch(ADMIN_API_URL + '/media/upload', {
         method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': file.type || 'application/octet-stream', 'X-Act': normalizeAct(act), 'X-File-Name': encodeURIComponent(file.name) },
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': file.type || 'application/octet-stream', 'X-Act': normalizeAct(act), 'X-File-Name': encodeURIComponent(file.name), ...(keep ? { 'X-Keep': '1' } : {}) },
         body: file
       });
       const data = await res.json().catch(() => ({}));
@@ -2024,6 +2074,7 @@ td { font-family: var(--font); font-size: 13px; }
   <div class="mnav-sheet-grid">
     <button type="button" class="mnav-sheet-item"  onclick="closeMobileMore(); switchView('report'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18M7 15l4-4 3 3 5-6"/></svg><span>Dashboard</span></button>
     <button type="button" class="mnav-sheet-item" data-admin="1" onclick="closeMobileMore(); switchView('clientes'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16M9 7h2M13 7h2M9 11h2M13 11h2"/></svg><span>Clientes</span></button>
+    <button type="button" class="mnav-sheet-item"  onclick="closeMobileMore(); switchView('automacoes'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM19 17a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM5 7v4a4 4 0 0 0 4 4h6a4 4 0 0 1 4 4M19 3v6M16 6h6"/></svg><span>Automações</span></button>
     <button type="button" class="mnav-sheet-item"  onclick="closeMobileMore(); switchView('cadencia'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM16 2v4M8 2v4M3 10h18"/></svg><span>Cadência</span></button>
     <button type="button" class="mnav-sheet-item"  onclick="closeMobileMore(); switchView('whatsapp'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4"/></svg><span>Conexões</span></button>
     <button type="button" class="mnav-sheet-item" data-admin="1" onclick="closeMobileMore(); switchView('integracoes'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg><span>Integrações</span></button>
@@ -2101,6 +2152,10 @@ td { font-family: var(--font); font-size: 13px; }
         <div class="nav-item" id="nav-contatos" onclick="if(window.abrirContatos) abrirContatos(); else switchView('contatos')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/><line x1="20" y1="8" x2="20" y2="14"/></svg>
           Contatos
+        </div>
+        <div class="nav-item" id="nav-automacoes" onclick="switchView('automacoes')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM19 17a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM5 7v4a4 4 0 0 0 4 4h6a4 4 0 0 1 4 4M19 3v6M16 6h6"/></svg>
+          Automações
         </div>
       </div>
       <div class="nav-group">
@@ -2415,7 +2470,6 @@ td { font-family: var(--font); font-size: 13px; }
           <div style="font-size:12px; color:var(--muted); margin-top:2px;" id="crm-subtitle">Selecione um cliente na barra lateral</div>
         </div>
         <div class="crm-actions">
-          <button type="button" class="crm-auto-btn" onclick="openAutomations()" title="Follow-up automático por coluna">⚡ Automações</button>
           <select class="crm-client-select" id="crm-client-select" onchange="onCrmClientChange()" style="display:none;">
             <option value="all">Todos os clientes</option>
           </select>
@@ -2942,6 +2996,9 @@ td { font-family: var(--font); font-size: 13px; }
         <div id="campaign-list" style="display:flex; flex-direction:column; gap:10px;"></div>
       </div>
     </div>
+
+    <!-- Automações View -->
+    <div id="automacoes-view" class="huv-view" style="display:none;"><div id="automacoes-body"></div></div>
 
     <!-- Clientes View (admin) -->
     <div id="clientes-view" class="huv-view" style="display:none;">
@@ -4684,12 +4741,12 @@ window.abrirContatos = function abrirContatos() {
     if(topbar) topbar.style.display = 'none';
     const contentEl = document.querySelector('.content');
     if(contentEl) contentEl.style.display = 'none';
-    ['crm-view','conta-view','whatsapp-view','campanhas-view','chat-view','cadencia-view','integracoes-view','clientes-view'].forEach(id => {
+    ['crm-view','conta-view','whatsapp-view','campanhas-view','chat-view','cadencia-view','integracoes-view','clientes-view','automacoes-view'].forEach(id => {
       const el = document.getElementById(id); if(el) el.style.display = 'none';
     });
     const v = document.getElementById('contatos-view');
     if(v) { v.style.cssText += ';display:block!important;visibility:visible!important;opacity:1!important;'; }
-    ['report','clientes','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','contatos','integracoes'].forEach(n => {
+    ['report','clientes','automacoes','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','contatos','integracoes'].forEach(n => {
       const el = document.getElementById('nav-'+n);
       if(el) el.classList.toggle('active', n==='contatos');
     });
@@ -5897,7 +5954,7 @@ function renderAtendimento() {
 }
 
 function switchView(view) {
-  ['report','clientes','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','contatos','integracoes'].forEach(v => {
+  ['report','clientes','automacoes','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','contatos','integracoes'].forEach(v => {
     const el = document.getElementById('nav-' + v);
     if (el) el.classList.toggle('active', v === view);
   });
@@ -5915,6 +5972,9 @@ function switchView(view) {
   if (view === 'campanhas') renderCampaignsView();
   const chatView = document.getElementById('chat-view');
   if (chatView) chatView.style.display = view === 'chat' ? 'block' : 'none';
+  const automacoesView = document.getElementById('automacoes-view');
+  if (automacoesView) automacoesView.style.display = view === 'automacoes' ? 'block' : 'none';
+  if (view === 'automacoes') renderAutomacoesView();
   const clientesView = document.getElementById('clientes-view');
   if (clientesView) clientesView.style.display = view === 'clientes' ? 'block' : 'none';
   if (view === 'clientes') renderClientesView();
@@ -7792,6 +7852,7 @@ function syncClientSelectors(act) {
   if (visible('contatos-view') && typeof onContatosClientChange === 'function') onContatosClientChange();
   if (visible('crm-view')) getLeadsAsync().then(() => { renderKanban(); renderFunilChart(); renderFunilEvolucao(); });
   if (visible('clientes-view')) renderClientesView();
+  if (visible('automacoes-view')) { if (_flow && _flow.act !== normalizeActValue(act)) { _flow = null; document.getElementById('automacoes-view').classList.remove('editing'); } renderAutomacoesView(); }
 }
 
 function setHuvFilter(f) { _huvFilter = f; renderClientesView(); }
@@ -8065,6 +8126,513 @@ function automationCardChip(lead) {
   const when = a.nextAt ? new Date(a.nextAt) : null;
   const txt = when ? when.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
   return `<span class="kc-chip kc-auto" title="${escapeHtml((a.name || 'Automação') + (txt ? ' · próximo passo em ' + txt : '') + (a.waiting ? ' · ' + a.waiting : ''))}">⚡ ${escapeHtml(limitText(a.name || 'Automação', 22))} · passo ${(Number(a.step) || 0) + 1}</span>`;
+}
+
+// ===== AUTOMAÇÕES: editor visual de fluxos (blocos ligados, no estilo do n8n) =====
+// O Worker executa cada lead pelo fluxo: gatilho → blocos seguindo as setas.
+let _flowList = [];
+let _flow = null;          // fluxo aberto no editor
+let _flowSel = null;       // bloco selecionado
+let _flowView = { x: 40, y: 40, z: 1 };
+let _flowPointer = null;   // arrastando tela, bloco ou ligação
+const FLOW_W = 240;
+const FLOW_UNITS = { min: 'minutos', h: 'horas', d: 'dias' };
+const FLOW_MEDIA = { text: 'Texto', image: 'Imagem', video: 'Vídeo', audio: 'Áudio (voz)' };
+const FLOW_ICONS = {
+  trigger: 'M13 2 3 14h9l-1 8 10-12h-9z',
+  wait: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2',
+  text: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
+  image: 'M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM8.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM21 15l-5-5L5 21',
+  video: 'M23 7l-7 5 7 5zM1 5h15v14H1z',
+  audio: 'M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v3',
+  move: 'M5 12h14M13 6l6 6-6 6',
+  condition: 'M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9'
+};
+const FLOW_COLORS = { trigger: '#C9A24A', wait: '#2F6FDB', message: '#1FA855', move: '#7A5AF8', condition: '#E08A1E' };
+
+function flowAct() {
+  if (!isAdmin) return window._fb && window._fb.getProfile() ? normalizeActValue(window._fb.getProfile().act) : '';
+  return normalizeActValue((activeClient && activeClient.account) || crmClientFilter || '');
+}
+
+function flowIcon(key, color) {
+  return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${color || 'currentColor'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${FLOW_ICONS[key] || FLOW_ICONS.text}"/></svg>`;
+}
+
+function flowUid() { return 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+// ----- Lista de automações -----
+async function renderAutomacoesView() {
+  const box = document.getElementById('automacoes-body');
+  if (!box) return;
+  const act = flowAct();
+  if (_flow) return renderFlowEditor();
+  if (!act) { box.innerHTML = '<div class="integ-empty">Escolha o cliente no topo do menu para ver e criar as automações dele.</div>'; return; }
+  box.innerHTML = '<div class="integ-muted">Carregando...</div>';
+  try { _flowList = await window._fb.listAutomations(act); }
+  catch (e) { box.innerHTML = `<div class="integ-error">Erro: ${escapeHtml(e.message)}</div>`; return; }
+  const leads = (_leadsCache || []).filter(l => leadMatchesClient(l, act));
+  box.innerHTML = `
+    <div class="huv-header" style="margin-bottom:14px;">
+      <div style="flex:1;min-width:220px;">
+        <div class="huv-crumb">${escapeHtml(getClientDisplayName(act) || act)}  /  Vendas</div>
+        <div class="huv-page-title" style="color:var(--text);">Automações</div>
+        <div class="integ-muted" style="margin-top:4px;">Fluxos que rodam sozinhos quando o lead entra numa coluna do funil: esperar, mandar mensagem, imagem, vídeo ou áudio, conferir se respondeu e mover o card.</div>
+      </div>
+      <button class="btn-add-lead" style="height:40px;padding:0 16px;" onclick="openFlowEditor(null)">+ Nova automação</button>
+    </div>
+    <div class="huv-grid">
+      ${_flowList.length ? _flowList.map(f => {
+        const running = leads.filter(l => l.automation && l.automation.id === f.id && l.automation.status === 'running').length;
+        const blocks = Array.isArray(f.nodes) ? f.nodes.length : (f.steps || []).length + 1;
+        const id = escapeJsString(f.id);
+        return `<article class="huv-card">
+          <div class="huv-card-head">
+            <div class="huv-avatar" style="background:var(--amber-dim);color:var(--amber);">${flowIcon('trigger', 'currentColor')}</div>
+            <div style="flex:1;min-width:0;"><div class="huv-name">${escapeHtml(f.name || 'Automação')}</div><div class="huv-sub">Quando entrar em ${escapeHtml(autoStageLabel(act, f.triggerStage))}</div></div>
+            <label class="integ-toggle"><input type="checkbox" ${f.active ? 'checked' : ''} onchange="toggleFlow('${id}', this.checked)"> ${f.active ? 'Ligada' : 'Desligada'}</label>
+          </div>
+          <div class="huv-stats">
+            <div><div class="huv-stat-label">Blocos</div><div class="huv-stat-value">${blocks}</div></div>
+            <div><div class="huv-stat-label">Leads no fluxo</div><div class="huv-stat-value">${running}</div></div>
+            <div><div class="huv-stat-label">Se responder</div><div class="huv-stat-value" style="font-size:13px;">${f.stopOnReply === false ? 'Segue o fluxo' : 'Para'}</div></div>
+          </div>
+          <div class="huv-actions">
+            <button class="huv-btn primary" onclick="openFlowEditor('${id}')">Abrir editor</button>
+            <button class="huv-btn" onclick="duplicateFlow('${id}')">Duplicar</button>
+            <button class="huv-btn" style="margin-left:auto;color:var(--red);border-color:var(--red);" onclick="deleteFlowConfirm('${id}')">Excluir</button>
+          </div>
+        </article>`;
+      }).join('') : '<div class="integ-empty" style="grid-column:1/-1;">Nenhuma automação ainda. Clique em "+ Nova automação" para montar o primeiro fluxo.</div>'}
+    </div>`;
+}
+
+async function toggleFlow(id, on) {
+  const f = _flowList.find(x => x.id === id);
+  if (!f) return;
+  if (on && _flowList.some(x => x.id !== id && x.active && x.triggerStage === f.triggerStage)) {
+    showToast('Já tem outra automação ligada nessa coluna. Desligue ela antes.', 'warning');
+    return renderAutomacoesView();
+  }
+  try { await window._fb.saveAutomation(id, { active: on }); f.active = on; renderAutomacoesView(); }
+  catch (e) { showToast('Erro: ' + e.message, 'warning'); }
+}
+
+async function duplicateFlow(id) {
+  const f = _flowList.find(x => x.id === id);
+  if (!f) return;
+  const { id: _i, createdAt, updatedAt, ...rest } = JSON.parse(JSON.stringify(f));
+  try { await window._fb.saveAutomation(null, { ...rest, name: (f.name || 'Automação') + ' (cópia)', active: false }); renderAutomacoesView(); }
+  catch (e) { showToast('Erro: ' + e.message, 'warning'); }
+}
+
+async function deleteFlowConfirm(id) {
+  const f = _flowList.find(x => x.id === id);
+  if (!f) return;
+  if (!await showConfirm(`A automação "${f.name}" será excluída. Os leads que estão no fluxo param de receber os próximos passos.`, 'Excluir automação', 'Excluir', true)) return;
+  try { await window._fb.deleteAutomation(id); renderAutomacoesView(); }
+  catch (e) { showToast('Erro: ' + e.message, 'warning'); }
+}
+
+// ----- Editor -----
+// Automações antigas (lista de passos) viram blocos ligados.
+function flowFromSteps(f, act) {
+  const nodes = [{ id: 't', type: 'trigger', x: 40, y: 160, data: { stage: f.triggerStage } }];
+  const edges = [];
+  let prev = 't', x = 330;
+  (f.steps || []).forEach(st => {
+    const add = (type, data) => { const id = flowUid(); nodes.push({ id, type, x, y: 160, data }); edges.push({ from: prev, port: 'out', to: id }); prev = id; x += 290; };
+    add('wait', { amount: st.amount, unit: st.unit });
+    if ((st.templates || []).length) add('message', { kind: 'text', templates: st.templates });
+    if (st.moveTo) add('move', { stage: st.moveTo, stageLabel: autoStageLabel(act, st.moveTo) });
+  });
+  return { nodes, edges };
+}
+
+function openFlowEditor(id) {
+  const act = flowAct();
+  if (!act) return showToast('Escolha o cliente no topo do menu.', 'warning');
+  const src = id ? _flowList.find(x => x.id === id) : null;
+  const stages = getStages(act) || [];
+  if (src) {
+    _flow = JSON.parse(JSON.stringify(src));
+    if (!Array.isArray(_flow.nodes)) Object.assign(_flow, flowFromSteps(src, act));
+  } else {
+    const t = flowUid(), w1 = flowUid(), m1 = flowUid(), w2 = flowUid(), m2 = flowUid();
+    _flow = {
+      act, name: 'Nova automação', active: true, stopOnReply: true, onReply: { moveTo: '' }, hours: { enabled: true, start: 8, end: 20 },
+      nodes: [
+        { id: t, type: 'trigger', x: 40, y: 160, data: { stage: stages[0] ? stages[0].id : 'novo' } },
+        { id: w1, type: 'wait', x: 330, y: 160, data: { amount: 2, unit: 'h' } },
+        { id: m1, type: 'message', x: 620, y: 160, data: { kind: 'text', templates: ['Oi {primeiro_nome}, conseguiu ver minha mensagem?'] } },
+        { id: w2, type: 'wait', x: 910, y: 160, data: { amount: 4, unit: 'h' } },
+        { id: m2, type: 'message', x: 1200, y: 160, data: { kind: 'text', templates: ['{primeiro_nome}, posso te ajudar com mais alguma informação?'] } }
+      ],
+      edges: [{ from: t, port: 'out', to: w1 }, { from: w1, port: 'out', to: m1 }, { from: m1, port: 'out', to: w2 }, { from: w2, port: 'out', to: m2 }]
+    };
+  }
+  _flow.act = act;
+  _flowSel = null;
+  _flowView = { x: 30, y: 30, z: window.innerWidth < 900 ? 0.7 : 1 };
+  document.getElementById('automacoes-view').classList.add('editing');
+  renderFlowEditor();
+}
+
+function closeFlowEditor(force) {
+  if (!force && _flow && _flow._dirty && !confirm('Sair sem salvar as mudanças?')) return;
+  _flow = null; _flowSel = null;
+  document.getElementById('automacoes-view').classList.remove('editing');
+  renderAutomacoesView();
+}
+
+function renderFlowEditor() {
+  const box = document.getElementById('automacoes-body');
+  if (!box || !_flow) return;
+  const act = _flow.act;
+  const add = (type, kind, label) => `<button class="flow-add" onclick="addFlowNode('${type}', '${kind || ''}')">${flowIcon(kind || type, FLOW_COLORS[type])}<span>${label}</span></button>`;
+  box.innerHTML = `
+    <div class="flow-editor">
+      <div class="flow-top">
+        <button class="huv-btn" onclick="closeFlowEditor()">← Automações</button>
+        <input class="field-input flow-name" id="flow-name" value="${escapeHtml(_flow.name || '')}" oninput="_flow.name = this.value; _flow._dirty = true" aria-label="Nome da automação">
+        <label class="integ-toggle"><input type="checkbox" ${_flow.active !== false ? 'checked' : ''} onchange="_flow.active = this.checked; _flow._dirty = true"> Ligada</label>
+        <span id="flow-fb" class="integ-muted" style="margin-left:auto;"></span>
+        <button class="btn-add-lead" style="height:38px;padding:0 16px;" onclick="saveFlow()">Salvar</button>
+      </div>
+      <div class="flow-body">
+        <aside class="flow-palette">
+          <div class="ci-label">Adicionar bloco</div>
+          ${add('wait', 'wait', 'Esperar')}
+          ${add('message', 'text', 'Mensagem de texto')}
+          ${add('message', 'image', 'Imagem')}
+          ${add('message', 'video', 'Vídeo')}
+          ${add('message', 'audio', 'Áudio (voz)')}
+          ${add('move', 'move', 'Mover card')}
+          ${add('condition', 'condition', 'Respondeu?')}
+          <div class="ci-label" style="margin-top:16px;">Regras do fluxo</div>
+          <label class="integ-toggle" style="align-items:flex-start;"><input type="checkbox" ${_flow.stopOnReply !== false ? 'checked' : ''} onchange="_flow.stopOnReply = this.checked; _flow._dirty = true; renderFlowEditor()"> Parar quando o lead responder</label>
+          ${_flow.stopOnReply !== false ? `<label class="auto-label" style="display:block;margin-top:6px;">e mover para<select class="field-input" style="margin-top:4px;" onchange="_flow.onReply = { moveTo: this.value }; _flow._dirty = true">${autoStageOptions(act, (_flow.onReply || {}).moveTo, 'Não mover')}</select></label>` : '<div class="integ-muted" style="margin-top:6px;">Use o bloco "Respondeu?" para decidir o caminho.</div>'}
+          <label class="integ-toggle" style="margin-top:10px;align-items:flex-start;"><input type="checkbox" ${_flow.hours && _flow.hours.enabled ? 'checked' : ''} onchange="_flow.hours = { ..._flow.hours, enabled: this.checked }; _flow._dirty = true"> Enviar só em horário comercial</label>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:4px;font-size:12px;color:var(--muted2);">das <input type="number" class="field-input" min="0" max="23" value="${(_flow.hours || {}).start ?? 8}" style="width:58px;padding:5px;" onchange="_flow.hours = { ..._flow.hours, start: Number(this.value) }; _flow._dirty = true"> às <input type="number" class="field-input" min="1" max="24" value="${(_flow.hours || {}).end ?? 20}" style="width:58px;padding:5px;" onchange="_flow.hours = { ..._flow.hours, end: Number(this.value) }; _flow._dirty = true"> h</div>
+          <div class="integ-muted" style="margin-top:14px;">Arraste os blocos para organizar. Para ligar, puxe a bolinha da direita de um bloco até outro. Clique na ✕ da linha para desligar.</div>
+        </aside>
+        <div class="flow-canvas" id="flow-canvas">
+          <div class="flow-world" id="flow-world"><svg class="flow-edges" id="flow-edges" width="6000" height="4000"></svg><div id="flow-nodes"></div></div>
+          <div class="flow-zoom"><button onclick="zoomFlow(0.1)" aria-label="Aproximar">+</button><button onclick="zoomFlow(-0.1)" aria-label="Afastar">−</button><button onclick="fitFlow()" aria-label="Enquadrar" title="Enquadrar tudo">⤢</button></div>
+        </div>
+        <aside class="flow-inspector" id="flow-inspector"></aside>
+      </div>
+    </div>`;
+  const canvas = document.getElementById('flow-canvas');
+  canvas.addEventListener('pointerdown', flowPointerDown);
+  canvas.addEventListener('wheel', ev => { if (ev.ctrlKey || ev.metaKey) { ev.preventDefault(); zoomFlow(ev.deltaY < 0 ? 0.08 : -0.08); } else { _flowView.x -= ev.deltaX; _flowView.y -= ev.deltaY; applyFlowView(); ev.preventDefault(); } }, { passive: false });
+  renderFlowNodes();
+  renderFlowInspector();
+}
+
+function applyFlowView() {
+  const w = document.getElementById('flow-world');
+  if (w) w.style.transform = `translate(${_flowView.x}px, ${_flowView.y}px) scale(${_flowView.z})`;
+}
+
+function zoomFlow(d) { _flowView.z = Math.min(1.6, Math.max(0.4, +(_flowView.z + d).toFixed(2))); applyFlowView(); }
+
+function fitFlow() {
+  const c = document.getElementById('flow-canvas');
+  if (!c || !_flow.nodes.length) return;
+  const xs = _flow.nodes.map(n => n.x), ys = _flow.nodes.map(n => n.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs) + FLOW_W, minY = Math.min(...ys), maxY = Math.max(...ys) + 140;
+  const z = Math.min(1.2, Math.max(0.4, Math.min((c.clientWidth - 60) / (maxX - minX), (c.clientHeight - 60) / (maxY - minY))));
+  _flowView = { z, x: 30 - minX * z, y: 30 - minY * z };
+  applyFlowView();
+}
+
+function flowNodeSummary(n) {
+  const d = n.data || {};
+  const act = _flow.act;
+  if (n.type === 'trigger') return `Quando o lead entrar em <b>${escapeHtml(autoStageLabel(act, d.stage))}</b>`;
+  if (n.type === 'wait') return `Esperar <b>${Number(d.amount) || 0} ${FLOW_UNITS[d.unit] || 'horas'}</b>`;
+  if (n.type === 'move') return d.stage ? `Mover para <b>${escapeHtml(autoStageLabel(act, d.stage))}</b>` : '<span style="color:var(--red);">Escolha a coluna</span>';
+  if (n.type === 'condition') return 'O lead respondeu no WhatsApp desde que entrou no fluxo?';
+  const kind = d.kind || 'text';
+  const txt = (d.templates || []).find(Boolean) || '';
+  const file = d.media && d.media.fileName ? `<div class="flow-file">📎 ${escapeHtml(limitText(d.media.fileName, 28))}</div>` : (kind !== 'text' ? '<div class="flow-file" style="color:var(--red);">Falta o arquivo</div>' : '');
+  return file + (txt ? escapeHtml(limitText(txt, 90)) : (kind === 'text' ? '<span style="color:var(--red);">Escreva a mensagem</span>' : ''));
+}
+
+function flowNodeTitle(n) {
+  if (n.type === 'message') return FLOW_MEDIA[(n.data || {}).kind || 'text'] === 'Texto' ? 'Mensagem' : FLOW_MEDIA[(n.data || {}).kind];
+  return { trigger: 'Gatilho', wait: 'Esperar', move: 'Mover card', condition: 'Respondeu?' }[n.type] || n.type;
+}
+
+function renderFlowNodes() {
+  const host = document.getElementById('flow-nodes');
+  if (!host) return;
+  host.innerHTML = _flow.nodes.map(n => {
+    const color = FLOW_COLORS[n.type];
+    const iconKey = n.type === 'message' ? ((n.data || {}).kind || 'text') : n.type;
+    const ports = n.type === 'condition'
+      ? `<span class="flow-port out yes" data-node="${n.id}" data-port="yes" title="Sim"></span><span class="flow-port-label yes">Sim</span><span class="flow-port out no" data-node="${n.id}" data-port="no" title="Não"></span><span class="flow-port-label no">Não</span>`
+      : `<span class="flow-port out" data-node="${n.id}" data-port="out"></span>`;
+    return `<div class="flow-node ${_flowSel === n.id ? 'selected' : ''}" data-node="${n.id}" style="left:${n.x}px;top:${n.y}px;">
+      ${n.type !== 'trigger' ? `<span class="flow-port in" data-node="${n.id}"></span>` : ''}
+      <div class="flow-node-head" style="border-color:${color};"><span class="flow-node-icon" style="background:${color}22;">${flowIcon(iconKey, color)}</span><span>${escapeHtml(flowNodeTitle(n))}</span></div>
+      <div class="flow-node-body">${flowNodeSummary(n)}</div>
+      ${ports}
+    </div>`;
+  }).join('');
+  applyFlowView();
+  drawFlowEdges();
+}
+
+function flowPortPos(nodeId, port) {
+  const n = _flow.nodes.find(x => x.id === nodeId);
+  const el = document.querySelector(`.flow-node[data-node="${nodeId}"]`);
+  if (!n || !el) return null;
+  if (port === 'in') return { x: n.x, y: n.y + 26 };
+  const p = el.querySelector(`.flow-port.out[data-port="${port}"]`);
+  return p ? { x: n.x + p.offsetLeft + 7, y: n.y + p.offsetTop + 7 } : { x: n.x + FLOW_W, y: n.y + 26 };
+}
+
+function flowCurve(a, b) {
+  const dx = Math.max(60, Math.abs(b.x - a.x) / 2);
+  return `M${a.x},${a.y} C${a.x + dx},${a.y} ${b.x - dx},${b.y} ${b.x},${b.y}`;
+}
+
+function drawFlowEdges(temp) {
+  const svg = document.getElementById('flow-edges');
+  if (!svg) return;
+  const parts = _flow.edges.map((e, i) => {
+    const a = flowPortPos(e.from, e.port || 'out'), b = flowPortPos(e.to, 'in');
+    if (!a || !b) return '';
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    const color = e.port === 'yes' ? '#1FA855' : e.port === 'no' ? '#D5563F' : 'var(--muted)';
+    return `<path d="${flowCurve(a, b)}" stroke="${color}" stroke-width="2.2" fill="none"/>
+      <g class="flow-edge-del" onclick="removeFlowEdge(${i})"><circle cx="${mx}" cy="${my}" r="9" fill="var(--surface)" stroke="var(--border2)"/><path d="M${mx - 3.5},${my - 3.5} L${mx + 3.5},${my + 3.5} M${mx + 3.5},${my - 3.5} L${mx - 3.5},${my + 3.5}" stroke="var(--muted2)" stroke-width="1.6"/></g>`;
+  });
+  if (temp) parts.push(`<path d="${flowCurve(temp.a, temp.b)}" stroke="var(--accent)" stroke-width="2.2" stroke-dasharray="6 5" fill="none"/>`);
+  svg.innerHTML = parts.join('');
+}
+
+function flowWorldPoint(ev) {
+  const r = document.getElementById('flow-canvas').getBoundingClientRect();
+  return { x: (ev.clientX - r.left - _flowView.x) / _flowView.z, y: (ev.clientY - r.top - _flowView.y) / _flowView.z };
+}
+
+function flowPointerDown(ev) {
+  if (ev.target.closest('.flow-zoom') || ev.target.closest('.flow-edge-del')) return;
+  const port = ev.target.closest('.flow-port.out');
+  const node = ev.target.closest('.flow-node');
+  if (port) {
+    _flowPointer = { mode: 'connect', from: port.dataset.node, port: port.dataset.port };
+  } else if (node) {
+    const n = _flow.nodes.find(x => x.id === node.dataset.node);
+    const p = flowWorldPoint(ev);
+    _flowPointer = { mode: 'node', id: n.id, dx: p.x - n.x, dy: p.y - n.y, moved: false };
+  } else {
+    _flowPointer = { mode: 'pan', sx: ev.clientX, sy: ev.clientY, vx: _flowView.x, vy: _flowView.y, moved: false };
+  }
+  document.addEventListener('pointermove', flowPointerMove);
+  document.addEventListener('pointerup', flowPointerUp, { once: true });
+  ev.preventDefault();
+}
+
+function flowPointerMove(ev) {
+  const s = _flowPointer;
+  if (!s) return;
+  if (s.mode === 'pan') {
+    _flowView.x = s.vx + ev.clientX - s.sx; _flowView.y = s.vy + ev.clientY - s.sy;
+    s.moved = s.moved || Math.abs(ev.clientX - s.sx) + Math.abs(ev.clientY - s.sy) > 4;
+    applyFlowView();
+  } else if (s.mode === 'node') {
+    const p = flowWorldPoint(ev);
+    const n = _flow.nodes.find(x => x.id === s.id);
+    const nx = Math.round((p.x - s.dx) / 10) * 10, ny = Math.round((p.y - s.dy) / 10) * 10;
+    if (nx !== n.x || ny !== n.y) { n.x = nx; n.y = ny; s.moved = true; _flow._dirty = true; }
+    const el = document.querySelector(`.flow-node[data-node="${n.id}"]`);
+    if (el) { el.style.left = n.x + 'px'; el.style.top = n.y + 'px'; }
+    drawFlowEdges();
+  } else if (s.mode === 'connect') {
+    drawFlowEdges({ a: flowPortPos(s.from, s.port), b: flowWorldPoint(ev) });
+  }
+}
+
+function flowPointerUp(ev) {
+  document.removeEventListener('pointermove', flowPointerMove);
+  const s = _flowPointer;
+  _flowPointer = null;
+  if (!s) return;
+  if (s.mode === 'connect') {
+    const target = document.elementFromPoint(ev.clientX, ev.clientY);
+    const nodeEl = target && target.closest('.flow-node');
+    const to = nodeEl && nodeEl.dataset.node;
+    const toNode = to && _flow.nodes.find(x => x.id === to);
+    if (toNode && to !== s.from && toNode.type !== 'trigger') {
+      _flow.edges = _flow.edges.filter(e => !(e.from === s.from && (e.port || 'out') === s.port));
+      _flow.edges.push({ from: s.from, port: s.port, to });
+      _flow._dirty = true;
+    }
+    drawFlowEdges();
+  } else if (s.mode === 'node' && !s.moved) {
+    _flowSel = s.id; renderFlowNodes(); renderFlowInspector();
+  } else if (s.mode === 'pan' && !s.moved) {
+    _flowSel = null; renderFlowNodes(); renderFlowInspector();
+  }
+}
+
+function removeFlowEdge(i) { _flow.edges.splice(i, 1); _flow._dirty = true; drawFlowEdges(); }
+
+function addFlowNode(type, kind) {
+  const c = document.getElementById('flow-canvas');
+  const cx = (c.clientWidth / 2 - _flowView.x) / _flowView.z - FLOW_W / 2;
+  const cy = (c.clientHeight / 2 - _flowView.y) / _flowView.z - 50;
+  const data = type === 'wait' ? { amount: 1, unit: 'h' } : type === 'message' ? { kind: kind || 'text', templates: [''] } : type === 'move' ? { stage: '' } : type === 'condition' ? { check: 'replied' } : {};
+  const n = { id: flowUid(), type, x: Math.round(cx / 10) * 10, y: Math.round(cy / 10) * 10, data };
+  // Liga sozinho depois do bloco selecionado, se ele ainda não tiver saída.
+  if (_flowSel && _flowSel !== n.id) {
+    const sel = _flow.nodes.find(x => x.id === _flowSel);
+    if (sel && sel.type !== 'condition' && !_flow.edges.some(e => e.from === sel.id)) {
+      _flow.edges.push({ from: sel.id, port: 'out', to: n.id });
+      n.x = sel.x + 290; n.y = sel.y;
+    }
+  }
+  _flow.nodes.push(n);
+  _flowSel = n.id;
+  _flow._dirty = true;
+  renderFlowNodes(); renderFlowInspector();
+}
+
+function deleteFlowNode(id) {
+  const n = _flow.nodes.find(x => x.id === id);
+  if (!n || n.type === 'trigger') return;
+  _flow.nodes = _flow.nodes.filter(x => x.id !== id);
+  _flow.edges = _flow.edges.filter(e => e.from !== id && e.to !== id);
+  _flowSel = null; _flow._dirty = true;
+  renderFlowNodes(); renderFlowInspector();
+}
+
+document.addEventListener('keydown', ev => {
+  if (!_flow || !_flowSel || (ev.key !== 'Delete' && ev.key !== 'Backspace')) return;
+  if (ev.target.closest && ev.target.closest('input, textarea, select')) return;
+  deleteFlowNode(_flowSel);
+});
+
+function setFlowData(key, value) {
+  const n = _flow.nodes.find(x => x.id === _flowSel);
+  if (!n) return;
+  n.data = { ...(n.data || {}), [key]: value };
+  if (key === 'stage') n.data.stageLabel = autoStageLabel(_flow.act, value);
+  _flow._dirty = true;
+  renderFlowNodes();
+}
+
+function setFlowTemplate(i, value) {
+  const n = _flow.nodes.find(x => x.id === _flowSel);
+  if (!n) return;
+  const t = [...((n.data || {}).templates || [''])];
+  t[i] = value;
+  n.data = { ...(n.data || {}), templates: t };
+  _flow._dirty = true;
+  const el = document.querySelector(`.flow-node[data-node="${n.id}"] .flow-node-body`);
+  if (el) el.innerHTML = flowNodeSummary(n);
+}
+
+function renderFlowInspector() {
+  const box = document.getElementById('flow-inspector');
+  if (!box) return;
+  const n = _flow.nodes.find(x => x.id === _flowSel);
+  if (!n) { box.innerHTML = '<div class="integ-muted">Clique num bloco para editar.</div>'; box.classList.remove('open'); return; }
+  box.classList.add('open');
+  const act = _flow.act;
+  const d = n.data || {};
+  let html = `<div class="flow-insp-head"><span class="flow-node-icon" style="background:${FLOW_COLORS[n.type]}22;">${flowIcon(n.type === 'message' ? (d.kind || 'text') : n.type, FLOW_COLORS[n.type])}</span><b>${escapeHtml(flowNodeTitle(n))}</b><button class="btn-close-panel" style="margin-left:auto;" onclick="_flowSel = null; renderFlowNodes(); renderFlowInspector()" aria-label="Fechar">×</button></div>`;
+  if (n.type === 'trigger') {
+    html += `<label class="auto-label">Quando o lead entrar na coluna<select class="field-input" onchange="setFlowData('stage', this.value)">${autoStageOptions(act, d.stage)}</select></label>
+      <div class="integ-muted" style="margin-top:8px;">Vale para leads novos e para cards arrastados ou movidos para essa coluna depois que a automação for salva.</div>`;
+  } else if (n.type === 'wait') {
+    html += `<label class="auto-label">Esperar</label><div style="display:flex;gap:6px;"><input type="number" min="0" class="field-input" value="${Number(d.amount) || 0}" style="width:90px;" oninput="setFlowData('amount', Math.max(0, Number(this.value) || 0))"><select class="field-input" onchange="setFlowData('unit', this.value)">${Object.entries(FLOW_UNITS).map(([k, l]) => `<option value="${k}" ${d.unit === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+      <div class="integ-muted" style="margin-top:8px;">Se cair fora do horário comercial do fluxo, a espera termina no começo do próximo horário.</div>`;
+  } else if (n.type === 'move') {
+    html += `<label class="auto-label">Mover o card para<select class="field-input" onchange="setFlowData('stage', this.value)">${autoStageOptions(act, d.stage, 'Escolha a coluna')}</select></label>
+      <div class="integ-muted" style="margin-top:8px;">Se essa coluna tiver a própria automação, ela começa quando este fluxo terminar.</div>`;
+  } else if (n.type === 'condition') {
+    html += `<div class="integ-muted">Confere se o lead mandou alguma mensagem no WhatsApp desde que entrou neste fluxo. Ligue a saída <b style="color:#1FA855;">Sim</b> e a saída <b style="color:#D5563F;">Não</b> aos próximos blocos.</div>
+      ${_flow.stopOnReply !== false ? '<div class="integ-muted" style="margin-top:8px;color:var(--amber);">Atenção: com "Parar quando o lead responder" ligado, o fluxo para antes de chegar aqui quando ele responde. Desligue essa regra à esquerda para usar o caminho "Sim".</div>' : ''}`;
+  } else if (n.type === 'message') {
+    const kind = d.kind || 'text';
+    html += `<label class="auto-label">Tipo</label><div class="flow-kinds">${Object.entries(FLOW_MEDIA).map(([k, l]) => `<button class="${kind === k ? 'active' : ''}" onclick="setFlowData('kind', '${k}'); ${k === 'text' ? "setFlowData('media', null);" : ''} renderFlowInspector()">${l}</button>`).join('')}</div>`;
+    if (kind !== 'text') {
+      html += `<label class="auto-label" style="margin-top:10px;">Arquivo</label>
+        ${d.media && d.media.fileName ? `<div class="flow-file" style="margin-bottom:6px;">📎 ${escapeHtml(d.media.fileName)}</div>` : ''}
+        <input type="file" class="field-input" accept="${kind === 'image' ? 'image/jpeg,image/png,image/webp' : kind === 'video' ? 'video/mp4' : 'audio/*'}" onchange="uploadFlowMedia(this, '${kind}')">
+        <div class="integ-muted" id="flow-upload-fb" style="margin-top:4px;">${kind === 'audio' ? 'Chega como áudio gravado na hora (não encaminhado).' : 'Até 24 MB.'}</div>`;
+    }
+    const temps = (d.templates && d.templates.length ? d.templates : ['']);
+    html += `<label class="auto-label" style="margin-top:10px;">${kind === 'text' ? 'Mensagem' : kind === 'audio' ? 'Texto enviado depois do áudio (opcional)' : 'Legenda (opcional)'}</label>
+      ${temps.map((t, i) => `<textarea class="field-input" rows="3" style="margin-bottom:6px;" placeholder="${i === 0 ? 'Oi {primeiro_nome}, ...' : 'Outra versão (sorteada)'}" oninput="setFlowTemplate(${i}, this.value)">${escapeHtml(t || '')}</textarea>`).join('')}
+      ${temps.length < 3 ? `<button class="ci-add" onclick="setFlowTemplate(${temps.length}, ''); renderFlowInspector()">+ outra versão</button>` : ''}
+      <div class="integ-muted" style="margin-top:6px;">Use {primeiro_nome} e {nome}. Com várias versões, uma é sorteada a cada envio.</div>`;
+  }
+  if (n.type !== 'trigger') html += `<button class="huv-btn" style="margin-top:16px;color:var(--red);border-color:var(--red);" onclick="deleteFlowNode('${n.id}')">Excluir bloco</button>`;
+  box.innerHTML = html;
+}
+
+async function uploadFlowMedia(input, kind) {
+  const file = input.files && input.files[0];
+  const fb = document.getElementById('flow-upload-fb');
+  if (!file) return;
+  if (file.size > 24 * 1024 * 1024) { fb.textContent = 'Arquivo maior que 24 MB.'; return; }
+  fb.textContent = 'Enviando arquivo...';
+  try {
+    const media = await window._fb.uploadCampaignMedia(_flow.act, file, true);
+    if (media.type !== kind) throw new Error('O arquivo não é do tipo escolhido.');
+    setFlowData('media', { type: media.type, url: media.url, mimetype: media.mimetype, fileName: media.fileName });
+    renderFlowInspector();
+    showToast('Arquivo pronto.', 'success');
+  } catch (e) { fb.textContent = 'Erro: ' + e.message; }
+}
+
+async function saveFlow() {
+  const fb = document.getElementById('flow-fb');
+  const fail = msg => { fb.style.color = 'var(--red)'; fb.textContent = msg; };
+  const f = _flow;
+  const act = f.act;
+  const trigger = f.nodes.find(n => n.type === 'trigger');
+  if (!(f.name || '').trim()) return fail('Dê um nome à automação.');
+  if (!trigger || !trigger.data || !trigger.data.stage) return fail('Escolha a coluna do gatilho.');
+  if (!f.edges.some(e => e.from === trigger.id)) return fail('Ligue o gatilho ao primeiro bloco.');
+  for (const n of f.nodes) {
+    const d = n.data || {};
+    const label = flowNodeTitle(n);
+    if (n.type === 'message') {
+      const kind = d.kind || 'text';
+      const hasText = (d.templates || []).some(t => String(t || '').trim());
+      if (kind === 'text' && !hasText) { _flowSel = n.id; renderFlowNodes(); renderFlowInspector(); return fail(`O bloco "${label}" está sem mensagem.`); }
+      if (kind !== 'text' && !(d.media && d.media.url)) { _flowSel = n.id; renderFlowNodes(); renderFlowInspector(); return fail(`O bloco "${label}" está sem arquivo.`); }
+    }
+    if (n.type === 'move' && !d.stage) { _flowSel = n.id; renderFlowNodes(); renderFlowInspector(); return fail('Escolha a coluna do bloco "Mover card".'); }
+  }
+  if (f.hours && f.hours.enabled && Number(f.hours.end) <= Number(f.hours.start)) return fail('O horário final precisa ser depois do inicial.');
+  const other = _flowList.find(a => a.id !== f.id && a.active && a.triggerStage === trigger.data.stage);
+  if (other && f.active !== false) return fail(`A automação "${other.name}" já está ligada nessa coluna. Desligue uma delas.`);
+  const data = {
+    act, name: f.name.trim(), active: f.active !== false,
+    triggerStage: trigger.data.stage, triggerStageLabel: autoStageLabel(act, trigger.data.stage),
+    stopOnReply: f.stopOnReply !== false,
+    onReply: { moveTo: (f.onReply || {}).moveTo || '', moveToLabel: (f.onReply || {}).moveTo ? autoStageLabel(act, f.onReply.moveTo) : '' },
+    hours: { enabled: !!(f.hours && f.hours.enabled), start: Number((f.hours || {}).start ?? 8), end: Number((f.hours || {}).end ?? 20) },
+    nodes: f.nodes.map(n => ({ id: n.id, type: n.type, x: n.x, y: n.y, data: JSON.parse(JSON.stringify(n.data || {})) })),
+    edges: f.edges.map(e => ({ from: e.from, port: e.port || 'out', to: e.to })),
+    steps: []
+  };
+  fb.style.color = 'var(--muted)'; fb.textContent = 'Salvando...';
+  try {
+    const id = await window._fb.saveAutomation(f.id || null, data);
+    f.id = id; f._dirty = false;
+    _flowList = await window._fb.listAutomations(act);
+    fb.style.color = 'var(--green)'; fb.textContent = 'Salvo ✓';
+    showToast('Automação salva. Vale para os leads que entrarem na coluna a partir de agora.', 'success', 5000);
+  } catch (e) { fail('Erro: ' + e.message); }
 }
 
 // ===== INTEGRAÇÕES: landing pages e formulários da Meta =====
@@ -10844,7 +11412,7 @@ function closeMobileMore() {
 }
 
 function setMobileNav(view) {
-  ['report','clientes','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','integracoes','cfg','contatos','mais'].forEach(v => {
+  ['report','clientes','automacoes','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','integracoes','cfg','contatos','mais'].forEach(v => {
     const el = document.getElementById('mnav-' + v);
     if (el) el.classList.toggle('active', v === view);
   });
@@ -11553,7 +12121,7 @@ function getCurrentCrmActForSheets() {
 
 function openIntegrationsFromNav() {
   switchView('crm');
-  ['report','clientes','crm','ajuda','conta','contatos','integracoes'].forEach(v => {
+  ['report','clientes','automacoes','crm','ajuda','conta','contatos','integracoes'].forEach(v => {
     const el = document.getElementById('nav-' + v);
     if (el) el.classList.toggle('active', v === 'integracoes');
   });
