@@ -8195,6 +8195,7 @@ let _prFiltered = [];
 let _prSelected = new Set();
 let _prShown = 200;
 let _prLoadingKey = '';
+let _prLoaded = null;
 const PR_UFS = ['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'];
 const PR_COLS = ['cnpj','razao','fantasia','tipo','abertura','cnae_secundarios','endereco','bairro','cep','municipio','uf','telefone1','telefone2','email','porte','socios'];
 
@@ -8264,27 +8265,48 @@ function prosResolveCnae(uf, text) {
   return Object.keys(present).filter(c => String(_prIndex.cnaes[c] || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(term)).slice(0, 8);
 }
 
-function prosParseCsv(text) {
-  const out = [];
-  const lines = text.split('\n');
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
-    if (!line) continue;
-    const f = [];
-    let cur = '', q = false;
-    for (let j = 0; j < line.length; j++) {
-      const ch = line[j];
-      if (q) { if (ch === '"' && line[j + 1] === '"') { cur += '"'; j++; } else if (ch === '"') q = false; else cur += ch; }
-      else if (ch === '"') q = true;
-      else if (ch === ';') { f.push(cur); cur = ''; }
-      else cur += ch;
-    }
-    f.push(cur);
-    const o = {};
-    PR_COLS.forEach((c, k) => { o[c] = f[k] || ''; });
-    out.push(o);
+// Lê uma linha do CSV da base (separador ";" com aspas).
+function prosParseLine(line) {
+  const f = [];
+  let cur = '', q = false;
+  for (let j = 0; j < line.length; j++) {
+    const ch = line[j];
+    if (q) { if (ch === '"' && line[j + 1] === '"') { cur += '"'; j++; } else if (ch === '"') q = false; else cur += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === ';') { f.push(cur); cur = ''; }
+    else cur += ch;
   }
-  return out;
+  f.push(cur);
+  const o = {};
+  PR_COLS.forEach((c, k) => { o[c] = f[k] || ''; });
+  return o;
+}
+
+// Lê o pedaço compactado aos poucos e guarda só as empresas da cidade escolhida, para não ocupar
+// muita memória nas atividades grandes (em SP há atividades com quase 300 mil empresas).
+const PR_MAX_ROWS = 60000;
+async function prosReadChunk(res, city, code, rows) {
+  const reader = res.body.pipeThrough(new DecompressionStream('gzip')).pipeThrough(new TextDecoderStream()).getReader();
+  let rest = '', header = true, cut = false;
+  const take = line => {
+    if (header) { header = false; return; }
+    if (!line) return;
+    if (rows.length >= PR_MAX_ROWS) { cut = true; return; }
+    const r = prosParseLine(line);
+    if (city && r.municipio !== city) return;
+    r.cnae = code;
+    rows.push(r);
+  };
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const parts = (rest + value).split('\n');
+    rest = parts.pop();
+    parts.forEach(take);
+    if (cut) { reader.cancel().catch(() => {}); break; }
+  }
+  if (!cut && rest) take(rest);
+  return cut;
 }
 
 const prosIsMobile = t => /^\(\d{2}\) 9\d{8}$/.test(String(t || '')) || /^\(\d{2}\) [6-9]\d{7}$/.test(String(t || ''));
@@ -8300,14 +8322,17 @@ async function prosSearch() {
   result.innerHTML = `<div class="integ-muted">Buscando ${codes.length > 1 ? codes.length + ' atividades' : 'empresas'}...</div>`;
   try {
     const rows = [];
+    const city = document.getElementById('pr-city').value;
+    let cut = false;
     for (const code of codes) {
       const info = _prIndex.porEstado[uf][code];
       const res = await prosFetch('/prospect/chunk', { part: info.p, offset: info.o, length: info.l });
-      const text = await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).text();
-      prosParseCsv(text).forEach(r => { r.cnae = code; rows.push(r); });
+      if (await prosReadChunk(res, city, code, rows)) { cut = true; break; }
     }
     if (_prLoadingKey !== key) return;
     _prRows = rows;
+    _prLoaded = { uf, cnae: document.getElementById('pr-cnae').value, city, cut };
+    if (cut) showToast(`Atividade muito grande: mostrando as primeiras ${PR_MAX_ROWS.toLocaleString('pt-BR')} empresas. Escolha a cidade para ver todas dela.`, 'warning', 7000);
     _prSelected = new Set();
     _prShown = 200;
     prosApplyFilters();
@@ -8318,6 +8343,9 @@ async function prosSearch() {
 
 function prosApplyFilters() {
   const city = document.getElementById('pr-city').value;
+  // A busca guardou só uma cidade (ou foi cortada): trocar estado, atividade ou cidade busca de novo.
+  const L = _prLoaded;
+  if (L && (L.uf !== document.getElementById('pr-uf').value || L.cnae !== document.getElementById('pr-cnae').value || (city !== L.city && (L.city || L.cut)))) return prosSearch();
   const bairro = (document.getElementById('pr-bairro').value || '').trim().toLowerCase();
   const phone = document.getElementById('pr-phone').checked, mobile = document.getElementById('pr-mobile').checked;
   const email = document.getElementById('pr-email').checked, matriz = document.getElementById('pr-matriz').checked;
