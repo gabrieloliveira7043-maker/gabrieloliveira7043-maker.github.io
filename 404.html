@@ -1392,6 +1392,9 @@ td { font-family: var(--font); font-size: 13px; }
 #campaign-client-select, #cadence-client-select, #chat-client-select, #contatos-client-select, #crm-client-select { display: none !important; }
 
 /* Contatos em tabela */
+.ct-filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.ct-filters label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+.ct-filters select { min-width: 220px; max-width: 320px; }
 .ct-table { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: var(--card-shadow); }
 .ct-row { display: grid; grid-template-columns: 40px minmax(180px, 2.2fr) 1.2fr 1.5fr 1.1fr 1.3fr 0.8fr 44px; gap: 10px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
 .ct-row:last-child { border-bottom: none; }
@@ -3018,6 +3021,12 @@ td { font-family: var(--font); font-size: 13px; }
         <div style="display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:var(--r2); padding:10px 14px; margin-bottom:14px;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           <input type="text" id="contatos-search" placeholder="Buscar por nome, e-mail ou telefone..." oninput="renderContatos()" style="border:none; background:none; outline:none; font-size:13px; color:var(--text); width:100%; font-family:inherit;">
+        </div>
+        <div class="ct-filters">
+          <label>Origem<select class="field-input" id="contatos-origem" onchange="_contatosShown = 300; renderContatos()"><option value="">Todas as origens</option></select></label>
+          <label>Entrada de<input type="date" class="field-input" id="contatos-from" onchange="_contatosShown = 300; renderContatos()"></label>
+          <label>até<input type="date" class="field-input" id="contatos-to" onchange="_contatosShown = 300; renderContatos()"></label>
+          <button class="chat-pill" id="contatos-clear-filters" style="display:none;align-self:flex-end;margin-bottom:6px;" onclick="clearContatosFilters()">Limpar filtros</button>
         </div>
         <div id="contatos-tag-filter" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;"></div>
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
@@ -5872,11 +5881,28 @@ function buildContactEntries(act) {
   return out;
 }
 
-function filterContactEntries(entries, tagFilter, q) {
+// Origem mostrada na lista de contatos (lead: origem ou rede social; contato: base do WhatsApp).
+const contactOrigin = e => e.lead ? (e.lead.origem || e.lead.redeSocial || '') : 'Base do WhatsApp';
+
+function clearContatosFilters() {
+  ['contatos-origem', 'contatos-from', 'contatos-to'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  _contatosShown = 300;
+  renderContatos();
+}
+
+function filterContactEntries(entries, tagFilter, q, extra) {
   const term = String(q || '').trim().toLowerCase();
   const digits = term.replace(/\D/g, '');
+  const f = extra || {};
+  const fromMs = f.from ? new Date(f.from + 'T00:00:00').getTime() : null;
+  const toMs = f.to ? new Date(f.to + 'T23:59:59.999').getTime() : null;
   return entries.filter(e => {
     if (tagFilter.size && !e.tags.some(t => tagFilter.has(t))) return false;
+    if (f.origem && (f.origem === '__none__' ? contactOrigin(e) : contactOrigin(e) !== f.origem)) return false;
+    if (fromMs != null || toMs != null) {
+      const t = e.lead ? Date.parse(e.lead.createdAt) : NaN;
+      if (isNaN(t) || (fromMs != null && t < fromMs) || (toMs != null && t > toMs)) return false;
+    }
     if (!term) return true;
     return e.name.toLowerCase().includes(term) || e.email.toLowerCase().includes(term)
       || (digits.length >= 3 && String(e.phone).replace(/\D/g, '').includes(digits));
@@ -5929,7 +5955,21 @@ function renderContatos() {
   const validKeys = new Set(_contatosEntries.map(e => e.key));
   [..._contatosSelected].forEach(k => { if (!validKeys.has(k)) _contatosSelected.delete(k); });
   [..._contatosTagFilter].forEach(id => { if (!tagById[id]) _contatosTagFilter.delete(id); });
-  _contatosFiltered = filterContactEntries(_contatosEntries, _contatosTagFilter, q);
+  // Filtro de origem: opções vêm dos próprios contatos (mais usadas primeiro).
+  const origemSel = document.getElementById('contatos-origem');
+  if (origemSel) {
+    const current = origemSel.value;
+    const counts = {};
+    _contatosEntries.forEach(e => { const o = contactOrigin(e); counts[o] = (counts[o] || 0) + 1; });
+    const opts = Object.entries(counts).filter(([o]) => o).sort((a, b) => b[1] - a[1]);
+    origemSel.innerHTML = '<option value="">Todas as origens</option>' + opts.map(([o, n]) => `<option value="${escapeHtml(o)}">${escapeHtml(limitText(o, 50))} (${n})</option>`).join('')
+      + (counts[''] ? `<option value="__none__">Sem origem (${counts['']})</option>` : '');
+    origemSel.value = [...origemSel.options].some(o => o.value === current) ? current : '';
+  }
+  const extra = { origem: origemSel ? origemSel.value : '', from: document.getElementById('contatos-from')?.value || '', to: document.getElementById('contatos-to')?.value || '' };
+  const clearBtn = document.getElementById('contatos-clear-filters');
+  if (clearBtn) clearBtn.style.display = extra.origem || extra.from || extra.to ? 'inline-block' : 'none';
+  _contatosFiltered = filterContactEntries(_contatosEntries, _contatosTagFilter, q, extra);
 
   const tagBar = document.getElementById('contatos-tag-filter');
   if (tagBar) {
