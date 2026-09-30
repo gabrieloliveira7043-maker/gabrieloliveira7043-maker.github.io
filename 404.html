@@ -1064,6 +1064,14 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
 .chat-qr-item div { font-size:12px; color:var(--muted2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .chat-bubble { position:relative; }
 .chat-bubble.deleted { font-style:italic; color:var(--muted2); }
+.chat-bubble img.chat-sticker { width:140px; height:140px; object-fit:contain; background:transparent; }
+.chat-stk-pop { padding:0; }
+.stk-head { display:flex; gap:6px; align-items:center; padding:8px 10px; border-bottom:1px solid var(--border); font-size:13px; color:var(--text); }
+.stk-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(72px, 1fr)); gap:6px; padding:8px; }
+.stk-item { position:relative; aspect-ratio:1; border-radius:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.stk-item:hover { background:var(--surface2); }
+.stk-item img { width:100%; height:100%; object-fit:contain; }
+.stk-del { position:absolute; top:2px; right:2px; background:var(--red); color:#fff; border-radius:50%; width:18px; height:18px; font-size:11px; display:flex; align-items:center; justify-content:center; }
 .chat-msg-more { position:absolute; top:2px; right:4px; background:transparent; border:none; color:var(--muted2); cursor:pointer; font-size:14px; line-height:1; padding:2px 4px; border-radius:6px; opacity:.35; }
 .chat-bubble:hover .chat-msg-more, .chat-msg-more:focus { opacity:1; background:var(--surface2); }
 @media (hover: none) { .chat-msg-more { opacity:.8; } }
@@ -2125,6 +2133,14 @@ td { font-family: var(--font); font-size: 13px; }
     async listInboxMessagesSince(act, chatKey, sinceIso, max) {
       const snap = await getDocs(query(collection(db, 'inbox', normalizeAct(act), 'chats', chatKey, 'messages'), where('at', '>=', sinceIso), orderBy('at', 'asc'), limit(max || 400)));
       return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    },
+    // Chat: pack de figurinhas (sticker_packs/{act} = { items: [{ id, url, fileName }] }).
+    async getStickerPack(act) {
+      const snap = await getDoc(doc(db, 'sticker_packs', normalizeAct(act)));
+      return snap.exists() && Array.isArray(snap.data().items) ? snap.data().items : [];
+    },
+    async saveStickerPack(act, items) {
+      await setDoc(doc(db, 'sticker_packs', normalizeAct(act)), { act: normalizeAct(act), items, updatedAt: new Date().toISOString() });
     },
     // Chat: respostas prontas (quick_replies/{act} = { items: [{ id, title, text }] }).
     async getQuickReplies(act) {
@@ -11221,9 +11237,11 @@ function openChat(key) {
     <div id="chat-media-chip" style="display:none;padding:6px 14px;font-size:12px;color:var(--text);border-top:1px solid var(--border);"></div>
     <div class="chat-compose">
       <div class="chat-qr-pop" id="chat-qr-pop"></div>
+      <div class="chat-qr-pop chat-stk-pop" id="chat-stk-pop"></div>
       <div class="chat-input">
         <label class="chat-pill chat-tool" title="Enviar foto, vídeo ou áudio">📎<input type="file" accept="image/jpeg,image/png,image/webp,video/mp4,audio/*" style="display:none;" onchange="attachChatMedia(this)"></label>
         <button class="chat-pill chat-tool" title="Respostas prontas (ou digite / no começo da mensagem)" onclick="toggleQuickReplies()">⚡</button>
+        <button class="chat-pill chat-tool" title="Figurinhas" onclick="toggleStickerPack()">🙂</button>
         <textarea id="chat-text" class="field-input" rows="1" placeholder="Mensagem ( / respostas prontas)" onkeydown="chatTextKey(event)" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,140)+'px';chatQrInput(this)" onblur="setTimeout(() => { if (_qrBySlash) closeQuickReplies(); }, 200)"></textarea>
         <button class="chat-pill chat-tool" title="Nota interna ou lembrete (só a equipe vê)" onclick="openChatNote()">📝</button>
         <button class="chat-pill chat-tool" title="Agendar mensagem" onclick="openScheduleMessage()">🕐</button>
@@ -11388,10 +11406,12 @@ function renderChatMessages() {
     }
     if (n) { parts.push(chatNoteHtml(n)); return; }
     let media = '';
-    if (['image', 'video', 'audio', 'document', 'sticker'].includes(m.type)) {
+    if (m.mediaUrl && (m.type === 'sticker' || m.type === 'image')) {
+      media = `<img src="${escapeHtml(m.mediaUrl)}" alt="" class="${m.type === 'sticker' ? 'chat-sticker' : ''}"><br>`;
+    } else if (['image', 'video', 'audio', 'document', 'sticker'].includes(m.type)) {
       const loaded = _chatMedia[m.id];
       if (loaded && loaded.url) {
-        media = m.type === 'image' || m.type === 'sticker' ? `<img src="${loaded.url}" alt="">`
+        media = m.type === 'image' || m.type === 'sticker' ? `<img src="${loaded.url}" alt="" class="${m.type === 'sticker' ? 'chat-sticker' : ''}">${m.type === 'sticker' && !m.fromMe ? `<br><a href="#" style="font-size:11.5px;color:var(--accent2);" onclick="saveReceivedSticker('${escapeJsString(m.id)}');return false;">⭐ Salvar no pack</a>` : ''}`
           : m.type === 'video' ? `<video src="${loaded.url}" controls></video>`
           : m.type === 'audio' ? `<audio src="${loaded.url}" controls style="max-width:240px;display:block;margin-bottom:4px;"></audio>`
           : `<a href="${loaded.url}" download="${escapeHtml(m.fileName || 'arquivo')}" style="color:var(--accent2);">⬇ ${escapeHtml(m.fileName || 'Baixar documento')}</a><br>`;
@@ -11687,6 +11707,107 @@ async function deleteQuickReply(id) {
     _qrCache[_chatAct] = items;
     renderQuickRepliesManager();
   } catch (e) { showToast('Erro: ' + e.message, 'error'); }
+}
+
+// ===== CHAT: FIGURINHAS =====
+// Um pack por cliente, usado por toda a equipe. As imagens viram figurinha do WhatsApp (512×512, WEBP).
+let _stkCache = {};
+let _stkManage = false;
+
+async function toggleStickerPack() {
+  const pop = document.getElementById('chat-stk-pop');
+  if (!pop) return;
+  if (pop.classList.contains('open')) { pop.classList.remove('open'); return; }
+  closeQuickReplies();
+  if (!_stkCache[_chatAct]) {
+    pop.innerHTML = '<div class="chat-qr-item" style="cursor:default;"><div>Carregando figurinhas...</div></div>';
+    pop.classList.add('open');
+    _stkCache[_chatAct] = await window._fb.getStickerPack(_chatAct).catch(() => []);
+  }
+  _stkManage = false;
+  renderStickerPack();
+  pop.classList.add('open');
+}
+
+function renderStickerPack() {
+  const pop = document.getElementById('chat-stk-pop');
+  if (!pop) return;
+  const items = _stkCache[_chatAct] || [];
+  pop.innerHTML = `<div class="stk-head"><b>Figurinhas</b><span style="flex:1;"></span>
+      ${items.length ? `<button class="chat-pill" onclick="_stkManage=!_stkManage;renderStickerPack()">${_stkManage ? 'Pronto' : 'Organizar'}</button>` : ''}
+      <label class="chat-pill" style="cursor:pointer;">+ Adicionar<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple style="display:none;" onchange="addStickerFiles(this)"></label></div>
+    <div class="stk-grid">${items.length ? items.map(it => `<div class="stk-item" title="${_stkManage ? 'Remover' : 'Enviar'}" onclick="${_stkManage ? `removeSticker('${escapeJsString(it.id)}')` : `sendSticker('${escapeJsString(it.id)}')`}"><img src="${escapeHtml(it.url)}" alt="" loading="lazy">${_stkManage ? '<span class="stk-del">✕</span>' : ''}</div>`).join('')
+      : '<div class="integ-muted" style="grid-column:1/-1;padding:10px;font-size:12.5px;">O pack está vazio. Clique em "+ Adicionar" e escolha imagens (PNG, JPG ou WEBP), ou salve figurinhas que os contatos mandarem.</div>'}</div>`;
+}
+
+// Converte qualquer imagem para figurinha: 512×512, fundo transparente, WEBP.
+async function imageToStickerFile(blob, name) {
+  const url = URL.createObjectURL(blob);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('Imagem inválida')); i.src = url; });
+    const c = document.createElement('canvas'); c.width = 512; c.height = 512;
+    const ctx = c.getContext('2d');
+    const k = Math.min(512 / img.width, 512 / img.height);
+    const w = img.width * k, h = img.height * k;
+    ctx.drawImage(img, (512 - w) / 2, (512 - h) / 2, w, h);
+    const out = await new Promise(res => c.toBlob(res, 'image/webp', 0.9));
+    if (!out || out.type !== 'image/webp') throw new Error('Este navegador não gera WEBP; use o Chrome ou o Edge.');
+    return new File([out], (name || 'figurinha').replace(/\.[^.]+$/, '') + '.webp', { type: 'image/webp' });
+  } finally { URL.revokeObjectURL(url); }
+}
+
+async function addStickersFromBlobs(list) {
+  const act = _chatAct;
+  const items = [...(_stkCache[act] || [])];
+  let added = 0;
+  for (const { blob, name } of list) {
+    if (items.length >= 60) { showToast('O pack tem no máximo 60 figurinhas.', 'warning'); break; }
+    const file = await imageToStickerFile(blob, name);
+    const up = await window._fb.uploadCampaignMedia(act, file, true);
+    items.push({ id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), url: up.url, fileName: up.fileName || file.name });
+    added++;
+  }
+  await window._fb.saveStickerPack(act, items);
+  _stkCache[act] = items;
+  return added;
+}
+
+async function addStickerFiles(input) {
+  const files = [...(input.files || [])].slice(0, 20);
+  input.value = '';
+  if (!files.length) return;
+  showToast('Preparando figurinhas...', 'info', 2500);
+  try {
+    const n = await addStickersFromBlobs(files.map(f => ({ blob: f, name: f.name })));
+    renderStickerPack();
+    showToast(`${n} figurinha(s) no pack.`, 'success');
+  } catch (e) { showToast('Erro: ' + e.message, 'error', 6000); }
+}
+
+async function saveReceivedSticker(messageId) {
+  const loaded = _chatMedia[messageId];
+  if (!loaded || !loaded.url) return;
+  try {
+    if (!_stkCache[_chatAct]) _stkCache[_chatAct] = await window._fb.getStickerPack(_chatAct).catch(() => []);
+    const blob = await (await fetch(loaded.url)).blob();
+    await addStickersFromBlobs([{ blob, name: 'figurinha' }]);
+    showToast('Figurinha salva no pack.', 'success');
+  } catch (e) { showToast('Não salvou: ' + e.message, 'error', 6000); }
+}
+
+async function removeSticker(id) {
+  const items = (_stkCache[_chatAct] || []).filter(x => x.id !== id);
+  try { await window._fb.saveStickerPack(_chatAct, items); _stkCache[_chatAct] = items; renderStickerPack(); }
+  catch (e) { showToast('Erro: ' + e.message, 'error'); }
+}
+
+async function sendSticker(id) {
+  const it = (_stkCache[_chatAct] || []).find(x => x.id === id);
+  if (!it || !_chatOpenKey) return;
+  document.getElementById('chat-stk-pop').classList.remove('open');
+  try {
+    await window._fb.whatsapp('/whatsapp/chat-send', _chatAct, { chatKey: _chatOpenKey, text: '', media: { type: 'sticker', url: it.url, mimetype: 'image/webp', fileName: it.fileName || 'figurinha.webp' } });
+  } catch (e) { showToast('Não enviou: ' + e.message, 'error', 6000); }
 }
 
 // ===== CHAT: NOTAS INTERNAS E LEMBRETES =====
