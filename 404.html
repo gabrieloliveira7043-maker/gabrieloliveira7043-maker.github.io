@@ -1524,6 +1524,35 @@ td { font-family: var(--font); font-size: 13px; }
 .auto-box .field-input { padding: 6px 8px; }
 .auto-steps-summary { margin: 4px 0 8px 18px; font-size: 12.5px; color: var(--text); display: flex; flex-direction: column; gap: 3px; }
 
+/* Atendimento (análise) */
+.an-filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 16px; }
+.an-filters label { display: flex; flex-direction: column; gap: 5px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+.an-filters .integ-toggle { flex-direction: row; text-transform: none; letter-spacing: 0; font-size: 12.5px; color: var(--text); }
+.an-section-title { font-family: var(--font-display); font-size: 18px; font-weight: 600; color: var(--text); margin: 20px 0 10px; }
+.an-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.an-kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; box-shadow: var(--card-shadow); }
+.an-kpi-label { font-size: 11.5px; font-weight: 700; color: var(--muted); }
+.an-kpi-value { font-size: 22px; font-weight: 800; color: var(--text); margin-top: 4px; }
+.an-kpi-sub { font-size: 11.5px; color: var(--muted2); margin-top: 2px; }
+.an-kpi.gold { border-color: rgba(201,162,74,.5); }
+.an-kpi.gold .an-kpi-value { color: #B08A2E; }
+.an-kpi.green .an-kpi-value { color: var(--green); }
+.an-kpi.red .an-kpi-value { color: var(--red); }
+.an-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.an-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; box-shadow: var(--card-shadow); min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.an-card-title { font-size: 13px; font-weight: 800; color: var(--text); margin-bottom: 10px; }
+.an-table { width: 100%; border-collapse: collapse; font-size: 12.5px; color: var(--text); }
+.an-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); font-weight: 800; padding: 8px 10px; border-bottom: 1px solid var(--border); background: var(--surface2); }
+.an-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.an-table-leads tbody tr:hover { background: var(--surface2); }
+.an-row { display: flex; justify-content: space-between; gap: 10px; padding: 7px 4px; border-bottom: 1px solid var(--border); font-size: 13px; cursor: pointer; color: var(--text); }
+.an-row:hover { background: var(--surface2); }
+.an-pill { font-size: 11.5px; font-weight: 700; border-radius: 20px; padding: 2px 9px; white-space: nowrap; }
+.an-pill.ok { background: var(--green-dim); color: var(--green); }
+.an-pill.mid { background: rgba(224,164,58,.18); color: #B7791F; }
+.an-pill.bad { background: rgba(248,113,113,.14); color: var(--red); }
+@media (max-width: 700px) { .an-table-leads th:nth-child(3), .an-table-leads td:nth-child(3), .an-table-leads th:nth-child(6), .an-table-leads td:nth-child(6) { display: none; } }
+
 /* Prospecção */
 .pr-tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
 .pr-tab { border: 1px solid var(--border2); background: var(--surface); color: var(--muted2); border-radius: 10px; padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; }
@@ -2007,6 +2036,15 @@ td { font-family: var(--font); font-size: 13px; }
     async updateInboxChat(act, chatKey, data) {
       await updateDoc(doc(db, 'inbox', normalizeAct(act), 'chats', chatKey), data);
     },
+    // Análise de atendimento: conversas com movimento desde uma data e as mensagens de cada uma.
+    async listInboxChatsSince(act, sinceIso, max) {
+      const snap = await getDocs(query(collection(db, 'inbox', normalizeAct(act), 'chats'), where('lastAt', '>=', sinceIso), orderBy('lastAt', 'desc'), limit(max || 800)));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    },
+    async listInboxMessagesSince(act, chatKey, sinceIso, max) {
+      const snap = await getDocs(query(collection(db, 'inbox', normalizeAct(act), 'chats', chatKey, 'messages'), where('at', '>=', sinceIso), orderBy('at', 'asc'), limit(max || 400)));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    },
     // Chat: respostas prontas (quick_replies/{act} = { items: [{ id, title, text }] }).
     async getQuickReplies(act) {
       const snap = await getDoc(doc(db, 'quick_replies', normalizeAct(act)));
@@ -2199,6 +2237,7 @@ td { font-family: var(--font); font-size: 13px; }
   <div class="mnav-sheet-grip"></div>
   <div class="mnav-sheet-grid">
     <button type="button" class="mnav-sheet-item"  onclick="closeMobileMore(); switchView('report'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18M7 15l4-4 3 3 5-6"/></svg><span>Dashboard</span></button>
+    <button type="button" class="mnav-sheet-item"  onclick="closeMobileMore(); switchView('analise'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6M12 2v3"/></svg><span>Atendimento</span></button>
     <button type="button" class="mnav-sheet-item" data-admin="1" onclick="closeMobileMore(); switchView('clientes'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16M9 7h2M13 7h2M9 11h2M13 11h2"/></svg><span>Clientes</span></button>
     <button type="button" class="mnav-sheet-item"  onclick="closeMobileMore(); switchView('automacoes'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM19 17a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM5 7v4a4 4 0 0 0 4 4h6a4 4 0 0 1 4 4M19 3v6M16 6h6"/></svg><span>Automações</span></button>
     <button type="button" class="mnav-sheet-item"  onclick="closeMobileMore(); switchView('prospeccao'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M8 11h6M11 8v6"/></svg><span>Prospecção</span></button>
@@ -2265,6 +2304,10 @@ td { font-family: var(--font); font-size: 13px; }
         <div class="nav-item active" id="nav-report" onclick="switchView('report')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
           Dashboard
+        </div>
+        <div class="nav-item" id="nav-analise" onclick="switchView('analise')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6M12 2v3"/></svg>
+          Atendimento
         </div>
       </div>
       <div class="nav-group">
@@ -3134,6 +3177,9 @@ td { font-family: var(--font); font-size: 13px; }
 
     <!-- Prospecção View -->
     <div id="prospeccao-view" class="huv-view" style="display:none;"><div id="prospeccao-body"></div></div>
+
+    <!-- Atendimento (análise de tempo de resposta) -->
+    <div id="analise-view" class="huv-view" style="display:none;"><div id="analise-body"></div></div>
 
     <!-- Clientes View (admin) -->
     <div id="clientes-view" class="huv-view" style="display:none;">
@@ -4876,12 +4922,12 @@ window.abrirContatos = function abrirContatos() {
     if(topbar) topbar.style.display = 'none';
     const contentEl = document.querySelector('.content');
     if(contentEl) contentEl.style.display = 'none';
-    ['crm-view','conta-view','whatsapp-view','campanhas-view','chat-view','cadencia-view','integracoes-view','clientes-view','automacoes-view','prospeccao-view'].forEach(id => {
+    ['crm-view','conta-view','whatsapp-view','campanhas-view','chat-view','cadencia-view','integracoes-view','clientes-view','automacoes-view','prospeccao-view','analise-view'].forEach(id => {
       const el = document.getElementById(id); if(el) el.style.display = 'none';
     });
     const v = document.getElementById('contatos-view');
     if(v) { v.style.cssText += ';display:block!important;visibility:visible!important;opacity:1!important;'; }
-    ['report','clientes','automacoes','prospeccao','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','contatos','integracoes'].forEach(n => {
+    ['report','analise','clientes','automacoes','prospeccao','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','contatos','integracoes'].forEach(n => {
       const el = document.getElementById('nav-'+n);
       if(el) el.classList.toggle('active', n==='contatos');
     });
@@ -6089,7 +6135,7 @@ function renderAtendimento() {
 }
 
 function switchView(view) {
-  ['report','clientes','automacoes','prospeccao','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','contatos','integracoes'].forEach(v => {
+  ['report','analise','clientes','automacoes','prospeccao','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','contatos','integracoes'].forEach(v => {
     const el = document.getElementById('nav-' + v);
     if (el) el.classList.toggle('active', v === view);
   });
@@ -6113,6 +6159,9 @@ function switchView(view) {
   const prospeccaoView = document.getElementById('prospeccao-view');
   if (prospeccaoView) prospeccaoView.style.display = view === 'prospeccao' ? 'block' : 'none';
   if (view === 'prospeccao') renderProspeccaoView();
+  const analiseView = document.getElementById('analise-view');
+  if (analiseView) analiseView.style.display = view === 'analise' ? 'block' : 'none';
+  if (view === 'analise') renderAnaliseView();
   const clientesView = document.getElementById('clientes-view');
   if (clientesView) clientesView.style.display = view === 'clientes' ? 'block' : 'none';
   if (view === 'clientes') renderClientesView();
@@ -7990,6 +8039,7 @@ function syncClientSelectors(act) {
   if (visible('contatos-view') && typeof onContatosClientChange === 'function') onContatosClientChange();
   if (visible('crm-view')) getLeadsAsync().then(() => { renderKanban(); renderFunilChart(); renderFunilEvolucao(); });
   if (visible('clientes-view')) renderClientesView();
+  if (visible('analise-view')) renderAnaliseView();
   if (visible('automacoes-view')) { if (_flow && _flow.act !== normalizeActValue(act)) { _flow = null; document.getElementById('automacoes-view').classList.remove('editing'); } renderAutomacoesView(); }
 }
 
@@ -12486,7 +12536,7 @@ function closeMobileMore() {
 }
 
 function setMobileNav(view) {
-  ['report','clientes','automacoes','prospeccao','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','integracoes','cfg','contatos','mais'].forEach(v => {
+  ['report','analise','clientes','automacoes','prospeccao','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','integracoes','cfg','contatos','mais'].forEach(v => {
     const el = document.getElementById('mnav-' + v);
     if (el) el.classList.toggle('active', v === view);
   });
@@ -12947,6 +12997,271 @@ function renderWhatsAppAlert() {
   el.innerHTML = `<button class="wa-alert-close" title="Esconder por 30 minutos" onclick="hideWhatsAppAlert()">×</button>${parts.join('')}`;
 }
 
+// ===== ATENDIMENTO: tempo de resposta (Chat × cards do funil) =====
+// Resposta humana = mensagem enviada por alguém da equipe, pelo CRM (tem "sentBy") ou pelo celular.
+// Mensagens automáticas (1ª mensagem, automações, disparos, agendadas) têm "source" e não contam como atendimento.
+// Só entram leads que chegaram sozinhos (WhatsApp, Meta, landing page, planilha); importados e prospecção ficam de fora.
+const _an = { from: '', to: '', biz: false, bizStart: '08:00', bizEnd: '18:00', bizSat: false, data: null, running: 0, charts: [] };
+try { Object.assign(_an, JSON.parse(localStorage.getItem('huven_analise_cfg') || '{}'), { data: null, running: 0, charts: [] }); } catch (e) {}
+
+const anIsHuman = m => !!m.fromMe && !m.source;
+const anWho = m => m.sentBy || 'Pelo celular';
+
+// Duração em ms; com expediente ligado, conta só as horas de trabalho (seg–sex, e sábado se marcado).
+function anDuration(startMs, endMs, cfg) {
+  if (!(endMs > startMs)) return 0;
+  if (!cfg.biz) return endMs - startMs;
+  const [sh, sm] = String(cfg.bizStart || '08:00').split(':').map(Number);
+  const [eh, em] = String(cfg.bizEnd || '18:00').split(':').map(Number);
+  let total = 0;
+  const day = new Date(startMs); day.setHours(0, 0, 0, 0);
+  for (let i = 0; i < 400 && day.getTime() < endMs; i++, day.setDate(day.getDate() + 1)) {
+    const wd = day.getDay();
+    if (wd === 0 || (wd === 6 && !cfg.bizSat)) continue;
+    const a = new Date(day); a.setHours(sh, sm, 0, 0);
+    const b = new Date(day); b.setHours(eh, em, 0, 0);
+    const s0 = Math.max(a.getTime(), startMs), e0 = Math.min(b.getTime(), endMs);
+    if (e0 > s0) total += e0 - s0;
+  }
+  return total;
+}
+
+function anFmt(ms) {
+  if (ms == null || isNaN(ms)) return '—';
+  const min = ms / 60000;
+  if (min < 1) return 'menos de 1 min';
+  if (min < 60) return Math.round(min) + ' min';
+  const h = Math.floor(min / 60), m = Math.round(min % 60);
+  if (h < 24) return h + ' h' + (m ? ' ' + m + ' min' : '');
+  const d = Math.floor(h / 24), hh = h % 24;
+  return d + (d === 1 ? ' dia' : ' dias') + (hh ? ' ' + hh + ' h' : '');
+}
+
+const anMedian = arr => { if (!arr.length) return null; const s = [...arr].sort((a, b) => a - b); const k = Math.floor(s.length / 2); return s.length % 2 ? s[k] : (s[k - 1] + s[k]) / 2; };
+const anAvg = arr => arr.length ? arr.reduce((t, v) => t + v, 0) / arr.length : null;
+const AN_BUCKETS = [['Até 5 min', 5], ['5 a 15 min', 15], ['15 a 60 min', 60], ['1 a 4 h', 240], ['4 a 24 h', 1440], ['Mais de 24 h', Infinity]];
+
+function anLeadChatKey(lead) {
+  const k = chatPhoneKey(lead.phone || lead.whatsappPhone);
+  if (k) return k;
+  const jid = String(lead.whatsappJid || '');
+  return jid.endsWith('@lid') ? 'lid_' + jid.split('@')[0].replace(/[^\w.-]/g, '') : '';
+}
+
+// Calcula tudo para um cliente e período (datas "AAAA-MM-DD"). onProgress(feitas, total).
+async function computeAttendance(act, fromDay, toDay, cfg, onProgress) {
+  act = normalizeActValue(act);
+  const fromMs = new Date(fromDay + 'T00:00:00').getTime();
+  const toMs = new Date(toDay + 'T23:59:59.999').getTime();
+  const fromIso = new Date(fromMs).toISOString();
+  if (!_leadsCache) await getLeadsAsync();
+  const leads = (_leadsCache || []).filter(l => leadMatchesClient(l, act) && !l.importado && !l.teste && l.source !== 'prospeccao'
+    && Date.parse(l.createdAt) >= fromMs && Date.parse(l.createdAt) <= toMs);
+  const chats = await window._fb.listInboxChatsSince(act, fromIso, 1000);
+  const chatByKey = Object.fromEntries(chats.map(c => [c.id, c]));
+  const msgsByChat = {};
+  let done = 0;
+  const queue = [...chats];
+  const worker = async () => {
+    while (queue.length) {
+      const c = queue.shift();
+      try { msgsByChat[c.id] = await window._fb.listInboxMessagesSince(act, c.id, fromIso, 600); } catch (e) { msgsByChat[c.id] = []; }
+      done++;
+      if (onProgress) onProgress(done, chats.length);
+    }
+  };
+  await Promise.all(Array.from({ length: 6 }, worker));
+
+  // 1) Primeiro contato de cada lead que chegou no período.
+  const leadRows = leads.map(lead => {
+    const key = anLeadChatKey(lead);
+    const arrival = Date.parse(lead.createdAt);
+    const msgs = key ? (msgsByChat[key] || []) : [];
+    const after = msgs.filter(m => Date.parse(m.at) >= arrival - 60000);
+    const human = after.find(anIsHuman);
+    const auto = after.find(m => m.fromMe && m.source);
+    const stage = (getStages(act).find(s => s.id === lead.stage) || {}).label || '';
+    return {
+      lead, name: lead.name || chatFormatPhone(lead.phone) || 'Sem nome', stage, origem: lead.origem || lead.redeSocial || '', arrival, chatKey: key,
+      hasChat: !!(key && chatByKey[key]),
+      humanAt: human ? Date.parse(human.at) : null, who: human ? anWho(human) : '',
+      dur: human ? anDuration(arrival, Date.parse(human.at), cfg) : null,
+      autoDur: auto ? Date.parse(auto.at) - arrival : null,
+      waiting: !human ? anDuration(arrival, Math.min(Date.now(), toMs), cfg) : null
+    };
+  });
+
+  // 2) Tempo de resposta nas conversas: cada vez que o contato escreve, quanto a equipe demora para responder.
+  const turns = [], pending = [], perAgent = {};
+  chats.forEach(c => {
+    let open = null;
+    (msgsByChat[c.id] || []).forEach(m => {
+      const at = Date.parse(m.at);
+      if (!m.fromMe) { if (!open) open = at; return; }
+      if (!anIsHuman(m)) return;
+      const who = anWho(m);
+      const a = perAgent[who] || (perAgent[who] = { who, sent: 0, answered: 0, times: [] });
+      a.sent++;
+      if (open != null) {
+        if (open >= fromMs && open <= toMs) { const d = anDuration(open, at, cfg); turns.push({ chatKey: c.id, start: open, end: at, dur: d, who }); a.answered++; a.times.push(d); }
+        open = null;
+      }
+    });
+    if (open != null && open <= toMs) pending.push({ chat: c, since: open, wait: anDuration(open, Date.now(), cfg) });
+  });
+
+  const answered = leadRows.filter(r => r.dur != null);
+  const firstTimes = answered.map(r => r.dur);
+  const turnTimes = turns.map(t => t.dur);
+  const buckets = AN_BUCKETS.map(([label, maxMin], i) => ({ label, n: firstTimes.filter(d => d / 60000 <= maxMin && (i === 0 || d / 60000 > AN_BUCKETS[i - 1][1])).length }));
+  // Mediana diária do primeiro contato (pela data de chegada).
+  const localDay = t => { const x = new Date(t); return new Date(x.getTime() - x.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+  const byDay = {};
+  answered.forEach(r => { const k = localDay(r.arrival); (byDay[k] = byDay[k] || []).push(r.dur); });
+  const days = [];
+  for (const t = new Date(fromMs); t.getTime() <= toMs; t.setDate(t.getDate() + 1)) days.push(localDay(t.getTime()));
+  return {
+    act, fromDay, toDay, cfg: { ...cfg }, generatedAt: new Date().toISOString(),
+    leads: leadRows, totalLeads: leadRows.length, answered: answered.length,
+    noContact: leadRows.filter(r => r.dur == null && r.hasChat).length, noChat: leadRows.filter(r => !r.hasChat).length,
+    firstMedian: anMedian(firstTimes), firstAvg: anAvg(firstTimes),
+    within5: firstTimes.filter(d => d <= 5 * 60000).length, within60: firstTimes.filter(d => d <= 60 * 60000).length,
+    autoMedian: anMedian(leadRows.filter(r => r.autoDur != null).map(r => r.autoDur)),
+    turns: turns.length, turnMedian: anMedian(turnTimes), turnAvg: anAvg(turnTimes),
+    pending: pending.sort((a, b) => b.wait - a.wait), chats: chats.length,
+    agents: Object.values(perAgent).map(a => ({ ...a, median: anMedian(a.times), avg: anAvg(a.times) })).sort((a, b) => b.answered - a.answered),
+    buckets, daily: days.map(d => ({ day: d, median: anMedian(byDay[d] || []), n: (byDay[d] || []).length }))
+  };
+}
+
+function anDefaultRange() {
+  const to = new Date(); const from = new Date(); from.setDate(to.getDate() - 29);
+  const f = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  return [f(from), f(to)];
+}
+
+function renderAnaliseView() {
+  const box = document.getElementById('analise-body');
+  if (!box) return;
+  if (!_an.from || !_an.to) [_an.from, _an.to] = anDefaultRange();
+  const act = flowAct();
+  box.innerHTML = `
+    <div class="huv-header" style="margin-bottom:14px;">
+      <div style="flex:1;min-width:220px;">
+        <div class="huv-crumb">Principal</div>
+        <div class="huv-page-title" style="color:var(--text);">Atendimento</div>
+        <div class="integ-muted" style="margin-top:4px;">Quanto tempo a equipe leva para responder quem chega pelo WhatsApp, cruzando as conversas do Chat com os cards do funil.</div>
+      </div>
+    </div>
+    <div class="an-filters">
+      <label>De<input type="date" class="field-input" id="an-from" value="${_an.from}"></label>
+      <label>Até<input type="date" class="field-input" id="an-to" value="${_an.to}"></label>
+      <label class="integ-toggle" style="align-self:flex-end;margin-bottom:10px;"><input type="checkbox" id="an-biz" ${_an.biz ? 'checked' : ''} onchange="document.getElementById('an-biz-box').style.display=this.checked?'flex':'none'"> Contar só o horário de expediente</label>
+      <div id="an-biz-box" style="display:${_an.biz ? 'flex' : 'none'};gap:8px;align-items:flex-end;flex-wrap:wrap;">
+        <label>Das<input type="time" class="field-input" id="an-biz-start" value="${_an.bizStart}"></label>
+        <label>Às<input type="time" class="field-input" id="an-biz-end" value="${_an.bizEnd}"></label>
+        <label class="integ-toggle" style="margin-bottom:10px;"><input type="checkbox" id="an-biz-sat" ${_an.bizSat ? 'checked' : ''}> Sábado</label>
+      </div>
+      <button class="btn-add-lead" style="height:40px;padding:0 18px;align-self:flex-end;" onclick="runAnalise()" ${act ? '' : 'disabled'}>Analisar</button>
+    </div>
+    <div id="an-result">${act ? '<div class="integ-empty">Escolha o período e clique em Analisar.</div>' : '<div class="integ-empty">Escolha o cliente no topo do menu.</div>'}</div>`;
+  if (act && _an.data && _an.data.act === normalizeActValue(act)) renderAnaliseResult(_an.data);
+}
+
+async function runAnalise() {
+  const act = flowAct();
+  if (!act) return showToast('Escolha o cliente no topo do menu.', 'warning');
+  _an.from = document.getElementById('an-from').value;
+  _an.to = document.getElementById('an-to').value;
+  _an.biz = document.getElementById('an-biz').checked;
+  _an.bizStart = document.getElementById('an-biz-start').value || '08:00';
+  _an.bizEnd = document.getElementById('an-biz-end').value || '18:00';
+  _an.bizSat = document.getElementById('an-biz-sat').checked;
+  if (!_an.from || !_an.to || _an.from > _an.to) return showToast('Confira o período.', 'warning');
+  try { localStorage.setItem('huven_analise_cfg', JSON.stringify({ from: _an.from, to: _an.to, biz: _an.biz, bizStart: _an.bizStart, bizEnd: _an.bizEnd, bizSat: _an.bizSat })); } catch (e) {}
+  const run = ++_an.running;
+  const out = document.getElementById('an-result');
+  out.innerHTML = '<div class="integ-muted">Lendo as conversas...</div>';
+  try {
+    const data = await computeAttendance(act, _an.from, _an.to, _an, (d, t) => { if (run === _an.running && out) out.innerHTML = `<div class="integ-muted">Lendo as conversas... ${d} de ${t}</div>`; });
+    if (run !== _an.running) return;
+    _an.data = data;
+    renderAnaliseResult(data);
+  } catch (e) {
+    out.innerHTML = `<div class="integ-error">Erro: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function anKpi(label, value, sub, tone) {
+  return `<div class="an-kpi ${tone || ''}"><div class="an-kpi-label">${label}</div><div class="an-kpi-value">${value}</div>${sub ? `<div class="an-kpi-sub">${sub}</div>` : ''}</div>`;
+}
+
+function renderAnaliseResult(d) {
+  const out = document.getElementById('an-result');
+  if (!out) return;
+  _an.charts.forEach(c => { try { c.destroy(); } catch (e) {} });
+  _an.charts = [];
+  const pct = (a, b) => b ? Math.round(a / b * 100) + '%' : '—';
+  const n = v => Number(v || 0).toLocaleString('pt-BR');
+  const worst = d.leads.filter(r => r.hasChat).sort((a, b) => (b.dur == null ? b.waiting + 1e15 : b.dur) - (a.dur == null ? a.waiting + 1e15 : a.dur));
+  out.innerHTML = `
+    ${d.cfg.biz ? `<div class="integ-muted" style="margin-bottom:10px;font-size:12px;">Tempos contados só no expediente: ${escapeHtml(d.cfg.bizStart)} às ${escapeHtml(d.cfg.bizEnd)}, segunda a ${d.cfg.bizSat ? 'sábado' : 'sexta'}.</div>` : ''}
+    <div class="an-section-title">Primeiro contato com o lead</div>
+    <div class="an-kpis">
+      ${anKpi('Leads que chegaram', n(d.totalLeads), `${n(d.noChat)} sem conversa no WhatsApp do CRM`)}
+      ${anKpi('Tempo até o 1º contato', anFmt(d.firstMedian), `mediana · média ${anFmt(d.firstAvg)}`, 'gold')}
+      ${anKpi('Respondidos em até 5 min', pct(d.within5, d.answered), `${n(d.within5)} de ${n(d.answered)} respondidos`, d.answered && d.within5 / d.answered >= 0.5 ? 'green' : '')}
+      ${anKpi('Em até 1 hora', pct(d.within60, d.answered), `${n(d.within60)} ${d.within60 === 1 ? 'lead' : 'leads'}`)}
+      ${anKpi('Ainda sem contato humano', n(d.noContact), 'têm conversa, mas ninguém da equipe respondeu', d.noContact ? 'red' : '')}
+      ${d.autoMedian != null ? anKpi('1ª mensagem automática', anFmt(d.autoMedian), 'mediana depois da chegada') : ''}
+    </div>
+    <div class="an-grid">
+      <div class="an-card"><div class="an-card-title">Quanto tempo levou o 1º contato</div><div style="height:220px;"><canvas id="an-ch-buckets"></canvas></div></div>
+      <div class="an-card"><div class="an-card-title">Tempo até o 1º contato por dia (mediana)</div><div style="height:220px;"><canvas id="an-ch-daily"></canvas></div></div>
+    </div>
+    <div class="an-section-title">Conversas: tempo de resposta a cada mensagem do contato</div>
+    <div class="an-kpis">
+      ${anKpi('Respostas da equipe', n(d.turns), `em ${n(d.chats)} conversas com movimento`)}
+      ${anKpi('Tempo de resposta', anFmt(d.turnMedian), `mediana · média ${anFmt(d.turnAvg)}`, 'gold')}
+      ${anKpi('Esperando resposta agora', n(d.pending.length), d.pending.length ? `a mais antiga há ${anFmt(d.pending[0].wait)}` : 'nenhuma conversa esperando', d.pending.length ? 'red' : 'green')}
+    </div>
+    <div class="an-grid">
+      <div class="an-card">
+        <div class="an-card-title">Por atendente</div>
+        ${d.agents.length ? `<table class="an-table"><thead><tr><th>Quem respondeu</th><th>Respostas</th><th>Mensagens</th><th>Tempo (mediana)</th></tr></thead><tbody>
+          ${d.agents.map(a => `<tr><td>${escapeHtml(a.who)}</td><td>${n(a.answered)}</td><td>${n(a.sent)}</td><td>${anFmt(a.median)}</td></tr>`).join('')}
+        </tbody></table><div class="integ-muted" style="font-size:11.5px;margin-top:6px;">"Pelo celular" = respostas dadas direto no WhatsApp do aparelho, fora do CRM.</div>` : '<div class="integ-muted">Nenhuma resposta da equipe no período.</div>'}
+      </div>
+      <div class="an-card">
+        <div class="an-card-title">Esperando resposta</div>
+        ${d.pending.length ? d.pending.slice(0, 12).map(p => `<div class="an-row" onclick="openChatByKey('${escapeJsString(d.act)}','${escapeJsString(p.chat.id)}')"><span>${escapeHtml(chatName(p.chat, chatLeadFor(p.chat, chatLeadIndex(d.act))))}</span><b style="color:var(--red);">${anFmt(p.wait)}</b></div>`).join('') : '<div class="integ-muted">Ninguém esperando. 👏</div>'}
+      </div>
+    </div>
+    <div class="an-section-title">Leads do período</div>
+    <div class="an-card" style="padding:0;overflow:hidden;">
+      <table class="an-table an-table-leads"><thead><tr><th>Lead</th><th>Chegou</th><th>1º contato</th><th>Tempo</th><th>Por</th><th>Etapa</th></tr></thead><tbody>
+        ${worst.slice(0, 200).map(r => `<tr onclick="${r.chatKey ? `openChatByKey('${escapeJsString(d.act)}','${escapeJsString(r.chatKey)}')` : ''}" style="cursor:pointer;">
+          <td><b>${escapeHtml(r.name)}</b><div class="ct-sub">${escapeHtml(limitText(r.origem, 40))}</div></td>
+          <td>${new Date(r.arrival).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+          <td>${r.humanAt ? new Date(r.humanAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+          <td>${r.dur != null ? `<span class="an-pill ${r.dur <= 5 * 60000 ? 'ok' : r.dur <= 3600000 ? 'mid' : 'bad'}">${anFmt(r.dur)}</span>` : `<span class="an-pill bad">sem contato · ${anFmt(r.waiting)}</span>`}</td>
+          <td>${escapeHtml(r.who || '—')}</td>
+          <td>${escapeHtml(r.stage)}</td></tr>`).join('') || '<tr><td colspan="6" class="integ-muted" style="padding:14px;">Nenhum lead com conversa no período.</td></tr>'}
+      </tbody></table>
+    </div>`;
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const grid = dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.06)', tick = dark ? '#A8A6A0' : '#6F6D67';
+  const common = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: tick, font: { size: 10.5 } } }, y: { grid: { color: grid }, ticks: { color: tick, font: { size: 10.5 } }, beginAtZero: true } } };
+  _an.charts.push(new Chart(document.getElementById('an-ch-buckets'), {
+    type: 'bar', data: { labels: d.buckets.map(b => b.label), datasets: [{ data: d.buckets.map(b => b.n), backgroundColor: ['#1FA855', '#5DBB63', '#C9A24A', '#E08A1E', '#E06A3A', '#D64545'], borderRadius: 6 }] },
+    options: { ...common, scales: { ...common.scales, y: { ...common.scales.y, ticks: { ...common.scales.y.ticks, precision: 0 } } } }
+  }));
+  _an.charts.push(new Chart(document.getElementById('an-ch-daily'), {
+    type: 'line', data: { labels: d.daily.map(x => x.day.split('-').reverse().slice(0, 2).join('/')), datasets: [{ data: d.daily.map(x => x.median == null ? null : Math.round(x.median / 60000)), borderColor: '#C9A24A', backgroundColor: 'rgba(201,162,74,.15)', fill: true, tension: .35, spanGaps: true, pointRadius: 2 }] },
+    options: { ...common, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => anFmt(c.raw * 60000) } } }, scales: { ...common.scales, y: { ...common.scales.y, ticks: { ...common.scales.y.ticks, callback: v => v >= 60 ? (v / 60).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' h' : Math.round(v) + ' min' } } } }
+  }));
+}
+
 // ===== AVISO: LIMITE GRÁTIS DO R2 (Prospecção) =====
 // O Worker conta cada busca em r2_usage/AAAA-MM. Admin vê aviso a partir de 50%; em 90% a Prospecção para até o mês virar.
 let _r2Usage = null;
@@ -13239,7 +13554,7 @@ function getCurrentCrmActForSheets() {
 
 function openIntegrationsFromNav() {
   switchView('crm');
-  ['report','clientes','automacoes','prospeccao','crm','ajuda','conta','contatos','integracoes'].forEach(v => {
+  ['report','analise','clientes','automacoes','prospeccao','crm','ajuda','conta','contatos','integracoes'].forEach(v => {
     const el = document.getElementById('nav-' + v);
     if (el) el.classList.toggle('active', v === 'integracoes');
   });
