@@ -5752,7 +5752,14 @@ function normalizeStageTextForMatch(value) {
 function normalizeLeadStageForClient(lead, act) {
   const current = String((lead && lead.stage) || '').trim();
   if (!current) return current;
-  const stages = getStages(act || '', leadPipeline(lead));
+  // Lead de outro pipeline: sem as colunas dele carregadas, não mexe na etapa
+  // (senão, logo depois do refresh, o card "cairia" para a primeira coluna).
+  const pl = leadPipeline(lead);
+  if (pl !== 'principal') {
+    const cfg = pipelinesFor(act);
+    if (!cfg || !(cfg.list || []).some(p => p.id === pl)) return current;
+  }
+  const stages = getStages(act || '', pl);
   const candidates = [
     current,
     lead && lead.stageLabel,
