@@ -6847,6 +6847,7 @@ function renderCampaignList(campaigns) {
     if (c.status === 'draft') actions.push(btn('Iniciar disparo', 'startCampaign'));
     if (c.status === 'running') actions.push(btn('Pausar', 'pauseCampaign'));
     if (c.status === 'paused') actions.push(btn('Retomar', 'startCampaign'));
+    if (['draft', 'running', 'paused'].includes(c.status)) actions.push(btn('Editar', 'editCampaign', 'background:transparent;'));
     if (c.status === 'running' || c.status === 'paused') actions.push(btn('Cancelar', 'cancelCampaign', 'background:transparent;'));
     actions.push(btn('Detalhes', 'openCampaignDetail', 'background:transparent;'));
     actions.push(btn('Reutilizar', 'reuseCampaign', 'background:transparent;'));
@@ -7031,6 +7032,48 @@ function onCampaignStartModeChange() {
 }
 
 // Reaproveita uma campanha: abre o editor com as mesmas mensagens, arquivo, regras e contatos.
+// Editar campanha em andamento, pausada ou rascunho: nome, mensagens, arquivo, WhatsApp e ritmo de envio.
+// Os contatos não mudam (quem já recebeu não recebe de novo). Vale a partir do próximo envio.
+function editCampaign(id) {
+  const c = _campaignsCache.find(x => x.id === id);
+  if (!c) return;
+  openCampaignEditor(c, { edit: true });
+  const editor = document.getElementById('campaign-editor');
+  if (editor) editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function saveCampaignEdit() {
+  const d = _campaignDraft;
+  const c = d && d.copyFrom;
+  if (!c) return;
+  const fb = document.getElementById('camp-feedback');
+  const setFb = (color, text) => { fb.style.color = color; fb.textContent = text; };
+  const name = document.getElementById('camp-name').value.trim();
+  const templates = readWhatsAppVariations('camp');
+  const mediaType = d.mediaType || 'text';
+  if (!name) { setFb('#f87171', 'Dê um nome à campanha.'); return; }
+  if (mediaType === 'text' && !templates.length) { setFb('#f87171', 'Escreva pelo menos uma mensagem.'); return; }
+  if (mediaType !== 'text' && !d.media) { setFb('#f87171', 'Envie o arquivo de ' + CAMPAIGN_MEDIA_LABELS[mediaType].toLowerCase() + '.'); return; }
+  const campLines = readWaLinePicker('camp-lines');
+  if (waHasMultiple(d.act) && !campLines) { setFb('#f87171', 'Escolha por qual WhatsApp disparar.'); return; }
+  const read = readCampaignDispatch();
+  if (read.error) { setFb('#f87171', read.error); return; }
+  const dispatch = { ...read.dispatch };
+  if (c.dispatch && c.dispatch.warmupStartedAt) dispatch.warmupStartedAt = c.dispatch.warmupStartedAt;
+  setFb('var(--muted)', 'Salvando...');
+  try {
+    await window._fb.updateCampaign(c.id, {
+      name, templates,
+      media: mediaType !== 'text' && d.media ? { type: d.media.type, url: d.media.url, mimetype: d.media.mimetype, fileName: d.media.fileName } : null,
+      dispatch,
+      lines: campLines || c.lines || [waDefaultLine(d.act)],
+      editedAt: new Date().toISOString()
+    });
+    showToast('Campanha atualizada. As mudanças valem a partir do próximo envio.', 'success');
+    closeCampaignEditor();
+  } catch (e) { setFb('#f87171', 'Erro: ' + e.message); }
+}
+
 function reuseCampaign(id) {
   const c = _campaignsCache.find(x => x.id === id);
   if (!c) return;
@@ -7039,8 +7082,9 @@ function reuseCampaign(id) {
   if (editor) editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function openCampaignEditor(copyFrom) {
+function openCampaignEditor(copyFrom, opts = {}) {
   if (copyFrom && !copyFrom.act) copyFrom = null; // chamado pelo botão "Nova campanha" (recebe o evento)
+  const editing = !!(opts && opts.edit && copyFrom);
   const act = campaignAct();
   if (!act) { showToast('Escolha o cliente primeiro.', 'warning'); return; }
   const editor = document.getElementById('campaign-editor');
@@ -7052,12 +7096,12 @@ function openCampaignEditor(copyFrom) {
   ensureWaSettings(act).then(() => { const b = document.getElementById('camp-lines-box'); if (b && !b.innerHTML.trim()) b.innerHTML = waLinePickerHtml(act, 'camp-lines', copyFrom && copyFrom.lines, 'Por qual WhatsApp disparar?'); });
   editor.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-      <div style="font-size:15px;font-weight:600;color:var(--text);">${copyFrom ? 'Reutilizar campanha' : 'Nova campanha'}</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text);">${editing ? 'Editar campanha' : copyFrom ? 'Reutilizar campanha' : 'Nova campanha'}</div>
       <button class="btn-close-panel" onclick="closeCampaignEditor()">×</button>
     </div>
     <label class="field-label">Nome da campanha</label>
-    <input class="field-input" id="camp-name" placeholder="Ex.: Promoção de outubro" style="margin-bottom:6px;" value="${copyFrom ? escapeHtml((copyFrom.name || 'Campanha') + ' (nova)') : ''}">
-    ${copyFrom ? `<div style="${hint}">Baseada em "${escapeHtml(copyFrom.name || 'Campanha')}". Mude o que quiser: mensagens (adicione ou apague variações), arquivo, contatos e regras.</div>` : ''}
+    <input class="field-input" id="camp-name" placeholder="Ex.: Promoção de outubro" style="margin-bottom:6px;" value="${editing ? escapeHtml(copyFrom.name || '') : copyFrom ? escapeHtml((copyFrom.name || 'Campanha') + ' (nova)') : ''}">
+    ${editing ? `<div style="${hint}">Você pode mudar o nome, as mensagens, o arquivo, o WhatsApp e o ritmo de envio. Os contatos continuam os mesmos (${Number(copyFrom.total) || 0}, dos quais ${Number(copyFrom.sent) || 0} já receberam). As mudanças valem a partir do próximo envio.</div>` : copyFrom ? `<div style="${hint}">Baseada em "${escapeHtml(copyFrom.name || 'Campanha')}". Mude o que quiser: mensagens (adicione ou apague variações), arquivo, contatos e regras.</div>` : ''}
     <div id="camp-lines-box">${waLinePickerHtml(act, 'camp-lines', copyFrom && copyFrom.lines, 'Por qual WhatsApp disparar?')}</div>
 
     <div style="${section}">Conteúdo</div>
@@ -7071,6 +7115,7 @@ function openCampaignEditor(copyFrom) {
     <div id="camp-text-hint" style="${hint}">Cadastre variações: cada contato recebe uma sorteada. Use {primeiro_nome} e {nome}; se o contato não tiver nome, o marcador some.</div>
     ${whatsappVariationsHtml('camp', copyFrom && Array.isArray(copyFrom.templates) ? copyFrom.templates : [])}
 
+    <div id="camp-audience-wrap">
     <div style="${section}">Para quem enviar</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
       ${[...(copyFrom ? [['previous', 'Mesmos contatos da campanha']] : []), ['crm', 'Leads do CRM'], ['pick', 'Escolher contatos / etiquetas'], ['sheet', 'Planilha'], ['contacts', 'Contatos do WhatsApp'], ['groups', 'Grupos do WhatsApp']].map(([k, l]) =>
@@ -7129,6 +7174,7 @@ function openCampaignEditor(copyFrom) {
     </div>
 
     <div id="camp-summary" style="margin-top:14px;padding:12px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text);"></div>
+    </div>
 
     <div style="${section}">Configurações de disparo</div>
     <div style="${hint}">Já vêm com o recomendado contra bloqueio. Ajuste antes de iniciar; valem só para esta campanha.</div>
@@ -7137,13 +7183,19 @@ function openCampaignEditor(copyFrom) {
     <div id="camp-risk" style="display:none;margin-top:14px;padding:10px 12px;border-radius:8px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.35);font-size:12px;color:var(--text);line-height:1.5;"></div>
 
     <div style="display:flex;gap:8px;align-items:center;margin-top:16px;flex-wrap:wrap;">
-      <button style="${wbtn}" id="camp-start-btn" onclick="saveCampaign(true)">Salvar e iniciar</button>
-      <button style="${wbtn}background:transparent;" onclick="saveCampaign(false)">Salvar como rascunho</button>
+      ${editing ? `<button style="${wbtn}" onclick="saveCampaignEdit()">Salvar alterações</button>` : `<button style="${wbtn}" id="camp-start-btn" onclick="saveCampaign(true)">Salvar e iniciar</button>
+      <button style="${wbtn}background:transparent;" onclick="saveCampaign(false)">Salvar como rascunho</button>`}
       <span id="camp-feedback" style="font-size:12px;"></span>
     </div>`;
   editor.style.display = 'block';
   editor.querySelectorAll('#camp-daily,#camp-hourly,#camp-start,#camp-end,#camp-warmup').forEach(el => el.addEventListener('change', renderCampaignSummary));
-  if (copyFrom) {
+  if (editing) {
+    applyCampaignCopy(copyFrom);
+    if (copyFrom.media && copyFrom.media.url) _campaignDraft.media = { ...copyFrom.media };
+    document.getElementById('camp-audience-wrap').style.display = 'none';
+    const startRadio = document.querySelector('input[name="camp-start"]');
+    if (startRadio && startRadio.closest('div')) startRadio.closest('div').style.display = 'none';
+  } else if (copyFrom) {
     applyCampaignCopy(copyFrom);
     selectCampaignSource('previous');
   } else {
