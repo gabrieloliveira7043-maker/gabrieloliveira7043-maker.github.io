@@ -8141,6 +8141,7 @@ async function renderIntegMeta() {
         <li>Volte aqui, clique em <b>Carregar páginas</b>, ligue cada página ao cliente e teste na <a href="https://developers.facebook.com/tools/lead-ads-testing" target="_blank" rel="noopener">Ferramenta de teste de Lead Ads</a>.</li>
       </ol>
       <div class="integ-row" style="gap:14px;">${check(st.hasToken, 'Token do Business')}${check(st.hasSecret, 'Chave secreta do app')}${check(st.hasVerify, 'Palavra do webhook')}</div>
+      ${st.tokenCheck ? `<div class="integ-muted" style="margin-top:10px;">Token salvo: <code>${escapeHtml(st.tokenCheck.head)}…${escapeHtml(st.tokenCheck.tail)}</code> (${st.tokenCheck.length} caracteres${st.tokenCheck.hasSpaces ? ', <b style="color:var(--red);">com espaços</b>' : ''}) · ${st.tokenCheck.owner ? `<b style="color:var(--green);">válido, de ${escapeHtml(st.tokenCheck.owner)}</b>` : `<b style="color:var(--red);">recusado pela Meta: ${escapeHtml(st.tokenCheck.error || '')}</b>`}</div>` : ''}
     </details>
     <div class="integ-intro" style="margin-top:18px;">
       <div class="integ-h2">Páginas do Facebook</div>
