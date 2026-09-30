@@ -1062,6 +1062,15 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
 .chat-qr-item:hover, .chat-qr-item.sel { background:var(--surface2); }
 .chat-qr-item b { font-size:12.5px; color:var(--text); }
 .chat-qr-item div { font-size:12px; color:var(--muted2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.chat-bubble { position:relative; }
+.chat-bubble.deleted { font-style:italic; color:var(--muted2); }
+.chat-msg-more { position:absolute; top:2px; right:4px; background:transparent; border:none; color:var(--muted2); cursor:pointer; font-size:14px; line-height:1; padding:2px 4px; border-radius:6px; opacity:.35; }
+.chat-bubble:hover .chat-msg-more, .chat-msg-more:focus { opacity:1; background:var(--surface2); }
+@media (hover: none) { .chat-msg-more { opacity:.8; } }
+.chat-bubble.out { padding-right:26px; }
+.chat-msg-menu { position:fixed; z-index:9800; background:var(--surface); border:1px solid var(--border2); border-radius:10px; box-shadow:0 12px 30px rgba(0,0,0,.25); display:flex; flex-direction:column; min-width:190px; overflow:hidden; }
+.chat-msg-menu button { background:none; border:none; text-align:left; padding:10px 14px; font-size:13px; color:var(--text); cursor:pointer; font-family:inherit; }
+.chat-msg-menu button:hover { background:var(--surface2); }
 .chat-note { align-self:center; width:min(520px, 92%); background:rgba(224,164,58,.13); border:1px solid rgba(224,164,58,.45); border-radius:10px; padding:8px 11px; font-size:13px; color:var(--text); white-space:pre-wrap; word-break:break-word; }
 .chat-note-head { display:flex; gap:6px; align-items:center; font-size:11px; font-weight:700; color:#B7791F; margin-bottom:3px; flex-wrap:wrap; }
 .chat-note-head .sp { flex:1; }
@@ -11393,7 +11402,17 @@ function renderChatMessages() {
       media = `<span style="color:var(--muted2);">${CHAT_MEDIA_LABELS[m.type]}</span>${m.text ? '<br>' : ''}`;
     }
     const who = m.fromMe ? [m.source, m.sentBy].filter(Boolean).join(' · ') : '';
-    parts.push(`<div class="chat-bubble ${m.fromMe ? 'out' : 'in'}">${media}${escapeHtml(m.text || '')}<div class="chat-meta">${who ? escapeHtml(who) + ' · ' : ''}${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div></div>`);
+    const time = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    if (m.deleted) {
+      parts.push(`<div class="chat-bubble ${m.fromMe ? 'out' : 'in'} deleted">🚫 Mensagem apagada<div class="chat-meta">${m.deletedBy ? 'apagada por ' + escapeHtml(m.deletedBy) + ' · ' : ''}${time}</div></div>`);
+      return;
+    }
+    // Enviada por nós e ainda dentro do prazo do WhatsApp: botão para editar (texto, 15 min) ou apagar (2 dias).
+    const age = Date.now() - d.getTime();
+    const canEdit = m.fromMe && (m.type || 'text') === 'text' && age < 15 * 60000 && !/^(crm|sch)\d/.test(m.id);
+    const canDel = m.fromMe && age < 2 * 86400000 && !/^(crm|sch)\d/.test(m.id);
+    const menu = canEdit || canDel ? `<button class="chat-msg-more" title="Editar ou apagar" onclick="openChatMsgMenu(event, '${escapeJsString(m.id)}', ${canEdit}, ${canDel})">⋯</button>` : '';
+    parts.push(`<div class="chat-bubble ${m.fromMe ? 'out' : 'in'}">${menu}${media}${escapeHtml(m.text || '')}<div class="chat-meta">${who ? escapeHtml(who) + ' · ' : ''}${m.edited ? 'editada · ' : ''}${time}</div></div>`);
   });
   pendingSched.forEach(s => {
     const when = new Date(s.sendAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -11404,6 +11423,55 @@ function renderChatMessages() {
   box.innerHTML = parts.join('');
   box.dataset.loaded = '1';
   if (nearBottom) box.scrollTop = box.scrollHeight;
+}
+
+// Menu da mensagem enviada: Editar / Apagar para todos.
+function openChatMsgMenu(ev, id, canEdit, canDel) {
+  ev.stopPropagation();
+  closeChatMsgMenu();
+  const menu = document.createElement('div');
+  menu.id = 'chat-msg-menu';
+  menu.className = 'chat-msg-menu';
+  menu.innerHTML = (canEdit ? `<button onclick="editChatMessage('${escapeJsString(id)}')">✏️ Editar</button>` : '')
+    + (canDel ? `<button style="color:var(--red);" onclick="deleteChatMessage('${escapeJsString(id)}')">🗑️ Apagar para todos</button>` : '');
+  document.body.appendChild(menu);
+  const r = ev.currentTarget.getBoundingClientRect();
+  menu.style.top = Math.min(window.innerHeight - 100, r.bottom + 4) + 'px';
+  menu.style.left = Math.max(8, Math.min(window.innerWidth - 200, r.right - 190)) + 'px';
+  setTimeout(() => document.addEventListener('click', closeChatMsgMenu, { once: true }), 0);
+}
+function closeChatMsgMenu() { const m = document.getElementById('chat-msg-menu'); if (m) m.remove(); }
+
+function editChatMessage(id) {
+  closeChatMsgMenu();
+  const m = _chatMsgs.find(x => x.id === id);
+  if (!m) return;
+  openHuvenModal('Editar mensagem', `
+    <div class="integ-muted" style="font-size:12.5px;margin-bottom:8px;">O contato vê a mensagem corrigida com a marca "editada". O WhatsApp só permite editar até 15 minutos depois do envio.</div>
+    <textarea class="field-input" id="chat-edit-text" rows="4" maxlength="4000" style="width:100%;box-sizing:border-box;resize:vertical;margin-bottom:10px;">${escapeHtml(m.text || '')}</textarea>
+    <button class="btn-save" style="width:auto;padding:9px 16px;" onclick="saveChatEdit('${escapeJsString(id)}')">Salvar correção</button> <span id="chat-edit-fb" class="integ-muted"></span>`, 480);
+  setTimeout(() => { const t = document.getElementById('chat-edit-text'); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); } }, 50);
+}
+
+async function saveChatEdit(id) {
+  const text = document.getElementById('chat-edit-text').value.trim();
+  const fb = document.getElementById('chat-edit-fb');
+  if (!text) { fb.textContent = 'Escreva o texto.'; return; }
+  fb.textContent = 'Salvando...';
+  try {
+    await window._fb.whatsapp('/whatsapp/chat-edit', _chatAct, { chatKey: _chatOpenKey, messageId: id, text });
+    closeHuvenModal();
+    showToast('Mensagem corrigida.', 'success');
+  } catch (e) { fb.style.color = 'var(--red)'; fb.textContent = e.message; }
+}
+
+async function deleteChatMessage(id) {
+  closeChatMsgMenu();
+  if (!await showConfirm('A mensagem some para o contato e ele vê "Mensagem apagada". Não dá para desfazer.', 'Apagar para todos', 'Apagar', true)) return;
+  try {
+    await window._fb.whatsapp('/whatsapp/chat-delete', _chatAct, { chatKey: _chatOpenKey, messageId: id });
+    showToast('Mensagem apagada.', 'success');
+  } catch (e) { showToast('Não apagou: ' + e.message, 'error', 6000); }
 }
 
 function loadOlderChatMessages() {
