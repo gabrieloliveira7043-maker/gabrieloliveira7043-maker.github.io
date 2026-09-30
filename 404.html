@@ -3382,6 +3382,11 @@ td { font-family: var(--font); font-size: 13px; }
             <div id="whatsapp-own-auto" style="font-size:12px; color:var(--muted); margin-top:12px;"></div>
           </div>
           <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--r2); padding:24px;">
+            <div style="font-size:15px; font-weight:600; color:var(--text); margin-bottom:6px;">Facebook e formulários de anúncio</div>
+            <div style="font-size:12px; color:var(--muted); margin-bottom:12px; line-height:1.5;">Conecte o seu Facebook e escolha as páginas: quem preencher os formulários dos seus anúncios cai direto no funil.</div>
+            <div id="fb-connect-own"></div>
+          </div>
+          <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--r2); padding:24px;">
             <div style="font-size:15px; font-weight:600; color:var(--text); margin-bottom:6px;">Primeira mensagem</div>
             <div style="font-size:12px; color:var(--muted); margin-bottom:12px; line-height:1.5;">Enviada aos leads novos. Cadastre variações: a cada envio uma é sorteada, o que ajuda a evitar bloqueio do número. Use {primeiro_nome}, {nome}, {rede_social} e {origem}.</div>
             <div id="whatsapp-own-variations"></div>
@@ -10585,6 +10590,103 @@ function renderInboundCode() {
 }
 
 // ----- Formulários da Meta (Lead Ads) -----
+// ===== "CONECTAR FACEBOOK" (cada cliente liga as próprias páginas) =====
+let _fbForms = {};
+
+async function renderFbConnectBox(act, el) {
+  if (!el) return;
+  act = normalizeActValue(act);
+  if (!act) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="integ-muted">Carregando...</div>';
+  let pages = [];
+  try { pages = (await window._fb.whatsapp('/fb/pages', act)).pages || []; }
+  catch (e) { el.innerHTML = `<div class="integ-error">${escapeHtml(e.message)}</div>`; return; }
+  const a = escapeJsString(act);
+  const elId = el.id;
+  el.innerHTML = `<button class="integ-btn primary" onclick="startFbConnect('${a}', '${elId}')">${pages.length ? 'Conectar outras páginas' : 'Conectar Facebook'}</button>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px;">${pages.map(p => {
+      const pid = escapeJsString(p.id);
+      const box = `fbp-${elId}-${p.id}`;
+      return `<div class="integ-card" style="margin:0;">
+        <div class="integ-card-head"><div style="flex:1;min-width:0;"><div class="integ-title">${escapeHtml(p.pageName)}</div>
+          <div class="integ-muted">${p.count} leads recebidos · último: ${escapeHtml(integWhen(p.lastAt))} · ${p.via === 'facebook-login' ? 'conectada pelo Facebook' + (p.connectedByName ? ' de ' + escapeHtml(p.connectedByName) : '') : 'ligada pela Huven'}</div></div>
+          <span class="integ-chip ${p.active ? 'ok' : 'off'}">${p.active ? 'Recebendo leads' : 'Desligada'}</span></div>
+        <div class="integ-grid">
+          <label>Coluna onde o lead entra<select class="field-input" id="${box}-stage">${integStageOptions(act, p.stage)}</select></label>
+          <label>Origem no card (opcional)<input class="field-input" id="${box}-origem" value="${escapeHtml(p.origem)}" placeholder="Meta Ads - nome do formulário"></label>
+        </div>
+        <div class="integ-row">
+          <button class="integ-btn primary" onclick="saveFbPage('${a}','${pid}','${elId}', true)">Salvar</button>
+          ${p.active ? `<button class="integ-btn" onclick="saveFbPage('${a}','${pid}','${elId}', false)">Pausar</button>` : ''}
+          <button class="integ-btn" onclick="loadFbForms('${a}','${pid}','${box}')">Formulários</button>
+          ${p.via === 'facebook-login' ? `<button class="integ-btn" style="color:var(--red);" onclick="disconnectFbPage('${a}','${pid}','${elId}')">Desconectar</button>` : ''}
+        </div>
+        <div id="${box}-forms"></div>
+      </div>`;
+    }).join('') || '<div class="integ-muted">Nenhuma página ligada ainda.</div>'}</div>`;
+}
+
+async function startFbConnect(act, elId) {
+  try {
+    const me = chatMe();
+    const r = await window._fb.whatsapp('/fb/login-url', act, { uid: me.uid });
+    const w = window.open(r.url, 'huvenfb', 'width=620,height=740');
+    if (!w) { showToast('O navegador bloqueou a janela. Libere pop-ups para o CRM e tente de novo.', 'warning', 7000); return; }
+    const onMsg = ev => {
+      if (!ev.data || ev.data.huvenFb === undefined) return;
+      window.removeEventListener('message', onMsg);
+      showToast(ev.data.msg || (ev.data.huvenFb ? 'Facebook conectado.' : 'Não conectou.'), ev.data.huvenFb ? 'success' : 'warning', 8000);
+      renderFbConnectBox(act, document.getElementById(elId));
+    };
+    window.addEventListener('message', onMsg);
+    // Se a janela fechar sem mensagem, atualiza a lista mesmo assim.
+    const t = setInterval(() => { if (w.closed) { clearInterval(t); setTimeout(() => renderFbConnectBox(act, document.getElementById(elId)), 800); } }, 1000);
+  } catch (e) { showToast('Erro: ' + e.message, 'error', 6000); }
+}
+
+async function saveFbPage(act, pageId, elId, active) {
+  const box = `fbp-${elId}-${pageId}`;
+  const data = { pageId, active, stage: document.getElementById(box + '-stage')?.value, origem: document.getElementById(box + '-origem')?.value.trim() };
+  const formsBox = document.getElementById(box + '-forms');
+  if (formsBox && formsBox.querySelector('[data-fbform]')) {
+    data.forms = {};
+    formsBox.querySelectorAll('[data-fbform]').forEach(row => {
+      data.forms[row.dataset.fbform] = { name: row.dataset.name, active: row.querySelector('.fbf-active').checked, stage: row.querySelector('.fbf-stage').value, origem: '' };
+    });
+  }
+  try {
+    await window._fb.whatsapp('/fb/page-save', act, data);
+    showToast(active ? 'Página salva.' : 'Página pausada: os formulários dela param de criar leads.', 'success');
+    renderFbConnectBox(act, document.getElementById(elId));
+  } catch (e) { showToast('Erro: ' + e.message, 'error'); }
+}
+
+async function loadFbForms(act, pageId, box) {
+  const out = document.getElementById(box + '-forms');
+  out.innerHTML = '<div class="integ-muted" style="margin-top:8px;">Buscando os formulários...</div>';
+  try {
+    const [r, pages] = await Promise.all([window._fb.whatsapp('/fb/forms', act, { pageId }), window._fb.whatsapp('/fb/pages', act)]);
+    const cfg = ((pages.pages || []).find(p => p.id === pageId) || {}).forms || {};
+    out.innerHTML = `<div class="integ-forms"><div class="integ-muted" style="margin-bottom:6px;">Desmarque os formulários que não devem criar leads. A coluna vazia usa a da página. Depois clique em Salvar.</div>${(r.forms || []).map(f => {
+      const c = cfg[f.id] || {};
+      return `<div class="integ-form-row" data-fbform="${escapeHtml(f.id)}" data-name="${escapeHtml(f.name)}">
+        <label class="integ-toggle"><input type="checkbox" class="fbf-active" ${c.active === false ? '' : 'checked'}> ${escapeHtml(f.name)} <span class="integ-muted">(${f.status === 'ACTIVE' ? 'ativo' : 'arquivado'} · ${f.leads} leads)</span></label>
+        <select class="field-input fbf-stage"><option value="">Mesma coluna da página</option>${integStageOptions(act, c.stage || '__none__')}</select>
+      </div>`;
+    }).join('') || '<div class="integ-muted">Nenhum formulário nesta página.</div>'}</div>`;
+    out.querySelectorAll('[data-fbform]').forEach(row => { const c = cfg[row.dataset.fbform] || {}; if (c.stage) row.querySelector('.fbf-stage').value = c.stage; });
+  } catch (e) { out.innerHTML = `<div class="integ-error" style="margin-top:8px;">${escapeHtml(e.message)}</div>`; }
+}
+
+async function disconnectFbPage(act, pageId, elId) {
+  if (!await showConfirm('Os formulários desta página deixam de criar leads no CRM e o acesso guardado é apagado. Os leads que já chegaram continuam no funil.', 'Desconectar página', 'Desconectar', true)) return;
+  try {
+    await window._fb.whatsapp('/fb/disconnect', act, { pageId });
+    showToast('Página desconectada.', 'success');
+    renderFbConnectBox(act, document.getElementById(elId));
+  } catch (e) { showToast('Erro: ' + e.message, 'error'); }
+}
+
 async function renderIntegMeta() {
   const body = document.getElementById('integ-body');
   if (!body) return;
@@ -10603,6 +10705,12 @@ async function renderIntegMeta() {
         <div class="integ-muted">A Meta avisa o CRM na hora em que alguém preenche o formulário do anúncio. O lead cai em segundos, sem planilha no meio.</div>
       </div>
       <span class="integ-chip ${st.configured ? 'ok' : 'off'}">${st.configured ? 'Conectado à Meta' : 'Falta configurar'}</span>
+    </div>
+    <div class="integ-card">
+      <div class="integ-title">Conectar pelo Facebook do cliente</div>
+      <div class="integ-muted" style="margin-bottom:10px;">O cliente (ou você, com o Facebook dele) entra com o Facebook e escolhe as páginas: elas ficam ligadas ao funil desse cliente, sem precisar atribuir nada no seu Business Manager. O cliente também faz isso sozinho na tela Conexões.</div>
+      <label style="display:block;max-width:320px;margin-bottom:10px;">Cliente<select class="field-input" onchange="renderFbConnectBox(this.value, document.getElementById('fb-connect-admin'))">${integClientOptions('', 'Escolha o cliente')}</select></label>
+      <div id="fb-connect-admin"></div>
     </div>
     <details class="integ-card" ${st.configured ? '' : 'open'}>
       <summary class="integ-title" style="cursor:pointer;">Passo a passo da configuração (uma vez só)</summary>
@@ -12292,6 +12400,7 @@ async function renderOwnWhatsAppSection() {
   status.style.display = 'block';
   status.style.width = '100%';
   renderWaLinesBox(act, status);
+  renderFbConnectBox(act, document.getElementById('fb-connect-own'));
   const auto = WHATSAPP_SETTINGS[act] && WHATSAPP_SETTINGS[act].autoFirstMessage;
   document.getElementById('whatsapp-own-auto').textContent = auto
     ? 'Mensagem automática para leads novos: ativada.'
