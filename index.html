@@ -10632,16 +10632,59 @@ async function startFbConnect(act, elId) {
     const r = await window._fb.whatsapp('/fb/login-url', act, { uid: me.uid });
     const w = window.open(r.url, 'huvenfb', 'width=620,height=740');
     if (!w) { showToast('O navegador bloqueou a janela. Libere pop-ups para o CRM e tente de novo.', 'warning', 7000); return; }
+    let answered = false;
     const onMsg = ev => {
       if (!ev.data || ev.data.huvenFb === undefined) return;
+      answered = true;
       window.removeEventListener('message', onMsg);
+      if (ev.data.huvenFb && ev.data.pending) { showFbPagePicker(act, elId, ev.data.pending); return; }
       showToast(ev.data.msg || (ev.data.huvenFb ? 'Facebook conectado.' : 'Não conectou.'), ev.data.huvenFb ? 'success' : 'warning', 8000);
       renderFbConnectBox(act, document.getElementById(elId));
     };
     window.addEventListener('message', onMsg);
     // Se a janela fechar sem mensagem, atualiza a lista mesmo assim.
-    const t = setInterval(() => { if (w.closed) { clearInterval(t); setTimeout(() => renderFbConnectBox(act, document.getElementById(elId)), 800); } }, 1000);
+    const t = setInterval(() => { if (w.closed) { clearInterval(t); setTimeout(() => { if (!answered) renderFbConnectBox(act, document.getElementById(elId)); }, 800); } }, 1000);
   } catch (e) { showToast('Erro: ' + e.message, 'error', 6000); }
+}
+
+// Depois do login: o Facebook tem várias páginas, a pessoa escolhe quais ligar a este cliente.
+async function showFbPagePicker(act, elId, pending) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.innerHTML = '<div class="integ-muted">Buscando as suas páginas...</div>';
+  let r;
+  try { r = await window._fb.whatsapp('/fb/pending', act, { pending }); }
+  catch (e) { el.innerHTML = `<div class="integ-error">${escapeHtml(e.message)}</div>`; return; }
+  const a = escapeJsString(act), p = escapeJsString(pending);
+  const pages = (r.pages || []).slice().sort((x, y) => (x.owner ? 1 : 0) - (y.owner ? 1 : 0) || String(x.name).localeCompare(String(y.name)));
+  el.innerHTML = `<div class="integ-title" style="margin-bottom:4px;">Quais páginas são deste cliente?</div>
+    <div class="integ-muted" style="margin-bottom:10px;">Facebook de ${escapeHtml(r.userName || 'quem conectou')}. Marque só as páginas cujos formulários devem cair no funil deste cliente.</div>
+    <input class="field-input" placeholder="Buscar página" style="margin-bottom:8px;" oninput="const q=this.value.toLowerCase();this.parentElement.querySelectorAll('[data-fbpick]').forEach(l=>l.style.display=l.dataset.n.includes(q)?'':'none')">
+    <div style="max-height:320px;overflow:auto;display:flex;flex-direction:column;gap:4px;border:1px solid var(--border);border-radius:10px;padding:8px;">${pages.map(pg => `<label class="integ-toggle" data-fbpick data-n="${escapeHtml(String(pg.name).toLowerCase())}" style="${pg.owner ? 'opacity:.5;' : ''}">
+      <input type="checkbox" value="${escapeHtml(pg.id)}" ${pg.owner ? 'disabled' : pg.here ? 'checked' : ''}> ${escapeHtml(pg.name)}
+      ${pg.owner ? `<span class="integ-muted">(já é de outro cliente)</span>` : pg.here ? '<span class="integ-muted">(já ligada aqui)</span>' : ''}</label>`).join('')}</div>
+    <div class="integ-row" style="margin-top:10px;">
+      <button class="integ-btn primary" onclick="linkFbPicked('${a}','${elId}','${p}', this)">Ligar selecionadas</button>
+      <button class="integ-btn" onclick="renderFbConnectBox('${a}', document.getElementById('${elId}'))">Cancelar</button>
+    </div>`;
+}
+
+async function linkFbPicked(act, elId, pending, btn) {
+  const el = document.getElementById(elId);
+  const ids = [...el.querySelectorAll('[data-fbpick] input:checked:not(:disabled)')].map(i => i.value);
+  if (!ids.length) { showToast('Marque pelo menos uma página.', 'warning'); return; }
+  btn.disabled = true;
+  let linked = 0, skipped = 0;
+  try {
+    // Em grupos pequenos: cada página precisa de uma chamada à Meta.
+    for (let i = 0; i < ids.length; i += 10) {
+      btn.textContent = `Ligando ${Math.min(i + 10, ids.length)} de ${ids.length}...`;
+      const r = await window._fb.whatsapp('/fb/pending-link', act, { pending, pageIds: ids.slice(i, i + 10), finish: i + 10 >= ids.length });
+      linked += r.linked || 0; skipped += r.skipped || 0;
+    }
+    showToast(`${linked} página(s) ligada(s). Os próximos leads dos formulários caem direto no funil.${skipped ? ` ${skipped} já eram de outro cliente.` : ''}`, 'success', 8000);
+  } catch (e) { showToast('Erro: ' + e.message, 'error', 7000); }
+  renderFbConnectBox(act, document.getElementById(elId));
 }
 
 async function saveFbPage(act, pageId, elId, active) {
