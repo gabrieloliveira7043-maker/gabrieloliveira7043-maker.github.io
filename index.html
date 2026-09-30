@@ -1856,6 +1856,11 @@ td { font-family: var(--font); font-size: 13px; }
       if (!currentProfile.act) return null;
       return onSnapshot(doc(db, 'whatsapp_status', currentProfile.act), snap => callback(snap.exists() ? [{ id: snap.id, ...snap.data() }] : []), onError);
     },
+    // Uso do plano grátis do R2 no mês (buscas da Prospecção). Só admin.
+    listenR2Usage(month, callback) {
+      if (!currentProfile || currentProfile.role !== 'admin') return null;
+      return onSnapshot(doc(db, 'r2_usage', month), snap => callback(snap.exists() ? snap.data() : null), error => console.warn('Uso do R2 indisponível:', error));
+    },
     async getInboxChat(act, chatKey) {
       const snap = await getDoc(doc(db, 'inbox', normalizeAct(act), 'chats', chatKey));
       return snap.exists() ? { id: snap.id, ...snap.data() } : null;
@@ -8264,7 +8269,7 @@ async function renderProspeccaoView() {
       <div style="flex:1;min-width:220px;">
         <div class="huv-crumb">Vendas</div>
         <div class="huv-page-title" style="color:var(--text);">Prospecção</div>
-        <div class="integ-muted" style="margin-top:4px;">${Number(idx.total || 0).toLocaleString('pt-BR')} empresas ativas da Receita Federal (base de ${escapeHtml(mes)}). Busque por atividade (CNAE) e região.</div>
+        <div class="integ-muted" style="margin-top:4px;">${Number(idx.total || 0).toLocaleString('pt-BR')} empresas ativas da Receita Federal (base de ${escapeHtml(mes)}). Busque por atividade (CNAE) e região.</div>${isAdmin ? `<div class="integ-muted" style="margin-top:2px;font-size:12px;">Uso do limite grátis de buscas neste mês: ${r2UsageInfo().reads.toLocaleString('pt-BR')} de ${r2UsageInfo().limit.toLocaleString('pt-BR')} (${r2UsageInfo().pct.toFixed(r2UsageInfo().pct < 1 ? 3 : 0)}%). Pausa sozinha em 90%.</div>` : ''}
       </div>
     </div>
     <div class="pr-filters">
@@ -12301,6 +12306,48 @@ function renderWhatsAppAlert() {
   el.innerHTML = `<button class="wa-alert-close" title="Esconder por 30 minutos" onclick="hideWhatsAppAlert()">×</button>${parts.join('')}`;
 }
 
+// ===== AVISO: LIMITE GRÁTIS DO R2 (Prospecção) =====
+// O Worker conta cada busca em r2_usage/AAAA-MM. Admin vê aviso a partir de 50%; em 90% a Prospecção para até o mês virar.
+let _r2Usage = null;
+let _r2Unsub = null;
+let _r2Month = '';
+let _r2AlertHiddenLevel = 0;
+
+function startR2UsageWatch() {
+  if (!isAdmin || !window._fb || typeof window._fb.listenR2Usage !== 'function') return;
+  const month = new Date().toISOString().slice(0, 7);
+  if (_r2Unsub && _r2Month === month) return;
+  if (_r2Unsub) _r2Unsub();
+  _r2Month = month;
+  _r2Usage = null;
+  _r2Unsub = window._fb.listenR2Usage(month, data => { _r2Usage = data; renderR2Alert(); });
+  // Na virada do mês passa a olhar o documento novo.
+  setTimeout(startR2UsageWatch, 60 * 60 * 1000);
+}
+
+function r2UsageInfo() {
+  const u = _r2Usage || {};
+  const limit = Number(u.limit) || 10000000;
+  const reads = Number(u.reads) || 0;
+  const pct = reads / limit * 100;
+  return { reads, limit, pct, blocked: reads > limit * (Number(u.blockAt) || 0.9) };
+}
+
+function renderR2Alert() {
+  const { reads, limit, pct, blocked } = r2UsageInfo();
+  const level = blocked ? 3 : pct >= 80 ? 2 : pct >= 50 ? 1 : 0;
+  let el = document.getElementById('r2-alert');
+  if (!level || level <= _r2AlertHiddenLevel) { if (el) el.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'r2-alert'; el.className = 'wa-alert'; el.style.top = document.getElementById('wa-alert') ? '120px' : ''; document.body.appendChild(el); }
+  el.style.background = level === 3 ? '' : '#3a2a10';
+  el.style.borderColor = level === 3 ? '' : '#E0A43A';
+  const n = v => v.toLocaleString('pt-BR');
+  const msg = level === 3
+    ? `<b>⛔ Prospecção pausada até o dia 1º</b><br>As buscas deste mês chegaram a ${n(reads)} de ${n(limit)} leituras grátis do armazenamento (R2). Para não gerar cobrança, a Prospecção ficou bloqueada e volta sozinha no próximo mês.`
+    : `<b>⚠️ Prospecção usou ${Math.floor(pct)}% do limite grátis do mês</b><br>${n(reads)} de ${n(limit)} leituras do armazenamento (R2). Ao chegar em 90%, a Prospecção é pausada automaticamente até o dia 1º, sem cobrança.`;
+  el.innerHTML = `<button class="wa-alert-close" title="Esconder até o próximo nível" onclick="_r2AlertHiddenLevel=${level};renderR2Alert()">×</button><div>${msg}</div>`;
+}
+
 function hideWhatsAppAlert() {
   _waAlertHiddenUntil = Date.now() + 30 * 60 * 1000;
   renderWhatsAppAlert();
@@ -12323,6 +12370,7 @@ function startLeadNotifier() {
   });
   const realtimeStarted = startLeadRealtimeListener();
   startWhatsAppStatusWatch();
+  startR2UsageWatch();
   if (!realtimeStarted) checkForNewLeads().catch(e => console.warn('Lead notifier prime error:', e));
   setInterval(() => {
     if (!_leadRealtimeUnsubscribe) checkForNewLeads().catch(e => console.warn('Lead notifier error:', e));
