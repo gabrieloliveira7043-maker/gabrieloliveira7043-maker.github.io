@@ -10624,7 +10624,10 @@ function metaPagesHtml() {
         <button class="integ-btn primary" onclick="connectMetaPage('${pid}', '${escapeJsString(name)}')">${on ? 'Salvar' : 'Ligar e salvar'}</button>
         ${on ? `<button class="integ-btn" onclick="disconnectMetaPage('${pid}')">Desligar</button>` : ''}
         <button class="integ-btn" onclick="loadMetaForms('${pid}')">${forms ? 'Atualizar formulários' : 'Ver formulários'}</button>
+        ${on ? `<button class="integ-btn" onclick="diagnoseMetaPage('${pid}')">Diagnóstico</button>
+        <button class="integ-btn" onclick="importMetaLeads('${pid}')">Importar leads que já estão nos formulários</button>` : ''}
       </div>
+      <div id="mp-diag-${id}"></div>
       ${forms ? metaFormsHtml(id, forms, s) : ''}
     </div>`;
   }).join('');
@@ -10685,6 +10688,40 @@ async function connectMetaPage(pageId, pageName) {
     showToast(`Página ligada a ${getClientDisplayName(act) || act}. Os próximos leads caem direto no CRM.`, 'success', 6000);
     document.getElementById('meta-pages').innerHTML = metaPagesHtml();
   } catch (e) { showToast('Não foi possível ligar: ' + e.message, 'warning', 7000); }
+}
+
+// Diagnóstico: a página está assinada? os leads recentes chegaram ao CRM?
+async function diagnoseMetaPage(pageId) {
+  const box = document.getElementById('mp-diag-' + pageId);
+  box.innerHTML = '<div class="integ-muted" style="margin-top:10px;">Consultando a Meta...</div>';
+  try {
+    const r = await window._fb.adminApi('/meta/diagnose', { pageId });
+    const saved = _metaSaved.find(p => p.id === pageId) || {};
+    const sub = (r.subscribedApps || []).some(a => (a.fields || []).includes('leadgen'));
+    const since = saved.subscribedAt ? Date.parse(saved.subscribedAt) : 0;
+    const after = (r.recent || []).filter(l => Date.parse(l.created) > since);
+    const missing = after.filter(l => !l.inCrm);
+    const verdict = !sub ? '⚠️ A página não está assinada para avisar o CRM. Clique em "Salvar" de novo.'
+      : missing.length ? `⚠️ ${missing.length} lead(s) chegaram depois da ligação e a Meta não avisou o CRM. Quase sempre é o app da Meta em modo Desenvolvimento: coloque o app em modo Ao vivo (Live) em developers.facebook.com. Os que já chegaram você traz com "Importar leads".`
+      : after.length ? '✅ Os leads que chegaram depois da ligação estão no CRM.' : 'Nenhum lead novo desde a ligação para conferir. Faça um teste na Ferramenta de teste de anúncios de cadastro da Meta.';
+    box.innerHTML = `<div class="integ-forms" style="margin-top:10px;"><div style="font-size:13px;margin-bottom:8px;">${verdict}</div>
+      ${(r.recent || []).length ? '<div class="integ-muted" style="margin-bottom:4px;">Últimos leads nos formulários (7 dias):</div>' + r.recent.map(l => `<div class="integ-muted">${l.inCrm ? '✅' : '•'} ${new Date(l.created).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · ${escapeHtml(l.formName || '')}${l.inCrm ? '' : ' · não está no CRM'}</div>`).join('') : ''}</div>`;
+  } catch (e) { box.innerHTML = `<div class="integ-error" style="margin-top:10px;">${escapeHtml(e.message)}</div>`; }
+}
+
+// Traz para o CRM os leads que já estavam nos formulários (a Meta só avisa os novos). Não duplica.
+async function importMetaLeads(pageId) {
+  const days = Number(prompt('Importar os leads de quantos dias para trás? (1 a 90)', '7'));
+  if (!days) return;
+  const saved = _metaSaved.find(p => p.id === pageId) || {};
+  if (!await showConfirm(`Os leads dos últimos ${days} dia(s) desta página entram no funil de ${getClientDisplayName(saved.act) || 'cliente'}, na coluna configurada. Leads que já estão no CRM são pulados. Se a 1ª mensagem automática ou alguma automação estiver ligada para esse cliente, ela vale para esses leads também.`, 'Importar leads da Meta', 'Importar', false)) return;
+  const box = document.getElementById('mp-diag-' + pageId);
+  box.innerHTML = '<div class="integ-muted" style="margin-top:10px;">Importando... pode levar alguns minutos.</div>';
+  try {
+    const r = await window._fb.adminApi('/meta/import', { pageId, days });
+    box.innerHTML = `<div class="integ-forms" style="margin-top:10px;font-size:13px;">✅ ${r.created} lead(s) criados no CRM · ${r.skipped} já estavam · ${r.failed} com erro (de ${r.found} encontrados nos últimos ${r.days} dias).</div>`;
+    showToast(`${r.created} lead(s) da Meta importados.`, 'success');
+  } catch (e) { box.innerHTML = `<div class="integ-error" style="margin-top:10px;">${escapeHtml(e.message)}</div>`; }
 }
 
 async function disconnectMetaPage(pageId) {
