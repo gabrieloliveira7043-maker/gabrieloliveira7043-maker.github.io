@@ -1507,6 +1507,16 @@ td { font-family: var(--font); font-size: 13px; }
 .auto-steps-summary { margin: 4px 0 8px 18px; font-size: 12.5px; color: var(--text); display: flex; flex-direction: column; gap: 3px; }
 
 /* Prospecção */
+.pr-tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.pr-tab { border: 1px solid var(--border2); background: var(--surface); color: var(--muted2); border-radius: 10px; padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; }
+.pr-tab.active { background: var(--btn-bg); color: var(--btn-text); border-color: var(--btn-bg); }
+.pr-one-row { display: grid; grid-template-columns: minmax(220px, 2fr) 1.4fr auto; gap: 12px; align-items: center; padding: 11px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.pr-one-row:last-child { border-bottom: none; }
+.pr-kvs { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.pr-kv { display: grid; grid-template-columns: 120px 1fr; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text); }
+.pr-kv:last-child { border-bottom: none; }
+.pr-kv > span { color: var(--muted); font-weight: 700; font-size: 12px; }
+@media (max-width: 700px) { .pr-one-row { grid-template-columns: 1fr; } .pr-kv { grid-template-columns: 1fr; gap: 2px; } }
 .pr-filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
 .pr-filters label { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 160px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
 .pr-cnae-menu { display: none; position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; z-index: 50; max-height: 320px; overflow-y: auto; background: var(--surface); border: 1px solid var(--border2); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.25); text-transform: none; letter-spacing: 0; scrollbar-width: none; }
@@ -8272,6 +8282,20 @@ async function renderProspeccaoView() {
         <div class="integ-muted" style="margin-top:4px;">${Number(idx.total || 0).toLocaleString('pt-BR')} empresas ativas da Receita Federal (base de ${escapeHtml(mes)}). Busque por atividade (CNAE) e região.</div>${isAdmin ? `<div class="integ-muted" style="margin-top:2px;font-size:12px;">Uso do limite grátis de buscas neste mês: ${r2UsageInfo().reads.toLocaleString('pt-BR')} de ${r2UsageInfo().limit.toLocaleString('pt-BR')} (${r2UsageInfo().pct.toFixed(r2UsageInfo().pct < 1 ? 3 : 0)}%). Pausa sozinha em 90%.</div>` : ''}
       </div>
     </div>
+    <div class="pr-tabs">
+      <button class="pr-tab ${_prMode === 'regiao' ? 'active' : ''}" onclick="prosSetMode('regiao')">Por atividade e região</button>
+      <button class="pr-tab ${_prMode === 'empresa' ? 'active' : ''}" onclick="prosSetMode('empresa')">Empresa específica (CNPJ ou nome)</button>
+    </div>
+    <div id="pr-mode-empresa" style="display:${_prMode === 'empresa' ? 'block' : 'none'};">
+      <div class="pr-filters">
+        <label style="flex:3;min-width:260px;">CNPJ ou nome da empresa<input class="field-input" id="pr-q" placeholder="Ex.: 12.345.678/0001-90 ou Arte em Azulejo" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();prosOneSearch();}"></label>
+        <label style="max-width:180px;">Estado (opcional)<select class="field-input" id="pr-q-uf"><option value="">Todos</option>${PR_UFS.map(u => `<option value="${u}">${u}</option>`).join('')}</select></label>
+        <label style="flex:0;min-width:auto;justify-content:flex-end;"><span>&nbsp;</span><button class="btn-add-lead" style="height:40px;padding:0 18px;" onclick="prosOneSearch()">Buscar</button></label>
+      </div>
+      <div class="integ-muted" style="margin:-2px 0 12px;font-size:12px;">Pelo nome, digite o começo da razão social ou do nome fantasia. Pelo CNPJ, os dados vêm direto da Receita (inclusive empresas fechadas).</div>
+      <div id="pr-one-result"></div>
+    </div>
+    <div id="pr-mode-regiao" style="display:${_prMode === 'regiao' ? 'block' : 'none'};">
     <div class="pr-filters">
       <label>Estado<select class="field-input" id="pr-uf" onchange="prosUfChange()"><option value="">Escolha</option>${PR_UFS.map(u => `<option value="${u}">${u}</option>`).join('')}</select></label>
       <label style="flex:2;min-width:260px;position:relative;">Atividade (CNAE)<input class="field-input" id="pr-cnae" placeholder="Digite: odontologia, academia, 8630504..." autocomplete="off" oninput="prosCnaeSuggest()" onfocus="prosCnaeSuggest()" onblur="setTimeout(prosCnaeHide, 200)" onkeydown="if(event.key==='Enter'){event.preventDefault();prosCnaeHide();prosSearch();}"><div id="pr-cnae-menu" class="pr-cnae-menu"></div></label>
@@ -8292,7 +8316,226 @@ async function renderProspeccaoView() {
       <label class="integ-toggle"><input type="checkbox" id="pr-matriz"> Só matriz</label>
       <button class="btn-add-lead" style="height:40px;padding:0 18px;margin-left:auto;" onclick="prosSearch()">Buscar empresas</button>
     </div>
-    <div id="pr-result"></div>`;
+    <div id="pr-result"></div>
+    </div>`;
+}
+
+// ----- Empresa específica: por CNPJ (consulta pública da Receita) ou pelo começo do nome (índice de nomes da base) -----
+let _prMode = 'regiao';
+let _prNames = null;
+let _prOne = null;
+
+function prosSetMode(mode) {
+  _prMode = mode;
+  document.querySelectorAll('.pr-tab').forEach((b, i) => b.classList.toggle('active', (i === 0) === (mode === 'regiao')));
+  document.getElementById('pr-mode-regiao').style.display = mode === 'regiao' ? 'block' : 'none';
+  document.getElementById('pr-mode-empresa').style.display = mode === 'empresa' ? 'block' : 'none';
+  if (mode === 'empresa') setTimeout(() => document.getElementById('pr-q').focus(), 50);
+}
+
+// Mesma normalização usada ao gerar o índice de nomes (exportar.js).
+const prosNormName = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  .replace(/^[\d.\-\/\s]+/, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+
+async function prosOneSearch() {
+  const raw = document.getElementById('pr-q').value.trim();
+  const box = document.getElementById('pr-one-result');
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 14 && !/[a-z]/i.test(raw)) return prosShowCompany(digits);
+  if (/^[\d.\-\/\s]+$/.test(raw)) return showToast('Digite o CNPJ completo, com 14 números.', 'warning');
+  const q = prosNormName(raw);
+  if (q.length < 3) return showToast('Digite pelo menos 3 letras do nome da empresa.', 'warning');
+  const uf = document.getElementById('pr-q-uf').value;
+  box.innerHTML = '<div class="integ-muted">Buscando...</div>';
+  try {
+    if (!_prNames) _prNames = await (await prosFetch('/prospect/names-index')).json();
+    // Pedaços cujo intervalo de nomes pode conter nomes que começam com o texto.
+    const P = _prNames.pedacos;
+    const end = q + '￿';
+    const hits = [];
+    for (let i = 0; i < P.length; i++) {
+      const next = i + 1 < P.length ? P[i + 1][0] : '￿';
+      if (P[i][0] < end && next > q) hits.push(P[i]);
+    }
+    const many = hits.length > 3;
+    const rows = [];
+    const seen = new Set();
+    for (const [, part, offset, length] of hits.slice(0, 3)) {
+      const res = await prosFetch('/prospect/chunk', { part, offset, length });
+      const text = await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).text();
+      text.split('\n').slice(1).forEach(line => {
+        if (!line || !line.startsWith(q)) return;
+        const f = prosParseLineRaw(line);
+        const r = { nome: f[0], cnpj: f[1], razao: f[2], fantasia: f[3], municipio: f[4], uf: f[5], cnae: f[6] };
+        if (uf && r.uf !== uf) return;
+        if (seen.has(r.cnpj)) return;
+        seen.add(r.cnpj);
+        rows.push(r);
+      });
+    }
+    renderProsOneList(rows, many);
+  } catch (e) {
+    box.innerHTML = `<div class="integ-error">Erro: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function prosParseLineRaw(line) {
+  const f = [];
+  let cur = '', q = false;
+  for (let j = 0; j < line.length; j++) {
+    const ch = line[j];
+    if (q) { if (ch === '"' && line[j + 1] === '"') { cur += '"'; j++; } else if (ch === '"') q = false; else cur += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === ';') { f.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  f.push(cur);
+  return f;
+}
+
+let _prOneRows = [];
+function renderProsOneList(rows, many) {
+  _prOneRows = rows;
+  const box = document.getElementById('pr-one-result');
+  const shown = rows.slice(0, 300);
+  box.innerHTML = `
+    <div class="pr-bar"><span class="integ-muted">${rows.length.toLocaleString('pt-BR')} empresa(s) ativa(s) encontrada(s)${rows.length > shown.length ? ` · mostrando ${shown.length}` : ''}</span></div>
+    ${many ? '<div class="integ-muted" style="margin-bottom:10px;">Muitos nomes começam assim: digite mais do nome ou escolha o estado para achar a empresa certa.</div>' : ''}
+    <div class="ct-table">
+      ${shown.map((r, i) => `<div class="pr-one-row">
+        <div style="min-width:0;"><div class="ct-strong">${escapeHtml(r.fantasia || r.razao)}</div><div class="ct-sub">${escapeHtml(r.fantasia ? r.razao : '')}${r.fantasia ? ' · ' : ''}${prosFmtCnpj(r.cnpj)}</div></div>
+        <div class="ct-sub" style="white-space:normal;">${escapeHtml(r.municipio)}/${escapeHtml(r.uf)}<br>${escapeHtml(limitText((_prIndex && _prIndex.cnaes[r.cnae]) || r.cnae, 60))}</div>
+        <button class="huv-btn" onclick="prosShowCompany('${escapeJsString(r.cnpj)}', ${i})">Ver dados</button>
+      </div>`).join('') || '<div class="integ-empty">Nenhuma empresa ativa começa com esse nome. Confira a grafia ou tente pelo nome fantasia ou pela razão social.</div>'}
+    </div>`;
+}
+
+// Dados completos de um CNPJ: BrasilAPI (Receita, atualizado) e, se ela falhar, CNPJ.ws; se as duas falharem, a nossa base.
+async function prosFetchCompany(cnpj, hint) {
+  const fone = v => { const d = String(v || '').replace(/\D/g, ''); return d.length >= 10 ? `(${d.slice(0, 2)}) ${d.slice(2)}` : ''; };
+  try {
+    const r = await fetch('https://brasilapi.com.br/api/cnpj/v1/' + cnpj);
+    if (r.status === 404) throw Object.assign(new Error('CNPJ não encontrado na Receita.'), { notFound: true });
+    if (!r.ok) throw new Error('BrasilAPI ' + r.status);
+    const d = await r.json();
+    return {
+      cnpj, razao: d.razao_social || '', fantasia: d.nome_fantasia || '', situacao: d.descricao_situacao_cadastral || '',
+      abertura: d.data_inicio_atividade ? d.data_inicio_atividade.split('-').reverse().join('/') : '',
+      cnae: String(d.cnae_fiscal || ''), cnaeDesc: d.cnae_fiscal_descricao || '',
+      endereco: [d.descricao_tipo_de_logradouro, d.logradouro, d.numero, d.complemento].filter(Boolean).join(' '), bairro: d.bairro || '', cep: d.cep || '',
+      municipio: d.municipio || '', uf: d.uf || '', telefone1: fone(d.ddd_telefone_1), telefone2: fone(d.ddd_telefone_2), email: String(d.email || '').toLowerCase(),
+      porte: d.porte || '', mei: d.opcao_pelo_mei === true, capital: d.capital_social,
+      socios: (d.qsa || []).map(s => s.nome_socio + (s.qualificacao_socio ? ` (${s.qualificacao_socio})` : '')).join(' | '), fonte: 'Receita Federal (BrasilAPI), dados de hoje'
+    };
+  } catch (e) {
+    if (e.notFound) throw e;
+  }
+  try {
+    const r = await fetch('https://publica.cnpj.ws/cnpj/' + cnpj);
+    if (r.status === 404) throw Object.assign(new Error('CNPJ não encontrado na Receita.'), { notFound: true });
+    if (!r.ok) throw new Error('CNPJ.ws ' + r.status);
+    const d = await r.json();
+    const est = d.estabelecimento || {};
+    return {
+      cnpj, razao: d.razao_social || '', fantasia: est.nome_fantasia || '', situacao: est.situacao_cadastral || '',
+      abertura: est.data_inicio_atividade ? est.data_inicio_atividade.split('-').reverse().join('/') : '',
+      cnae: String((est.atividade_principal || {}).id || ''), cnaeDesc: (est.atividade_principal || {}).descricao || '',
+      endereco: [est.tipo_logradouro, est.logradouro, est.numero, est.complemento].filter(Boolean).join(' '), bairro: est.bairro || '', cep: est.cep || '',
+      municipio: (est.cidade || {}).nome || '', uf: (est.estado || {}).sigla || '', telefone1: fone((est.ddd1 || '') + (est.telefone1 || '')), telefone2: fone((est.ddd2 || '') + (est.telefone2 || '')),
+      email: String(est.email || '').toLowerCase(), porte: (d.porte || {}).descricao || '', capital: d.capital_social,
+      socios: (d.socios || []).map(s => s.nome + ((s.qualificacao_socio || {}).descricao ? ` (${s.qualificacao_socio.descricao})` : '')).join(' | '), fonte: 'Receita Federal (CNPJ.ws), dados de hoje'
+    };
+  } catch (e) {
+    if (e.notFound) throw e;
+  }
+  // Última opção: a linha completa na nossa base (precisa saber estado e atividade, que a busca por nome traz).
+  if (hint && hint.uf && hint.cnae && _prIndex && _prIndex.porEstado[hint.uf] && _prIndex.porEstado[hint.uf][hint.cnae]) {
+    const info = _prIndex.porEstado[hint.uf][hint.cnae];
+    const rows = [];
+    await prosReadChunk(await prosFetch('/prospect/chunk', { part: info.p, offset: info.o, length: info.l }), '', hint.cnae, rows);
+    const r = rows.find(x => x.cnpj === cnpj);
+    if (r) return { ...r, cnaeDesc: _prIndex.cnaes[hint.cnae] || '', situacao: 'Ativa', porte: r.porte === 'Demais' ? 'Médio/grande porte' : r.porte, fonte: `Base da Receita de ${(_prIndex.mes || '').split('-').reverse().join('/')}` };
+  }
+  throw new Error('Não consegui consultar a Receita agora. Tente de novo em alguns minutos.');
+}
+
+async function prosShowCompany(cnpj, listIndex) {
+  const hint = typeof listIndex === 'number' ? _prOneRows[listIndex] : null;
+  openHuvenModal('Dados da empresa', '<div class="integ-muted">Consultando a Receita...</div>', 640);
+  let c;
+  try { c = await prosFetchCompany(cnpj, hint); }
+  catch (e) { openHuvenModal('Dados da empresa', `<div class="integ-error">${escapeHtml(e.message)}</div>`, 640); return; }
+  _prOne = c;
+  const row = (label, value) => value ? `<div class="pr-kv"><span>${label}</span><div>${value}</div></div>` : '';
+  const tel = t => t ? `${escapeHtml(t)}${prosIsMobile(t) ? ' <span class="chat-tag" style="background:var(--green-dim);color:var(--green);">celular</span>' : ''}` : '';
+  const active = /ativa/i.test(c.situacao);
+  const act = flowAct();
+  openHuvenModal(c.fantasia || c.razao, `
+    <div class="pr-kvs">
+      ${row('Razão social', escapeHtml(c.razao))}
+      ${row('CNPJ', prosFmtCnpj(c.cnpj))}
+      ${row('Situação', `<b style="color:${active ? 'var(--green)' : 'var(--red)'};">${escapeHtml(c.situacao || '—')}</b>`)}
+      ${row('Abertura', escapeHtml(c.abertura))}
+      ${row('Atividade', escapeHtml([c.cnae, c.cnaeDesc].filter(Boolean).join(' - ')))}
+      ${row('Porte', escapeHtml(c.porte + (c.mei ? ' (MEI)' : '')))}
+      ${row('Telefones', [tel(c.telefone1), tel(c.telefone2)].filter(Boolean).join('<br>') || '—')}
+      ${row('E-mail', escapeHtml(c.email || '—'))}
+      ${row('Endereço', escapeHtml([c.endereco, c.bairro, [c.municipio, c.uf].filter(Boolean).join('/'), c.cep].filter(Boolean).join(', ')))}
+      ${row('Sócios', escapeHtml(c.socios || 'Sem sócios informados (ex.: MEI ou empresário individual)').split(' | ').join('<br>'))}
+    </div>
+    <div class="integ-muted" style="margin:12px 0;font-size:11.5px;">Fonte: ${escapeHtml(c.fonte)}.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn-save" style="width:auto;padding:9px 16px;" onclick="prosOneToFunnel()" ${act ? '' : 'disabled title="Escolha o cliente no topo do menu"'}>Enviar para o funil</button>
+      <button class="huv-btn" onclick="prosOneCopy()">Copiar dados</button>
+    </div>`, 640);
+}
+
+function prosOneText(c) {
+  return [`${c.fantasia || c.razao}`, `Razão social: ${c.razao}`, `CNPJ: ${prosFmtCnpj(c.cnpj)}`, c.situacao ? `Situação: ${c.situacao}` : '',
+    [c.telefone1, c.telefone2].filter(Boolean).length ? `Telefones: ${[c.telefone1, c.telefone2].filter(Boolean).join(' / ')}` : '', c.email ? `E-mail: ${c.email}` : '',
+    `Endereço: ${[c.endereco, c.bairro, [c.municipio, c.uf].filter(Boolean).join('/'), c.cep].filter(Boolean).join(', ')}`,
+    c.cnaeDesc ? `Atividade: ${c.cnaeDesc}` : '', c.socios ? `Sócios: ${c.socios}` : ''].filter(Boolean).join('\n');
+}
+
+function prosOneCopy() {
+  if (!_prOne) return;
+  navigator.clipboard.writeText(prosOneText(_prOne)).then(() => showToast('Dados copiados.', 'success')).catch(() => showToast('Não consegui copiar.', 'error'));
+}
+
+function prosOneToFunnel() {
+  const act = flowAct();
+  if (!act || !_prOne) return showToast('Escolha o cliente no topo do menu.', 'warning');
+  const stages = getStages(act) || [];
+  openHuvenModal(`Enviar ${_prOne.fantasia || _prOne.razao} para o funil de ${getClientDisplayName(act) || act}`, `
+    <label class="field-label">Coluna</label>
+    <select class="field-input" id="pr-stage" style="margin-bottom:12px;">${stages.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.label)}</option>`).join('')}</select>
+    <label class="field-label">Origem no card</label>
+    <input class="field-input" id="pr-origem" value="Prospecção" style="margin-bottom:12px;">
+    <button class="btn-save" style="width:auto;padding:9px 16px;" onclick="prosOneSaveFunnel()">Enviar</button> <span id="pr-fb" class="integ-muted"></span>`);
+}
+
+async function prosOneSaveFunnel() {
+  const act = flowAct();
+  const c = _prOne;
+  const stage = document.getElementById('pr-stage').value;
+  const origem = document.getElementById('pr-origem').value.trim() || 'Prospecção';
+  const tel = (prosIsMobile(c.telefone1) ? c.telefone1 : prosIsMobile(c.telefone2) ? c.telefone2 : (c.telefone1 || c.telefone2 || '')).replace(/\D/g, '');
+  const fb = document.getElementById('pr-fb');
+  if (tel && (_leadsCache || []).some(l => leadMatchesClient(l, act) && chatPhoneKey(l.phone) === chatPhoneKey(tel))) { fb.textContent = 'Essa empresa já está no funil deste cliente.'; return; }
+  const now = new Date(), nowIso = now.toISOString();
+  const lead = {
+    id: now.getTime() + '_0', name: c.fantasia || c.razao, phone: tel, email: c.email || '', stage, act, origem, redeSocial: 'Prospecção', source: 'prospeccao', importado: true,
+    obs: prosOneText(c).split('\n').slice(1).join('\n'),
+    history: [{ stage: autoStageLabel(act, stage), at: now.toLocaleString('pt-BR') }],
+    stageChangedAt: nowIso, createdAt: nowIso, updatedAt: nowIso
+  };
+  fb.textContent = 'Enviando...';
+  try {
+    await window._fb.saveLeadsBatch([lead]);
+    if (_leadsCache) _leadsCache.push(lead);
+    closeHuvenModal();
+    showToast('Empresa enviada para o funil.', 'success');
+  } catch (e) { fb.textContent = 'Erro: ' + e.message; }
 }
 
 function prosUfChange() {
