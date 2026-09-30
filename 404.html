@@ -1527,6 +1527,16 @@ td { font-family: var(--font); font-size: 13px; }
 .auto-box .field-input { padding: 6px 8px; }
 .auto-steps-summary { margin: 4px 0 8px 18px; font-size: 12.5px; color: var(--text); display: flex; flex-direction: column; gap: 3px; }
 
+/* Vários WhatsApps */
+.wa-lines { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 10px; }
+.wa-line-row { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; flex-wrap: wrap; }
+.wa-line-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.wa-line-sub { font-size: 12px; color: var(--muted2); margin-top: 1px; }
+.wa-line-picker { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin: 8px 0 12px; display: flex; flex-wrap: wrap; gap: 8px 14px; background: var(--surface2); }
+.wa-line-picker-title { width: 100%; font-size: 12px; font-weight: 800; color: var(--text); }
+.wa-line-picker-hint { width: 100%; font-size: 11.5px; color: var(--muted2); }
+.chat-line-select { width: auto; padding: 4px 8px; font-size: 12px; border-radius: 14px; height: auto; }
+
 /* Pipelines do funil */
 .pl-bar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 0 0 12px; }
 .pl-label { font-size: 11px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
@@ -1952,7 +1962,7 @@ td { font-family: var(--font); font-size: 13px; }
         return onSnapshot(collection(db, 'whatsapp_status'), snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))), onError);
       }
       if (!currentProfile.act) return null;
-      return onSnapshot(doc(db, 'whatsapp_status', currentProfile.act), snap => callback(snap.exists() ? [{ id: snap.id, ...snap.data() }] : []), onError);
+      return onSnapshot(query(collection(db, 'whatsapp_status'), where('act', '==', normalizeAct(currentProfile.act))), snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))), onError);
     },
     // Uso do plano grátis do R2 no mês (buscas da Prospecção). Só admin.
     listenR2Usage(month, callback) {
@@ -7038,6 +7048,7 @@ function openCampaignEditor(copyFrom) {
   const hint = 'font-size:11px;color:var(--muted);margin:4px 0 10px;line-height:1.5;';
   const section = 'font-size:13px;font-weight:600;color:var(--text);margin:18px 0 6px;';
   _campaignDraft = { act, source: 'crm', recipients: [], label: '', media: null, copyFrom: copyFrom || null };
+  ensureWaSettings(act).then(() => { const b = document.getElementById('camp-lines-box'); if (b && !b.innerHTML.trim()) b.innerHTML = waLinePickerHtml(act, 'camp-lines', copyFrom && copyFrom.lines, 'Por qual WhatsApp disparar?'); });
   editor.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
       <div style="font-size:15px;font-weight:600;color:var(--text);">${copyFrom ? 'Reutilizar campanha' : 'Nova campanha'}</div>
@@ -7046,6 +7057,7 @@ function openCampaignEditor(copyFrom) {
     <label class="field-label">Nome da campanha</label>
     <input class="field-input" id="camp-name" placeholder="Ex.: Promoção de outubro" style="margin-bottom:6px;" value="${copyFrom ? escapeHtml((copyFrom.name || 'Campanha') + ' (nova)') : ''}">
     ${copyFrom ? `<div style="${hint}">Baseada em "${escapeHtml(copyFrom.name || 'Campanha')}". Mude o que quiser: mensagens (adicione ou apague variações), arquivo, contatos e regras.</div>` : ''}
+    <div id="camp-lines-box">${waLinePickerHtml(act, 'camp-lines', copyFrom && copyFrom.lines, 'Por qual WhatsApp disparar?')}</div>
 
     <div style="${section}">Conteúdo</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
@@ -7411,7 +7423,7 @@ async function loadCampaignContacts() {
   const summary = document.getElementById('camp-summary');
   summary.textContent = 'Carregando contatos do WhatsApp...';
   try {
-    const r = await window._fb.whatsapp('/whatsapp/contacts', _campaignDraft.act);
+    const r = await window._fb.whatsapp('/whatsapp/contacts', _campaignDraft.act, { line: (readWaLinePicker('camp-lines') || [WA_MAIN])[0] });
     setCampaignRecipients(r.contacts || [], 'Contatos do WhatsApp');
   } catch (e) {
     summary.innerHTML = `<span style="color:#f87171;">${escapeHtml(e.message)}</span>`;
@@ -7455,7 +7467,7 @@ async function loadCampaignGroups(refresh) {
   const box = document.getElementById('camp-groups-list');
   box.innerHTML = '<div style="font-size:12px;color:var(--muted);">Carregando grupos... na primeira vez pode levar até 1 minuto.</div>';
   try {
-    const r = await window._fb.whatsapp('/whatsapp/groups', _campaignDraft.act, refresh ? { refresh: true } : undefined);
+    const r = await window._fb.whatsapp('/whatsapp/groups', _campaignDraft.act, { refresh: !!refresh, line: (readWaLinePicker('camp-lines') || [WA_MAIN])[0] });
     const groups = (r.groups || []).sort((a, b) => a.subject.localeCompare(b.subject, 'pt-BR'));
     if (!groups.length) { box.innerHTML = '<div style="font-size:12px;color:var(--muted);">Nenhum grupo encontrado.</div>'; return; }
     box.innerHTML = groupsCacheNote(r, 'loadCampaignGroups(true)') + `<label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--text);padding:4px 0 8px;cursor:pointer;border-bottom:1px solid var(--border);margin-bottom:4px;">
@@ -7490,7 +7502,7 @@ async function loadCampaignGroupParticipants() {
   const request = ++_groupParticipantsRequest;
   summary.textContent = `Carregando participantes de ${checked.length} grupo(s)... pode levar até 1 minuto.`;
   try {
-    const r = await window._fb.whatsapp('/whatsapp/group-participants', _campaignDraft.act, { groupIds: checked.map(cb => cb.value) });
+    const r = await window._fb.whatsapp('/whatsapp/group-participants', _campaignDraft.act, { groupIds: checked.map(cb => cb.value), line: (readWaLinePicker('camp-lines') || [WA_MAIN])[0] });
     if (request !== _groupParticipantsRequest || !_campaignDraft) return; // seleção mudou enquanto carregava
     const names = checked.map(cb => cb.getAttribute('data-subject'));
     setCampaignRecipients(r.participants || [], checked.length === document.querySelectorAll('.camp-group').length
@@ -7547,6 +7559,8 @@ async function saveCampaign(start) {
   if (mediaType === 'text' && !templates.length) { setFb('#f87171', 'Escreva pelo menos uma mensagem.'); return; }
   if (mediaType !== 'text' && !_campaignDraft.media) { setFb('#f87171', 'Envie o arquivo de ' + CAMPAIGN_MEDIA_LABELS[mediaType].toLowerCase() + '.'); return; }
   if (!_campaignDraft.recipients.length) { setFb('#f87171', 'A lista de contatos está vazia.'); return; }
+  const campLines = readWaLinePicker('camp-lines');
+  if (waHasMultiple(_campaignDraft.act) && !campLines) { setFb('#f87171', 'Escolha por qual WhatsApp disparar (pode marcar mais de um para mesclar).'); return; }
   const read = readCampaignDispatch();
   if (read.error) { setFb('#f87171', read.error); return; }
   const startInfo = readCampaignStart();
@@ -7564,6 +7578,7 @@ async function saveCampaign(start) {
         fileName: _campaignDraft.media.fileName
       } : null,
       dispatch: read.dispatch,
+      lines: campLines || [WA_MAIN],
       startAt: startInfo.startAt,
       audienceType: _campaignDraft.source,
       audienceLabel: _campaignDraft.label
@@ -7896,7 +7911,8 @@ async function openCadenceEditor(copyFrom, options = {}) {
     type: copyFrom ? copyFrom.type || 'text' : 'text',
     media: copyFrom && copyFrom.media ? copyFrom.media : null,
     pollSeed: copyFrom && copyFrom.poll ? copyFrom.poll.options : null,
-    preselect: copyFrom ? [...new Set((options.groupIds || [copyFrom.groupId]))] : []
+    preselect: copyFrom ? [...new Set((options.groupIds || [copyFrom.groupId]))] : [],
+    line: (copyFrom && copyFrom.line) || WA_MAIN
   };
   const title = mode === 'edit-item' ? 'Editar envio' : mode === 'edit-series' ? `Editar série (${_cadenceDraft.editIds.length} envios)` : copyFrom ? 'Duplicar envio' : 'Programar envio';
   editor.innerHTML = `
@@ -7911,6 +7927,7 @@ async function openCadenceEditor(copyFrom, options = {}) {
     <div style="font-size:13px;color:var(--text);">${escapeHtml((options.groupNames || []).join(', '))}</div>
     <div style="${hint}">Para trocar os grupos de uma série, exclua a série e programe de novo.</div>` : `
     <div style="${hint}">${mode === 'edit-item' ? 'Escolha o grupo deste envio.' : 'Marque um ou mais grupos: a mensagem sai em cada um deles.'}</div>
+    <div id="cad-line-box"></div>
     <input class="field-input" id="cad-group-search" placeholder="Buscar grupo..." oninput="filterCadenceGroups(this.value)" style="margin-bottom:6px;">
     <div id="cad-groups" style="max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;color:var(--muted);">Carregando grupos... na primeira vez pode levar até 1 minuto.</div>`}
 
@@ -8049,13 +8066,23 @@ function editCadenceSeries(index) {
   });
 }
 
+// Grupos são de um WhatsApp específico: com vários números, escolhe de qual.
+async function renderCadenceLineBox() {
+  if (!_cadenceDraft) return;
+  await ensureWaSettings(_cadenceDraft.act);
+  const box = document.getElementById('cad-line-box');
+  if (!box || !waHasMultiple(_cadenceDraft.act)) return;
+  box.innerHTML = `<label class="field-label">Grupos do WhatsApp</label><select class="field-input" id="cad-line" style="margin-bottom:8px;" ${_cadenceDraft.mode === 'edit-item' ? 'disabled' : ''} onchange="_cadenceDraft.line=this.value;loadCadenceGroups()">${waLines(_cadenceDraft.act).map(l => `<option value="${escapeHtml(l.id)}" ${_cadenceDraft.line === l.id ? 'selected' : ''}>${escapeHtml(l.label)}</option>`).join('')}</select>`;
+}
+
 async function loadCadenceGroups(refresh) {
   if (!_cadenceDraft) return;
   const act = _cadenceDraft.act;
   const box = document.getElementById('cad-groups');
+  if (!document.getElementById('cad-line')) renderCadenceLineBox();
   if (refresh && box) box.innerHTML = 'Atualizando a lista de grupos... pode levar até 1 minuto.';
   try {
-    const r = await window._fb.whatsapp('/whatsapp/groups', act, refresh ? { refresh: true } : undefined);
+    const r = await window._fb.whatsapp('/whatsapp/groups', act, { refresh: !!refresh, line: _cadenceDraft.line || WA_MAIN });
     const groups = (r.groups || []).sort((a, b) => a.subject.localeCompare(b.subject, 'pt-BR'));
     if (!box || !_cadenceDraft) return;
     const checked = new Set([...document.querySelectorAll('.cad-group:checked')].map(cb => cb.value).concat(_cadenceDraft.preselect));
@@ -8321,6 +8348,7 @@ async function saveCadence() {
 }
 
 async function createCadenceItems(items, setFb) {
+  items.forEach(i => { if (!i.line) i.line = (_cadenceDraft && _cadenceDraft.line) || WA_MAIN; });
   if (items.length > CADENCE_MAX_ITEMS) { setFb('#f87171', `São ${items.length} envios; o máximo é ${CADENCE_MAX_ITEMS} por vez.`); return; }
   setFb('var(--muted)', 'Programando...');
   try {
@@ -9463,6 +9491,7 @@ function openFlowEditor(id) {
   const act = flowAct();
   if (!act) return showToast('Escolha o cliente no topo do menu.', 'warning');
   const src = id ? _flowList.find(x => x.id === id) : null;
+  ensureWaSettings(act);
   const stages = getStages(act) || [];
   if (src) {
     _flow = JSON.parse(JSON.stringify(src));
@@ -9758,7 +9787,8 @@ function renderFlowInspector() {
   let html = `<div class="flow-insp-head"><span class="flow-node-icon" style="background:${FLOW_COLORS[n.type]}22;">${flowIcon(n.type === 'message' ? (d.kind || 'text') : n.type, FLOW_COLORS[n.type])}</span><b>${escapeHtml(flowNodeTitle(n))}</b><button class="btn-close-panel" style="margin-left:auto;" onclick="_flowSel = null; renderFlowNodes(); renderFlowInspector()" aria-label="Fechar">×</button></div>`;
   if (n.type === 'trigger') {
     html += `<label class="auto-label">Quando o lead entrar na coluna<select class="field-input" onchange="setFlowData('stage', this.value)">${autoStageOptions(act, d.stage)}</select></label>
-      <div class="integ-muted" style="margin-top:8px;">Vale para leads novos e para cards arrastados ou movidos para essa coluna depois que a automação for salva.</div>`;
+      <div class="integ-muted" style="margin-top:8px;">Vale para leads novos e para cards arrastados ou movidos para essa coluna depois que a automação for salva.</div>
+      <div style="margin-top:12px;" onchange="_flow.lines = readWaLinePicker('flow-lines') || ['main']; _flow._dirty = true;">${waLinePickerHtml(act, 'flow-lines', _flow.lines, 'Enviar as mensagens por qual WhatsApp?')}</div>`;
   } else if (n.type === 'wait') {
     html += `<label class="auto-label">Esperar</label><div style="display:flex;gap:6px;"><input type="number" min="0" class="field-input" value="${Number(d.amount) || 0}" style="width:90px;" oninput="setFlowData('amount', Math.max(0, Number(this.value) || 0))"><select class="field-input" onchange="setFlowData('unit', this.value)">${Object.entries(FLOW_UNITS).map(([k, l]) => `<option value="${k}" ${d.unit === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
       <div class="integ-muted" style="margin-top:8px;">Se cair fora do horário comercial do fluxo, a espera termina no começo do próximo horário.</div>`;
@@ -9831,6 +9861,7 @@ async function saveFlow() {
     stopOnReply: f.stopOnReply !== false,
     onReply: { moveTo: (f.onReply || {}).moveTo || '', moveToLabel: (f.onReply || {}).moveTo ? autoStageLabel(act, f.onReply.moveTo) : '' },
     hours: { enabled: !!(f.hours && f.hours.enabled), start: Number((f.hours || {}).start ?? 8), end: Number((f.hours || {}).end ?? 20) },
+    lines: Array.isArray(f.lines) && f.lines.length ? f.lines : [WA_MAIN],
     nodes: f.nodes.map(n => ({ id: n.id, type: n.type, x: n.x, y: n.y, data: JSON.parse(JSON.stringify(n.data || {})) })),
     edges: f.edges.map(e => ({ from: e.from, port: e.port || 'out', to: e.to })),
     steps: []
@@ -10367,6 +10398,7 @@ let _chatMedia = {};
 let _chatPendingMedia = null;
 let _chatSending = false;
 let _chatExtra = {}; // conversas abertas pelo card/contato que não estão entre as mais recentes
+let _chatLineFilter = 'all';  // Chat: 'all' ou o id do WhatsApp (linha)
 let _chatNotes = [];          // notas internas da conversa aberta
 let _chatNotesUnsub = null;
 let _chatSched = [];          // mensagens agendadas da conversa aberta
@@ -10625,7 +10657,9 @@ function renderChatFilters() {
   box.innerHTML = CHAT_FILTERS.map(([k, label]) => {
     const n = _chatItems.filter(c => chatMatchesFilter(c, k, me)).length;
     return `<button class="chat-pill ${_chatFilter === k ? 'active' : ''}" onclick="setChatFilter('${k}')">${label}${k !== 'all' && n ? ` · ${n}` : ''}</button>`;
-  }).join('');
+  }).join('') + (_chatAct && waHasMultiple(_chatAct)
+    ? `<select class="field-input chat-line-select" onchange="_chatLineFilter=this.value;renderChatList()" title="Qual WhatsApp"><option value="all">Todos os WhatsApps</option>${waLines(_chatAct).map(l => `<option value="${escapeHtml(l.id)}" ${_chatLineFilter === l.id ? 'selected' : ''}>${escapeHtml(l.label)}</option>`).join('')}</select>`
+    : '');
 }
 
 function renderChatList() {
@@ -10639,8 +10673,11 @@ function renderChatList() {
   const tagById = Object.fromEntries((_contactTagsCache[_chatAct] || []).map(t => [t.id, t]));
   const term = (document.getElementById('chat-search').value || '').trim().toLowerCase();
   const termDigits = term.replace(/\D/g, '');
+  const multiLine = waHasMultiple(_chatAct);
+  if (!multiLine) _chatLineFilter = 'all';
   const rows = _chatItems.filter(c => {
     if (!chatMatchesFilter(c, _chatFilter, me)) return false;
+    if (_chatLineFilter !== 'all' && (c.line || waLineOfKey(c.id)) !== _chatLineFilter) return false;
     const lead = chatLeadFor(c, index);
     if (_chatTagFilter.size && !chatTagIds(c, lead, chatContactFor(c, contactIndex)).some(id => _chatTagFilter.has(id))) return false;
     if (!term) return true;
@@ -10661,6 +10698,7 @@ function renderChatList() {
     if (chatReplied(c)) tags.push('<span class="chat-tag" style="background:var(--green-dim);color:var(--green);">Respondeu</span>');
     else if (chatWaiting(c)) tags.push('<span class="chat-tag" style="background:var(--amber-dim);color:var(--amber);">Aguardando resposta</span>');
     if (c.assignedName) tags.push(`<span class="chat-tag" style="background:var(--blue-dim);color:var(--blue);">${escapeHtml(c.assignedTo === me.uid ? 'Você' : c.assignedName)}</span>`);
+    if (multiLine) tags.push(`<span class="chat-tag" style="background:var(--surface3);color:var(--muted2);">📱 ${escapeHtml(waLineLabel(_chatAct, c.line || waLineOfKey(c.id)))}</span>`);
     const rem = chatReminderFor(_chatAct, c.id);
     if (rem) tags.push(`<span class="chat-tag" style="background:rgba(224,164,58,.2);color:#B7791F;">🔔 ${new Date(rem.remindAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>`);
     chatTagIds(c, lead, chatContactFor(c, contactIndex)).map(id => tagById[id]).filter(Boolean).forEach(t => tags.push(tagChipHtml(t)));
@@ -10833,6 +10871,7 @@ function renderChatHeader() {
       <div style="font-size:15px;font-weight:600;color:var(--text);">${escapeHtml(chatName(c, lead))}</div>
       <div style="font-size:12px;color:var(--muted2);display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:2px;">
         <span>${escapeHtml(chatFormatPhone(c.phone) || 'Número oculto pelo WhatsApp')}</span>
+        ${waHasMultiple(_chatAct) ? `<span class="chat-tag" style="background:var(--surface3);color:var(--text);">📱 via ${escapeHtml(waLineLabel(_chatAct, c.line || waLineOfKey(c.id)))}</span>` : ''}
         ${stage ? `<span class="chat-tag" style="background:var(--accent-glow);color:var(--text);">Lead · ${escapeHtml(stage)}</span>` : ''}
         ${c.dispatchSource ? `<span class="chat-tag" style="background:var(--surface3);color:var(--muted2);">${escapeHtml(c.dispatchSource)}</span>` : ''}
         ${c.assignedName ? `<span class="chat-tag" style="background:var(--blue-dim);color:var(--blue);">Responsável: ${escapeHtml(c.assignedTo === me.uid ? 'você' : c.assignedName)}</span>` : '<span class="chat-tag" style="background:var(--surface3);color:var(--muted2);">Sem responsável</span>'}
@@ -10926,7 +10965,7 @@ async function loadChatMedia(id, type) {
   _chatMedia[id] = { loading: true };
   renderChatMessages();
   try {
-    const r = await window._fb.whatsapp('/whatsapp/chat-media', _chatAct, { messageId: id });
+    const r = await window._fb.whatsapp('/whatsapp/chat-media', _chatAct, { messageId: id, line: waLineOfKey(_chatOpenKey) });
     const bytes = Uint8Array.from(atob(r.base64), ch => ch.charCodeAt(0));
     const mime = type === 'audio' && /ogg|opus/.test(r.mimetype) ? 'audio/ogg' : r.mimetype;
     _chatMedia[id] = { url: URL.createObjectURL(new Blob([bytes], { type: mime })) };
@@ -11289,6 +11328,7 @@ function openNewChat(prefill) {
   document.getElementById('chat-main').innerHTML = `
     <div class="chat-head"><button class="chat-pill chat-back" onclick="closeChat()">←</button><div style="font-size:15px;font-weight:600;color:var(--text);">Nova conversa</div></div>
     <div style="padding:20px;max-width:420px;">
+      ${waHasMultiple(_chatAct) ? `<label class="field-label">Enviar pelo WhatsApp</label><select id="chat-new-line" class="field-input" style="margin-bottom:10px;">${waLines(_chatAct).map(l => `<option value="${escapeHtml(l.id)}" ${_chatLineFilter === l.id ? 'selected' : ''}>${escapeHtml(l.label)}</option>`).join('')}</select>` : ''}
       <label class="field-label">Número com DDD</label>
       <input id="chat-new-phone" class="field-input" placeholder="(61) 99999-9999" style="margin-bottom:10px;">
       <label class="field-label">Nome (opcional)</label>
@@ -11307,7 +11347,7 @@ function openNewChat(prefill) {
 }
 
 // Abre a conversa de um lead/contato no Chat do CRM (ou começa uma nova com o número dele).
-async function openChatWith({ act, phone, jid, name }) {
+async function openChatWith({ act, phone, jid, name, line }) {
   act = normalizeActValue(act);
   if (!act) { showToast('Este contato não tem cliente definido.', 'warning'); return; }
   switchView('chat');
@@ -11319,11 +11359,12 @@ async function openChatWith({ act, phone, jid, name }) {
   } else if (normalizeActValue(chatAct()) !== act) {
     showToast('Este contato é de outro cliente.', 'warning'); return;
   }
-  const lidKey = jid && String(jid).endsWith('@lid') ? 'lid_' + String(jid).split('@')[0].replace(/[^w.-]/g, '') : '';
-  const key = phone ? chatPhoneKey(phone) : lidKey;
+  const lidKey = jid && String(jid).endsWith('@lid') ? 'lid_' + String(jid).split('@')[0].replace(/[^\w.-]/g, '') : '';
+  const baseKey = phone ? chatPhoneKey(phone) : lidKey;
+  const key = line && line !== WA_MAIN && baseKey ? line + '__' + baseKey : baseKey;
   let chat = _chatItems.find(c => c.id === key || (jid && (c.lid === jid || c.jid === jid)));
   if (!chat) {
-    for (const k of [key, lidKey].filter(Boolean)) {
+    for (const k of [...new Set([key, baseKey, lidKey])].filter(Boolean)) {
       try { chat = await window._fb.getInboxChat(act, k); } catch (e) { chat = null; }
       if (chat) break;
     }
@@ -11337,7 +11378,7 @@ async function openChatWith({ act, phone, jid, name }) {
 function openLeadChat(id) {
   const lead = getLeads().find(l => l.id === id);
   if (!lead) return;
-  openChatWith({ act: lead.act, phone: lead.phone, jid: lead.whatsappJid, name: lead.name });
+  openChatWith({ act: lead.act, phone: lead.phone, jid: lead.whatsappJid, name: lead.name, line: lead.whatsappLine });
 }
 
 async function sendNewChat() {
@@ -11350,7 +11391,8 @@ async function sendNewChat() {
   const btn = document.getElementById('chat-new-btn');
   btn.disabled = true; fb.style.color = 'var(--muted2)'; fb.textContent = 'Enviando...';
   try {
-    const r = await window._fb.whatsapp('/whatsapp/chat-send', _chatAct, { phone, name, text });
+    const line = document.getElementById('chat-new-line') ? document.getElementById('chat-new-line').value : WA_MAIN;
+    const r = await window._fb.whatsapp('/whatsapp/chat-send', _chatAct, { phone, name, text, line });
     const me = chatMe();
     await window._fb.updateInboxChat(_chatAct, r.chatKey, { assignedTo: me.uid, assignedName: me.name, assignedAt: new Date().toISOString() }).catch(() => {});
     openChat(r.chatKey);
@@ -11368,13 +11410,117 @@ const WHATSAPP_STATE_LABELS = {
   not_created: ['Não conectado', 'var(--muted)']
 };
 
-async function fetchWhatsAppState(act) {
+// ----- Vários WhatsApps por cliente ("linhas") -----
+// "main" é o número de sempre; os outros ficam em whatsapp_settings/{act}.lines = [{ id, label }].
+const WA_MAIN = 'main';
+
+function waLines(act) {
+  const s = WHATSAPP_SETTINGS[normalizeActValue(act)] || {};
+  return [{ id: WA_MAIN, label: s.mainLabel || 'Principal' }]
+    .concat((Array.isArray(s.lines) ? s.lines : []).filter(l => l && l.id && l.id !== WA_MAIN).map(l => ({ id: l.id, label: l.label || l.id })));
+}
+const waHasMultiple = act => waLines(act).length > 1;
+const waLineLabel = (act, id) => (waLines(act).find(l => l.id === (id || WA_MAIN)) || { label: 'Principal' }).label;
+const waLineOfKey = key => (String(key || '').match(/^([a-z0-9]{1,12})__/) || [])[1] || WA_MAIN;
+
+async function ensureWaSettings(act) {
+  act = normalizeActValue(act);
+  if (!act || WHATSAPP_SETTINGS[act]) return;
+  try { Object.assign(WHATSAPP_SETTINGS, await window._fb.getWhatsAppSettings()); } catch (e) {}
+}
+
+// Escolha de WhatsApp para disparos, automações e 1ª mensagem. Vários marcados = alterna entre eles.
+function waLinePickerHtml(act, name, selected, title) {
+  const lines = waLines(act);
+  if (lines.length < 2) return '';
+  const sel = new Set((Array.isArray(selected) && selected.length ? selected : [WA_MAIN]));
+  return `<div class="wa-line-picker">
+    <div class="wa-line-picker-title">${escapeHtml(title || 'Por qual WhatsApp enviar?')}</div>
+    ${lines.map(l => `<label class="integ-toggle"><input type="checkbox" name="${escapeHtml(name)}" value="${escapeHtml(l.id)}" ${sel.has(l.id) ? 'checked' : ''}> ${escapeHtml(l.label)}</label>`).join('')}
+    <div class="wa-line-picker-hint">Marcando mais de um, os envios se alternam entre os números (mesclar). Cada contato continua sempre pelo mesmo número.</div>
+  </div>`;
+}
+
+function readWaLinePicker(name) {
+  const boxes = [...document.querySelectorAll(`input[name="${name}"]`)];
+  if (!boxes.length) return null;
+  const v = boxes.filter(b => b.checked).map(b => b.value);
+  return v.length ? v : null;
+}
+
+async function fetchWhatsAppState(act, line) {
   try {
-    const r = await window._fb.whatsapp('/whatsapp/status', act);
+    const r = await window._fb.whatsapp('/whatsapp/status', act, { line: line || WA_MAIN });
     return { state: r.state };
   } catch (e) {
     return { state: 'offline', error: e.message };
   }
+}
+
+// Lista de números do cliente com estado, número conectado e ações (tela Conexões).
+async function renderWaLinesBox(act, el) {
+  if (!el) return;
+  el.innerHTML = '<span style="color:var(--muted);font-size:12px;">verificando...</span>';
+  let states = [];
+  try { states = (await window._fb.whatsapp('/whatsapp/lines-status', act)).lines || []; }
+  catch (e) { el.innerHTML = `<span style="color:#f87171;font-size:12px;">Servidor do WhatsApp fora do ar</span>`; return; }
+  const a = escapeJsString(act);
+  el.innerHTML = waLines(act).map(l => {
+    const st = states.find(x => x.line === l.id) || { state: 'not_created' };
+    const id = escapeJsString(l.id);
+    const num = st.number ? chatFormatPhone(st.number) : '';
+    return `<div class="wa-line-row">
+      <div style="flex:1;min-width:0;"><div class="wa-line-name">${escapeHtml(l.label)}</div><div class="wa-line-sub">${whatsappStateBadge(st)}${num ? ' · ' + escapeHtml(num) : ''}</div></div>
+      ${st.state === 'open' ? `<button style="${wbtn}" onclick="disconnectWhatsApp('${a}','${id}')">Desconectar</button>` : `<button style="${wbtn}" onclick="openWhatsAppConnect('${a}','${escapeJsString(getClientDisplayName(act) + ' · ' + l.label)}','${id}')">Conectar</button>`}
+      <button class="chat-pill" title="Renomear" onclick="renameWaLine('${a}','${id}')">✎</button>
+      ${l.id !== WA_MAIN ? `<button class="chat-pill" style="color:var(--red);" title="Remover este WhatsApp" onclick="removeWaLine('${a}','${id}')">✕</button>` : ''}
+    </div>`;
+  }).join('') + `<button class="chat-pill" style="margin-top:6px;" onclick="addWaLine('${a}')">+ Conectar outro WhatsApp</button>`;
+}
+
+function refreshWaLinesFor(act) {
+  document.querySelectorAll('[data-wa-lines]').forEach(el => { if (el.getAttribute('data-wa-lines') === act) renderWaLinesBox(act, el); });
+}
+
+async function addWaLine(act) {
+  const label = (prompt('Nome deste WhatsApp (ex.: Comercial, Suporte, Filial Centro):') || '').trim().slice(0, 30);
+  if (!label) return;
+  const s = WHATSAPP_SETTINGS[act] || {};
+  const lines = (Array.isArray(s.lines) ? s.lines : []).slice();
+  if (lines.length >= 5) { showToast('Máximo de 6 WhatsApps por cliente.', 'warning'); return; }
+  const id = 'l' + Date.now().toString(36).slice(-6);
+  lines.push({ id, label });
+  try {
+    await window._fb.saveWhatsAppSettings(act, { lines });
+    WHATSAPP_SETTINGS[act] = { ...s, lines };
+    refreshWaLinesFor(act);
+    openWhatsAppConnect(act, getClientDisplayName(act) + ' · ' + label, id);
+  } catch (e) { showToast('Erro: ' + e.message, 'error'); }
+}
+
+async function renameWaLine(act, id) {
+  const label = (prompt('Novo nome deste WhatsApp:', waLineLabel(act, id)) || '').trim().slice(0, 30);
+  if (!label) return;
+  const s = WHATSAPP_SETTINGS[act] || {};
+  const data = id === WA_MAIN ? { mainLabel: label } : { lines: (s.lines || []).map(l => l.id === id ? { ...l, label } : l) };
+  try {
+    await window._fb.saveWhatsAppSettings(act, data);
+    WHATSAPP_SETTINGS[act] = { ...s, ...data };
+    refreshWaLinesFor(act);
+  } catch (e) { showToast('Erro: ' + e.message, 'error'); }
+}
+
+async function removeWaLine(act, id) {
+  if (!await showConfirm(`O número "${waLineLabel(act, id)}" será desconectado e removido deste cliente. As conversas dele continuam no Chat.`, 'Remover WhatsApp', 'Remover', true)) return;
+  const s = WHATSAPP_SETTINGS[act] || {};
+  try {
+    await window._fb.whatsapp('/whatsapp/delete-line', act, { line: id }).catch(() => null);
+    const lines = (s.lines || []).filter(l => l.id !== id);
+    await window._fb.saveWhatsAppSettings(act, { lines });
+    WHATSAPP_SETTINGS[act] = { ...s, lines };
+    refreshWaLinesFor(act);
+    showToast('WhatsApp removido.', 'success');
+  } catch (e) { showToast('Erro: ' + e.message, 'error'); }
 }
 
 function whatsappStateBadge(result) {
@@ -11415,16 +11561,11 @@ async function renderOwnWhatsAppSection() {
   const act = profile.act;
   const status = document.getElementById('whatsapp-own-status');
   const actions = document.getElementById('whatsapp-own-actions');
-  status.textContent = 'Verificando...';
   actions.innerHTML = '';
-  const result = await fetchWhatsAppState(act);
-  status.innerHTML = whatsappStateBadge(result);
-  const jsAct = escapeJsString(act);
-  if (result.state === 'open') {
-    actions.innerHTML = `<button style="${wbtn}" onclick="disconnectWhatsApp('${jsAct}')">Desconectar</button>`;
-  } else if (result.state !== 'offline') {
-    actions.innerHTML = `<button style="${wbtn}" onclick="openWhatsAppConnect('${jsAct}')">Conectar WhatsApp</button>`;
-  }
+  status.setAttribute('data-wa-lines', act);
+  status.style.display = 'block';
+  status.style.width = '100%';
+  renderWaLinesBox(act, status);
   const auto = WHATSAPP_SETTINGS[act] && WHATSAPP_SETTINGS[act].autoFirstMessage;
   document.getElementById('whatsapp-own-auto').textContent = auto
     ? 'Mensagem automática para leads novos: ativada.'
@@ -11506,8 +11647,8 @@ function renderAdminWhatsAppList() {
       <div class="wa-card-head">
         <div class="huv-avatar" style="background:${t[0]};color:${t[1]};">${escapeHtml(huvInitials(c.name))}</div>
         <div style="flex:1;min-width:0;"><div class="huv-name">${escapeHtml(c.name)}</div></div>
-        <span data-wa-act="${escapeHtml(c.act)}" style="display:flex;align-items:center;gap:8px;font-size:12px;flex-wrap:wrap;justify-content:flex-end;"></span>
       </div>
+      <div class="wa-lines" data-wa-lines="${escapeHtml(c.act)}"></div>
       <div class="wa-card-stats">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><span style="flex:1;">1ª mensagem automática no "Novo lead"</span><input type="checkbox" onchange="toggleWhatsAppAuto('${jsLogin}', this)" ${s.autoFirstMessage ? 'checked' : ''}></label>
         <div style="display:flex;"><span style="flex:1;">Captura de leads pelo WhatsApp</span><b>${capture ? (rules ? rules + (rules > 1 ? ' regras' : ' regra') : 'Ligada') : 'Desligada'}</b></div>
@@ -11542,6 +11683,8 @@ function toggleWhatsAppSettings(login) {
       <div style="${section}">Mensagens</div>
       <div style="${hint}">Cadastre variações da mesma mensagem: a cada envio uma é sorteada, o que reduz o risco de bloqueio. Use {primeiro_nome}, {nome}, {rede_social} e {origem}.</div>
       ${whatsappVariationsHtml('wa-' + id, getWhatsAppTemplates(act))}
+
+      ${waHasMultiple(act) ? `<div style="${section}">WhatsApp da 1ª mensagem automática</div>${waLinePickerHtml(act, 'wa-first-lines-' + id, s.firstMessageLines, 'Por qual WhatsApp sai a 1ª mensagem?')}` : ''}
 
       <div style="${section}">Captura de leads pelo WhatsApp</div>
       <div style="${hint}">Quando alguém mandar uma mensagem que bata com uma das identificações abaixo, o card é criado com o nome e o telefone, na coluna escolhida. Maiúsculas e acentos não importam; vale a primeira identificação da lista que bater. Quem responder "sair" ou "parar" deixa de receber mensagens automáticas.</div>
@@ -11620,6 +11763,8 @@ async function saveAdminWhatsAppSettings(login) {
   // O ritmo de envio (limites, intervalo, horário) usa sempre os valores recomendados; não é editado aqui.
   // "phrases" continua sendo gravado para compatibilidade.
   const data = { templates, template: templates[0], leadCapture: { enabled: captureEnabled, rules, phrases: rules.map(r => r.phrase) } };
+  const firstLines = readWaLinePicker('wa-first-lines-' + id);
+  if (firstLines) data.firstMessageLines = firstLines;
   try {
     await window._fb.saveWhatsAppSettings(act, data);
     WHATSAPP_SETTINGS[act] = { ...(WHATSAPP_SETTINGS[act] || {}), ...data };
@@ -11646,15 +11791,16 @@ function saveOwnWhatsAppTemplate() {
 
 let _whatsappPoll = null;
 let _whatsappQrAct = null;
+let _whatsappQrLine = 'main';
 
 function setWhatsAppQrBody(html) {
   const body = document.getElementById('whatsapp-qr-body');
   if (body) body.innerHTML = html;
 }
 
-async function loadWhatsAppQr(act) {
+async function loadWhatsAppQr(act, line) {
   try {
-    const r = await window._fb.whatsapp('/whatsapp/connect', act);
+    const r = await window._fb.whatsapp('/whatsapp/connect', act, { line: line || WA_MAIN });
     if (r.state === 'open') { onWhatsAppConnected(); return; }
     const qr = String(r.qr || '');
     if (!qr.startsWith('data:image/')) { setWhatsAppQrBody('<div style="color:var(--muted);">Gerando QR Code...</div>'); return; }
@@ -11671,30 +11817,32 @@ function onWhatsAppConnected() {
   setTimeout(closeWhatsAppQrModal, 1800);
 }
 
-async function openWhatsAppConnect(act, name) {
+async function openWhatsAppConnect(act, name, line) {
   const modal = document.getElementById('whatsapp-qr-modal');
   if (!modal) return;
+  line = line || WA_MAIN;
   _whatsappQrAct = act;
+  _whatsappQrLine = line;
   document.getElementById('whatsapp-qr-title').textContent = 'Conectar WhatsApp' + (name ? ' — ' + name : '');
   setWhatsAppQrBody('<div style="color:var(--muted);">Gerando QR Code...</div>');
   modal.style.display = 'flex';
   modal.classList.add('open');
-  await loadWhatsAppQr(act);
+  await loadWhatsAppQr(act, line);
 
   // Confere a conexão a cada 5 s e troca o QR Code a cada ~25 s (ele expira). Para depois de 5 min.
   let ticks = 0;
   clearInterval(_whatsappPoll);
   _whatsappPoll = setInterval(async () => {
     ticks += 1;
-    const result = await fetchWhatsAppState(act);
+    const result = await fetchWhatsAppState(act, line);
     if (result.state === 'open') { onWhatsAppConnected(); return; }
     if (ticks >= 60) {
       clearInterval(_whatsappPoll);
       _whatsappPoll = null;
-      setWhatsAppQrBody(`<div style="color:var(--muted);">O QR Code expirou.</div><button style="${wbtn}" onclick="openWhatsAppConnect('${escapeJsString(act)}')">Gerar outro</button>`);
+      setWhatsAppQrBody(`<div style="color:var(--muted);">O QR Code expirou.</div><button style="${wbtn}" onclick="openWhatsAppConnect('${escapeJsString(act)}','','${escapeJsString(line)}')">Gerar outro</button>`);
       return;
     }
-    if (ticks % 5 === 0) loadWhatsAppQr(act);
+    if (ticks % 5 === 0) loadWhatsAppQr(act, line);
   }, 5000);
 }
 
@@ -11707,10 +11855,10 @@ function closeWhatsAppQrModal() {
   if (isAdmin && _whatsappQrAct) refreshAdminWhatsAppStates();
 }
 
-async function disconnectWhatsApp(act) {
+async function disconnectWhatsApp(act, line) {
   if (!await showConfirm('O número deixa de enviar mensagens pelo CRM até ser conectado de novo.', 'Desconectar WhatsApp', 'Desconectar', true)) return;
   try {
-    await window._fb.whatsapp('/whatsapp/logout', act);
+    await window._fb.whatsapp('/whatsapp/logout', act, { line: line || WA_MAIN });
     showToast('WhatsApp desconectado.', 'success');
   } catch (e) {
     showToast('Erro ao desconectar: ' + e.message, 'warning');
@@ -11721,17 +11869,7 @@ async function disconnectWhatsApp(act) {
 
 // Preenche o estado do WhatsApp de cada cliente no painel admin.
 function refreshAdminWhatsAppStates() {
-  document.querySelectorAll('[data-wa-act]').forEach(async el => {
-    const act = el.getAttribute('data-wa-act');
-    el.innerHTML = '<span style="color:var(--muted);">verificando...</span>';
-    const result = await fetchWhatsAppState(act);
-    const jsAct = escapeJsString(act);
-    const name = escapeJsString(getClientDisplayName(act));
-    const action = result.state === 'open'
-      ? `<button style="${wbtn}" onclick="disconnectWhatsApp('${jsAct}')">Desconectar</button>`
-      : result.state === 'offline' ? '' : `<button style="${wbtn}" onclick="openWhatsAppConnect('${jsAct}','${name}')">Conectar</button>`;
-    el.innerHTML = whatsappStateBadge(result) + ' ' + action;
-  });
+  document.querySelectorAll('[data-wa-lines]').forEach(el => renderWaLinesBox(el.getAttribute('data-wa-lines'), el));
 }
 
 async function toggleWhatsAppAuto(login, checkbox) {
@@ -13443,13 +13581,14 @@ function renderWhatsAppAlert() {
   if (isAdmin) {
     if (down.length) {
       parts.push(`<div style="margin-top:${server ? 8 : 0}px;"><b>⚠️ WhatsApp desconectado ${down.length > 1 ? `(${down.length} clientes)` : ''}</b> — é preciso ler o QR Code de novo:</div>`);
-      parts.push(down.map(s => `<div class="wa-alert-row"><span>• <b>${escapeHtml(getClientDisplayName(s.id) || s.id)}</b> — ${s.loggedOut ? 'desconectado pelo celular' : 'sem conexão'} ${escapeHtml(waAlertTime(s.since))}</span><button class="wa-alert-btn" onclick="openWaReconnect('${escapeJsString(s.id)}')">Reconectar</button></div>`).join(''));
+      parts.push(down.map(s => { const act = s.act || s.id.split('__')[0]; const line = s.line || 'main'; return `<div class="wa-alert-row"><span>• <b>${escapeHtml(getClientDisplayName(act) || act)}${line !== 'main' ? ' · ' + escapeHtml(waLineLabel(act, line)) : ''}</b> — ${s.loggedOut ? 'desconectado pelo celular' : 'sem conexão'} ${escapeHtml(waAlertTime(s.since))}</span><button class="wa-alert-btn" onclick="openWaReconnect('${escapeJsString(act)}','${escapeJsString(line)}')">Reconectar</button></div>`; }).join(''));
     }
   } else if (down.length) {
     const s = down[0];
-    parts.push(`<div><b>⚠️ Seu WhatsApp foi desconectado do CRM</b> ${escapeHtml(waAlertTime(s.since))}.</div>
+    const sLine = s.line || 'main';
+    parts.push(`<div><b>⚠️ Seu WhatsApp${sLine !== 'main' ? ' "' + escapeHtml(waLineLabel(s.act || s.id, sLine)) + '"' : ''} foi desconectado do CRM</b> ${escapeHtml(waAlertTime(s.since))}.</div>
       <div style="margin-top:4px;">Enquanto estiver desconectado, as mensagens do WhatsApp não viram card no kanban, o Chat não recebe mensagens e a 1ª mensagem automática não sai. Leia o QR Code de novo para voltar a funcionar.</div>
-      <div style="margin-top:8px;"><button class="wa-alert-btn" onclick="openWaReconnect('${escapeJsString(s.id)}')">Reconectar agora</button></div>`);
+      <div style="margin-top:8px;"><button class="wa-alert-btn" onclick="openWaReconnect('${escapeJsString(s.act || s.id.split('__')[0])}','${escapeJsString(sLine)}')">Reconectar agora</button></div>`);
   }
   el.innerHTML = `<button class="wa-alert-close" title="Esconder por 30 minutos" onclick="hideWhatsAppAlert()">×</button>${parts.join('')}`;
 }
@@ -13767,10 +13906,10 @@ function hideWhatsAppAlert() {
   setTimeout(renderWhatsAppAlert, 30 * 60 * 1000 + 1000);
 }
 
-function openWaReconnect(act) {
+function openWaReconnect(act, line) {
   switchView('whatsapp');
   if (typeof setMobileNav === 'function') setMobileNav('whatsapp');
-  openWhatsAppConnect(act, isAdmin ? (getClientDisplayName(act) || '') : '');
+  openWhatsAppConnect(act, (isAdmin ? (getClientDisplayName(act) || '') : '') + (line && line !== 'main' ? ' · ' + waLineLabel(act, line) : ''), line || 'main');
 }
 
 function startLeadNotifier() {
