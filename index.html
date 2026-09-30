@@ -2930,6 +2930,7 @@ td { font-family: var(--font); font-size: 13px; }
           <button class="btn-close-panel" onclick="closeWhatsAppQrModal()">×</button>
         </div>
         <div id="whatsapp-qr-body" style="min-height:280px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;"></div>
+        <div id="whatsapp-qr-delete" style="display:none;margin-top:8px;"><button class="chat-pill" style="color:var(--red);border-color:rgba(248,113,113,.4);" onclick="deleteWaLineFromQr()">Não vou conectar: excluir este WhatsApp</button></div>
         <div style="font-size:12px; color:var(--muted); margin-top:12px; line-height:1.5;">No celular: <b>WhatsApp → Aparelhos conectados → Conectar um aparelho</b> e aponte a câmera para o QR Code.</div>
       </div>
     </div>
@@ -7080,8 +7081,8 @@ function openCampaignEditor(copyFrom) {
         <div style="flex:1;min-width:200px;">
           <label class="field-label">Coluna do CRM</label>
           <select class="field-input" id="camp-crm-stage" onchange="buildCampaignAudience()">
-            <option value="">Todas as colunas</option>
-            ${stages.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.label)}</option>`).join('')}
+            <option value="">Todas as colunas de todos os pipelines</option>
+            ${campaignStageOptions(act)}
             <option value="__contacts__">Base de contatos importados do WhatsApp</option>
           </select>
         </div>
@@ -7364,6 +7365,21 @@ function setCampaignRecipients(list, label) {
   renderCampaignSummary();
 }
 
+// Colunas para escolher o público da campanha, agrupadas por pipeline (com "todo o pipeline" em cada grupo).
+function campaignStageOptions(act) {
+  ensurePipelines(act, () => {
+    const sel = document.getElementById('camp-crm-stage');
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = `<option value="">Todas as colunas de todos os pipelines</option>${campaignStageOptions(act)}<option value="__contacts__">Base de contatos importados do WhatsApp</option>`;
+    sel.value = cur;
+  });
+  const pls = pipelineList(act);
+  const opts = p => getStages(act, p.id).map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.label)}</option>`).join('');
+  if (pls.length === 1) return opts(pls[0]);
+  return pls.map(p => `<optgroup label="${escapeHtml(p.name)}"><option value="pl:${escapeHtml(p.id)}">Todas as colunas de ${escapeHtml(p.name)}</option>${opts(p)}</optgroup>`).join('');
+}
+
 async function buildCampaignAudience() {
   if (!_campaignDraft || _campaignDraft.source !== 'crm') return;
   const act = _campaignDraft.act;
@@ -7381,8 +7397,13 @@ async function buildCampaignAudience() {
     }
     return;
   }
-  const stageLabel = stage ? (getStages(act).find(s => s.id === stage) || {}).label || stage : 'todas as colunas';
-  const leads = getLeads().filter(l => leadMatchesClient(l, act) && (!stage || l.stage === stage) && (!month || leadMonthKey(l) === month) && !l.whatsappOptOut);
+  // "pl:<pipeline>" = todas as colunas daquele pipeline; senão, uma coluna (ids únicos entre pipelines).
+  const plOnly = stage.startsWith('pl:') ? stage.slice(3) : '';
+  const stageLabel = plOnly ? 'todo o pipeline ' + pipelineName(act, plOnly)
+    : stage ? autoStageLabel(act, stage) : 'todas as colunas';
+  const leads = getLeads().filter(l => leadMatchesClient(l, act)
+    && (plOnly ? leadPipeline(l) === plOnly : (!stage || l.stage === stage))
+    && (!month || leadMonthKey(l) === month) && !l.whatsappOptOut);
   setCampaignRecipients(leads.map(l => ({ name: l.name, phone: l.phone, jid: l.whatsappJid })),
     `Leads do CRM (${stageLabel}${month ? ', ' + monthLabel(month) : ', geral'})`);
 }
@@ -11472,8 +11493,8 @@ async function renderWaLinesBox(act, el) {
     return `<div class="wa-line-row">
       <div style="flex:1;min-width:0;"><div class="wa-line-name">${escapeHtml(l.label)}</div><div class="wa-line-sub">${whatsappStateBadge(st)}${num ? ' · ' + escapeHtml(num) : ''}</div></div>
       ${st.state === 'open' ? `<button style="${wbtn}" onclick="disconnectWhatsApp('${a}','${id}')">Desconectar</button>` : `<button style="${wbtn}" onclick="openWhatsAppConnect('${a}','${escapeJsString(getClientDisplayName(act) + ' · ' + l.label)}','${id}')">Conectar</button>`}
-      <button class="chat-pill" title="Renomear" onclick="renameWaLine('${a}','${id}')">✎</button>
-      ${l.id !== WA_MAIN ? `<button class="chat-pill" style="color:var(--red);" title="Remover este WhatsApp" onclick="removeWaLine('${a}','${id}')">✕</button>` : ''}
+      <button class="chat-pill" onclick="renameWaLine('${a}','${id}')">Renomear</button>
+      ${l.id !== WA_MAIN ? `<button class="chat-pill" style="color:var(--red);border-color:rgba(248,113,113,.4);" onclick="removeWaLine('${a}','${id}')">Excluir</button>` : ''}
     </div>`;
   }).join('') + `<button class="chat-pill" style="margin-top:6px;" onclick="addWaLine('${a}')">+ Conectar outro WhatsApp</button>`;
 }
@@ -11508,6 +11529,13 @@ async function renameWaLine(act, id) {
     WHATSAPP_SETTINGS[act] = { ...s, ...data };
     refreshWaLinesFor(act);
   } catch (e) { showToast('Erro: ' + e.message, 'error'); }
+}
+
+async function deleteWaLineFromQr() {
+  const act = _whatsappQrAct, line = _whatsappQrLine;
+  if (!act || !line || line === WA_MAIN) return;
+  closeWhatsAppQrModal();
+  await removeWaLine(act, line);
 }
 
 async function removeWaLine(act, id) {
@@ -11823,6 +11851,8 @@ async function openWhatsAppConnect(act, name, line) {
   line = line || WA_MAIN;
   _whatsappQrAct = act;
   _whatsappQrLine = line;
+  const delBox = document.getElementById('whatsapp-qr-delete');
+  if (delBox) delBox.style.display = line !== WA_MAIN ? 'block' : 'none';
   document.getElementById('whatsapp-qr-title').textContent = 'Conectar WhatsApp' + (name ? ' — ' + name : '');
   setWhatsAppQrBody('<div style="color:var(--muted);">Gerando QR Code...</div>');
   modal.style.display = 'flex';
