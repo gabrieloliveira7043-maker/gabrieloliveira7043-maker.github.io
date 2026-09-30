@@ -9490,7 +9490,10 @@ async function renderAutomacoesView() {
         <div class="huv-page-title" style="color:var(--text);">Automações</div>
         <div class="integ-muted" style="margin-top:4px;">Fluxos que rodam sozinhos quando o lead entra numa coluna do funil: esperar, mandar mensagem, imagem, vídeo ou áudio, conferir se respondeu e mover o card.</div>
       </div>
-      <button class="btn-add-lead" style="height:40px;padding:0 16px;" onclick="openFlowEditor(null)">+ Nova automação</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="huv-btn" style="height:40px;padding:0 16px;" onclick="openAiFlowModal()">✨ Criar com IA</button>
+        <button class="btn-add-lead" style="height:40px;padding:0 16px;" onclick="openFlowEditor(null)">+ Nova automação</button>
+      </div>
     </div>
     <div class="huv-grid">
       ${_flowList.length ? _flowList.map(f => {
@@ -9588,6 +9591,112 @@ function openFlowEditor(id) {
   _flowView = { x: 30, y: 30, z: window.innerWidth < 900 ? 0.7 : 1 };
   document.getElementById('automacoes-view').classList.add('editing');
   renderFlowEditor();
+}
+
+// ===== AUTOMAÇÃO CRIADA POR IA =====
+// O cliente descreve (ou anexa um PDF) e a IA da Cloudflare devolve os passos; aqui viram blocos ligados no editor.
+// A automação abre desligada: o cliente confere, anexa os arquivos pedidos e liga.
+let _aiPdfText = '';
+
+function openAiFlowModal() {
+  const act = flowAct();
+  if (!act) return showToast('Escolha o cliente no topo do menu.', 'warning');
+  _aiPdfText = '';
+  openHuvenModal('✨ Criar automação com IA', `
+    <div class="integ-muted" style="font-size:12.5px;margin-bottom:10px;">Descreva o fluxo do seu jeito, em ordem: quando começa, quanto tempo esperar, o que enviar e o que fazer se o lead responder ou não. A IA monta os blocos no editor para você conferir antes de ligar.</div>
+    <textarea class="field-input" id="ai-flow-text" rows="7" maxlength="8000" style="width:100%;box-sizing:border-box;resize:vertical;margin-bottom:10px;" placeholder="Ex.: Quando o lead chegar em Novo lead, espera 5 minutos e manda boas-vindas perguntando qual serviço ele procura. Se não responder em 2 horas, manda de novo. Se depois de 1 dia continuar sem responder, manda o vídeo de depoimento e move para Sem resposta. Se responder, move para Em contato."></textarea>
+    <label class="field-label">Ou anexe um PDF ou arquivo de texto com o fluxo (opcional)</label>
+    <input type="file" class="field-input" id="ai-flow-file" accept="application/pdf,.pdf,text/plain,.txt" onchange="readAiFlowFile(this)" style="margin-bottom:6px;">
+    <div id="ai-flow-file-fb" class="integ-muted" style="font-size:12px;margin-bottom:12px;"></div>
+    <button class="btn-save" id="ai-flow-btn" style="width:auto;padding:9px 16px;" onclick="runAiFlow()">Criar automação</button> <span id="ai-flow-fb" class="integ-muted"></span>`, 560);
+}
+
+async function readAiFlowFile(input) {
+  const file = input.files && input.files[0];
+  const fb = document.getElementById('ai-flow-file-fb');
+  _aiPdfText = '';
+  if (!file) { fb.textContent = ''; return; }
+  fb.textContent = 'Lendo o arquivo...';
+  try {
+    if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
+      if (!window.pdfjsLib) {
+        await new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'; s.onload = res; s.onerror = () => rej(new Error('Não consegui abrir o leitor de PDF.')); document.head.appendChild(s); });
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+      const pdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+      const parts = [];
+      for (let i = 1; i <= Math.min(pdf.numPages, 15); i++) {
+        const page = await pdf.getPage(i);
+        parts.push((await page.getTextContent()).items.map(it => it.str).join(' '));
+      }
+      _aiPdfText = parts.join('\n').replace(/[ \t]+/g, ' ').trim();
+    } else {
+      _aiPdfText = (await file.text()).trim();
+    }
+    fb.style.color = _aiPdfText.length > 20 ? 'var(--green)' : 'var(--amber)';
+    fb.textContent = _aiPdfText.length > 20 ? `✓ ${_aiPdfText.length.toLocaleString('pt-BR')} caracteres lidos do arquivo.` : 'Não encontrei texto no arquivo (PDF escaneado ou só imagem). Descreva o fluxo no campo acima.';
+  } catch (e) { fb.style.color = 'var(--red)'; fb.textContent = 'Erro ao ler: ' + e.message; }
+}
+
+// Passos da IA -> blocos do editor. Condição abre dois caminhos: "Sim" para cima e "Não" para baixo.
+function aiFlowToGraph(flow, act) {
+  const nodes = [], edges = [];
+  const t = flowUid();
+  nodes.push({ id: t, type: 'trigger', x: 40, y: 320, data: { stage: flow.triggerStage } });
+  const place = (steps, fromId, fromPort, x, y, spread) => {
+    let prev = fromId, port = fromPort;
+    for (const st of steps || []) {
+      const id = flowUid();
+      let data = {};
+      if (st.type === 'wait') data = { amount: st.amount, unit: st.unit };
+      else if (st.type === 'message') data = { kind: st.kind || 'text', templates: st.texts && st.texts.length ? st.texts : [''], fileHint: st.fileHint || '' };
+      else if (st.type === 'move') data = { stage: st.stage, stageLabel: autoStageLabel(act, st.stage) };
+      else if (st.type === 'condition') data = { check: 'replied' };
+      nodes.push({ id, type: st.type, x, y, data });
+      edges.push({ from: prev, port, to: id });
+      prev = id; port = 'out'; x += 290;
+      if (st.type === 'condition') {
+        place(st.yes, id, 'yes', x, y - spread, Math.max(110, spread / 2));
+        place(st.no, id, 'no', x, y + spread, Math.max(110, spread / 2));
+        return;
+      }
+    }
+  };
+  place(flow.steps, t, 'out', 330, 320, 200);
+  return { nodes, edges };
+}
+
+async function runAiFlow() {
+  const act = flowAct();
+  const desc = document.getElementById('ai-flow-text').value.trim();
+  const fb = document.getElementById('ai-flow-fb');
+  const btn = document.getElementById('ai-flow-btn');
+  const text = [desc, _aiPdfText ? 'Conteúdo do arquivo anexado:\n' + _aiPdfText.slice(0, 9000) : ''].filter(Boolean).join('\n\n');
+  if (text.length < 15) { fb.style.color = 'var(--red)'; fb.textContent = 'Descreva o fluxo ou anexe um arquivo.'; return; }
+  if (!pipelinesFor(act)) {
+    try { _pipelinesCache[normalizeActValue(act)] = (await window._fb.getPipelines(act)) || { list: [] }; } catch (e) {}
+  }
+  const stages = [];
+  pipelineList(act).forEach(p => getStages(act, p.id).forEach(s => stages.push({ id: s.id, label: s.label, pipeline: p.name })));
+  btn.disabled = true; fb.style.color = 'var(--muted)'; fb.textContent = 'A IA está montando o fluxo... (uns 10 segundos)';
+  try {
+    const r = await window._fb.whatsapp('/ai/flow', act, { text, stages });
+    const graph = aiFlowToGraph(r.flow, act);
+    closeHuvenModal();
+    _flow = {
+      act, name: r.flow.name, active: false, stopOnReply: r.flow.stopOnReply, onReply: { moveTo: '' }, hours: r.flow.hours,
+      lines: [waDefaultLine(act)], nodes: graph.nodes, edges: graph.edges, _dirty: true, _ai: true
+    };
+    _flowSel = null;
+    _flowView = { x: 30, y: 30, z: window.innerWidth < 900 ? 0.6 : 0.85 };
+    document.getElementById('automacoes-view').classList.add('editing');
+    renderFlowEditor();
+    const missing = graph.nodes.filter(n => n.type === 'message' && (n.data.kind || 'text') !== 'text').length;
+    showToast(`Fluxo montado pela IA${missing ? ` · anexe ${missing} arquivo(s) nos blocos de mídia` : ''}. Confira os blocos e clique em Salvar; ele fica desligado até você ligar.${r.notes ? ' Observação da IA: ' + r.notes : ''}`, 'success', 12000);
+  } catch (e) {
+    fb.style.color = 'var(--red)'; fb.textContent = e.message;
+    btn.disabled = false;
+  }
 }
 
 function closeFlowEditor(force) {
@@ -9876,6 +9985,7 @@ function renderFlowInspector() {
     html += `<label class="auto-label">Tipo</label><div class="flow-kinds">${Object.entries(FLOW_MEDIA).map(([k, l]) => `<button class="${kind === k ? 'active' : ''}" onclick="setFlowData('kind', '${k}'); ${k === 'text' ? "setFlowData('media', null);" : ''} renderFlowInspector()">${l}</button>`).join('')}</div>`;
     if (kind !== 'text') {
       html += `<label class="auto-label" style="margin-top:10px;">Arquivo</label>
+        ${d.fileHint && !(d.media && d.media.url) ? `<div class="integ-muted" style="color:var(--amber);margin-bottom:6px;">📎 Anexe: ${escapeHtml(d.fileHint)}</div>` : ''}
         ${d.media && d.media.fileName ? `<div class="flow-file" style="margin-bottom:6px;">📎 ${escapeHtml(d.media.fileName)}</div>` : ''}
         <input type="file" class="field-input" accept="${kind === 'image' ? 'image/jpeg,image/png,image/webp' : kind === 'video' ? 'video/mp4' : 'audio/*'}" onchange="uploadFlowMedia(this, '${kind}')">
         <div class="integ-muted" id="flow-upload-fb" style="margin-top:4px;">${kind === 'audio' ? 'Chega como áudio gravado na hora (não encaminhado).' : 'Até 24 MB.'}</div>`;
