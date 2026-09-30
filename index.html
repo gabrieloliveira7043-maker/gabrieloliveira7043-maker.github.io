@@ -8243,6 +8243,13 @@ async function renderProspeccaoView() {
       <label style="flex:2;min-width:260px;position:relative;">Atividade (CNAE)<input class="field-input" id="pr-cnae" placeholder="Digite: odontologia, academia, 8630504..." autocomplete="off" oninput="prosCnaeSuggest()" onfocus="prosCnaeSuggest()" onblur="setTimeout(prosCnaeHide, 200)" onkeydown="if(event.key==='Enter'){event.preventDefault();prosCnaeHide();prosSearch();}"><div id="pr-cnae-menu" class="pr-cnae-menu"></div></label>
       <label>Cidade<select class="field-input" id="pr-city"><option value="">Todas do estado</option></select></label>
       <label>Bairro<input class="field-input" id="pr-bairro" placeholder="Opcional"></label>
+      <label>Porte da empresa<select class="field-input" id="pr-porte" onchange="if(_prRows.length) prosApplyFilters()">
+        <option value="">Todos os portes</option>
+        <option value="Micro empresa">Micro empresa (inclui MEI)</option>
+        <option value="Pequeno porte">Pequeno porte</option>
+        <option value="Demais">Médio e grande porte</option>
+        <option value="Não informado">Não informado</option>
+      </select></label>
     </div>
     <div class="pr-checks">
       <label class="integ-toggle"><input type="checkbox" id="pr-phone" checked> Só com telefone</label>
@@ -8423,7 +8430,9 @@ function prosApplyFilters() {
   const bairro = (document.getElementById('pr-bairro').value || '').trim().toLowerCase();
   const phone = document.getElementById('pr-phone').checked, mobile = document.getElementById('pr-mobile').checked;
   const email = document.getElementById('pr-email').checked, matriz = document.getElementById('pr-matriz').checked;
+  const porte = document.getElementById('pr-porte').value;
   _prFiltered = _prRows.filter(r => (!city || r.municipio === city) && (!bairro || r.bairro.toLowerCase().includes(bairro))
+    && (!porte || r.porte === porte || (porte === 'Não informado' && !r.porte))
     && (!phone || r.telefone1 || r.telefone2) && (!mobile || prosIsMobile(r.telefone1) || prosIsMobile(r.telefone2))
     && (!email || r.email) && (!matriz || r.tipo === 'Matriz'));
   renderProsResult();
@@ -8456,7 +8465,7 @@ function renderProsResult() {
         const tels = [r.telefone1, r.telefone2].filter(Boolean).map(t => `${escapeHtml(t)}${prosIsMobile(t) ? ' <span class="chat-tag" style="background:var(--green-dim);color:var(--green);">celular</span>' : ''}`).join('<br>');
         return `<div class="pr-row ${_prSelected.has(r.cnpj) ? 'selected' : ''}">
           <input type="checkbox" ${_prSelected.has(r.cnpj) ? 'checked' : ''} onchange="prosToggle('${cnpj}', this.checked)" aria-label="Selecionar">
-          <div style="min-width:0;"><div class="ct-strong">${escapeHtml(r.fantasia || r.razao)}</div><div class="ct-sub">${escapeHtml(r.fantasia ? r.razao : '')} · ${prosFmtCnpj(r.cnpj)} · ${escapeHtml(r.tipo)}${r.abertura ? ' desde ' + escapeHtml(r.abertura) : ''}</div>
+          <div style="min-width:0;"><div class="ct-strong">${escapeHtml(r.fantasia || r.razao)}</div><div class="ct-sub">${escapeHtml(r.fantasia ? r.razao : '')} · ${prosFmtCnpj(r.cnpj)} · ${escapeHtml(r.tipo)}${r.abertura ? ' desde ' + escapeHtml(r.abertura) : ''}${r.porte ? ' · ' + escapeHtml(r.porte === 'Demais' ? 'Médio/grande porte' : r.porte) : ''}</div>
             ${r.socios ? `<div class="ct-sub" title="${escapeHtml(r.socios)}">Sócios: ${escapeHtml(limitText(r.socios, 120))}</div>` : ''}</div>
           <div class="ct-cell" style="white-space:normal;">${tels || '—'}</div>
           <div class="ct-sub" style="white-space:normal;">${escapeHtml(r.email || '—')}</div>
@@ -8476,7 +8485,7 @@ function prosExport() {
   const rows = prosSelectedRows().length ? prosSelectedRows() : _prFiltered;
   if (!rows.length) return showToast('Nada para exportar.', 'warning');
   const esc = v => '"' + String(v || '').replace(/"/g, '""') + '"';
-  const csv = PR_COLS.join(';') + '\n' + rows.map(r => PR_COLS.map(c => esc(c === 'cnpj' ? prosFmtCnpj(r.cnpj) : r[c])).join(';')).join('\n');
+  const csv = PR_COLS.join(';') + '\n' + rows.map(r => PR_COLS.map(c => esc(c === 'cnpj' ? prosFmtCnpj(r.cnpj) : c === 'porte' && r.porte === 'Demais' ? 'Médio/grande porte' : r[c])).join(';')).join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
   a.download = 'prospeccao.csv';
