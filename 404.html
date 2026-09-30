@@ -1478,6 +1478,20 @@ td { font-family: var(--font); font-size: 13px; }
 .auto-box .field-input { padding: 6px 8px; }
 .auto-steps-summary { margin: 4px 0 8px 18px; font-size: 12.5px; color: var(--text); display: flex; flex-direction: column; gap: 3px; }
 
+/* Prospecção */
+.pr-filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.pr-filters label { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 160px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+.pr-checks { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 10px 14px; margin-bottom: 14px; }
+.pr-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.pr-row { display: grid; grid-template-columns: 28px minmax(220px, 2.4fr) 1.1fr 1.3fr 1.2fr; gap: 12px; align-items: start; padding: 11px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.pr-row:last-child { border-bottom: none; }
+.pr-row.selected { background: var(--accent-glow2); }
+.pr-row input[type=checkbox] { margin-top: 3px; }
+@media (max-width: 900px) {
+  .pr-row { grid-template-columns: 28px 1fr; }
+  .pr-row > :nth-child(n+3) { grid-column: 2; }
+}
+
 /* Automações: editor visual */
 #automacoes-view.editing { padding: 12px 16px; }
 .flow-editor { display: flex; flex-direction: column; height: calc(100vh - 24px); background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
@@ -2075,6 +2089,7 @@ td { font-family: var(--font); font-size: 13px; }
     <button type="button" class="mnav-sheet-item"  onclick="closeMobileMore(); switchView('report'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18M7 15l4-4 3 3 5-6"/></svg><span>Dashboard</span></button>
     <button type="button" class="mnav-sheet-item" data-admin="1" onclick="closeMobileMore(); switchView('clientes'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16M9 7h2M13 7h2M9 11h2M13 11h2"/></svg><span>Clientes</span></button>
     <button type="button" class="mnav-sheet-item"  onclick="closeMobileMore(); switchView('automacoes'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM19 17a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM5 7v4a4 4 0 0 0 4 4h6a4 4 0 0 1 4 4M19 3v6M16 6h6"/></svg><span>Automações</span></button>
+    <button type="button" class="mnav-sheet-item"  onclick="closeMobileMore(); switchView('prospeccao'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M8 11h6M11 8v6"/></svg><span>Prospecção</span></button>
     <button type="button" class="mnav-sheet-item"  onclick="closeMobileMore(); switchView('cadencia'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM16 2v4M8 2v4M3 10h18"/></svg><span>Cadência</span></button>
     <button type="button" class="mnav-sheet-item"  onclick="closeMobileMore(); switchView('whatsapp'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4"/></svg><span>Conexões</span></button>
     <button type="button" class="mnav-sheet-item" data-admin="1" onclick="closeMobileMore(); switchView('integracoes'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg><span>Integrações</span></button>
@@ -2156,6 +2171,10 @@ td { font-family: var(--font); font-size: 13px; }
         <div class="nav-item" id="nav-automacoes" onclick="switchView('automacoes')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM19 17a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM5 7v4a4 4 0 0 0 4 4h6a4 4 0 0 1 4 4M19 3v6M16 6h6"/></svg>
           Automações
+        </div>
+        <div class="nav-item" id="nav-prospeccao" onclick="switchView('prospeccao')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M8 11h6M11 8v6"/></svg>
+          Prospecção
         </div>
       </div>
       <div class="nav-group">
@@ -2999,6 +3018,9 @@ td { font-family: var(--font); font-size: 13px; }
 
     <!-- Automações View -->
     <div id="automacoes-view" class="huv-view" style="display:none;"><div id="automacoes-body"></div></div>
+
+    <!-- Prospecção View -->
+    <div id="prospeccao-view" class="huv-view" style="display:none;"><div id="prospeccao-body"></div></div>
 
     <!-- Clientes View (admin) -->
     <div id="clientes-view" class="huv-view" style="display:none;">
@@ -4741,12 +4763,12 @@ window.abrirContatos = function abrirContatos() {
     if(topbar) topbar.style.display = 'none';
     const contentEl = document.querySelector('.content');
     if(contentEl) contentEl.style.display = 'none';
-    ['crm-view','conta-view','whatsapp-view','campanhas-view','chat-view','cadencia-view','integracoes-view','clientes-view','automacoes-view'].forEach(id => {
+    ['crm-view','conta-view','whatsapp-view','campanhas-view','chat-view','cadencia-view','integracoes-view','clientes-view','automacoes-view','prospeccao-view'].forEach(id => {
       const el = document.getElementById(id); if(el) el.style.display = 'none';
     });
     const v = document.getElementById('contatos-view');
     if(v) { v.style.cssText += ';display:block!important;visibility:visible!important;opacity:1!important;'; }
-    ['report','clientes','automacoes','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','contatos','integracoes'].forEach(n => {
+    ['report','clientes','automacoes','prospeccao','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','contatos','integracoes'].forEach(n => {
       const el = document.getElementById('nav-'+n);
       if(el) el.classList.toggle('active', n==='contatos');
     });
@@ -5954,7 +5976,7 @@ function renderAtendimento() {
 }
 
 function switchView(view) {
-  ['report','clientes','automacoes','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','contatos','integracoes'].forEach(v => {
+  ['report','clientes','automacoes','prospeccao','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','contatos','integracoes'].forEach(v => {
     const el = document.getElementById('nav-' + v);
     if (el) el.classList.toggle('active', v === view);
   });
@@ -5975,6 +5997,9 @@ function switchView(view) {
   const automacoesView = document.getElementById('automacoes-view');
   if (automacoesView) automacoesView.style.display = view === 'automacoes' ? 'block' : 'none';
   if (view === 'automacoes') renderAutomacoesView();
+  const prospeccaoView = document.getElementById('prospeccao-view');
+  if (prospeccaoView) prospeccaoView.style.display = view === 'prospeccao' ? 'block' : 'none';
+  if (view === 'prospeccao') renderProspeccaoView();
   const clientesView = document.getElementById('clientes-view');
   if (clientesView) clientesView.style.display = view === 'clientes' ? 'block' : 'none';
   if (view === 'clientes') renderClientesView();
@@ -8160,6 +8185,251 @@ function flowIcon(key, color) {
 }
 
 function flowUid() { return 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+// ===== PROSPECÇÃO: empresas ativas da Receita por CNAE + estado/cidade =====
+// O índice diz em qual arquivo/posição está cada UF+CNAE; o servidor devolve só aquele pedaço (CSV compactado)
+// e o navegador descompacta e filtra.
+let _prIndex = null;
+let _prRows = [];
+let _prFiltered = [];
+let _prSelected = new Set();
+let _prShown = 200;
+let _prLoadingKey = '';
+const PR_UFS = ['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'];
+const PR_COLS = ['cnpj','razao','fantasia','tipo','abertura','cnae_secundarios','endereco','bairro','cep','municipio','uf','telefone1','telefone2','email','porte','socios'];
+
+async function prosFetch(path, body) {
+  const token = await window._fb.getIdToken();
+  const res = await fetch('https://huven-crm-admin.gabrieloliveira7043.workers.dev' + path, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify(body || {})
+  });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || ('Erro ' + res.status)); }
+  return res;
+}
+
+async function renderProspeccaoView() {
+  const box = document.getElementById('prospeccao-body');
+  if (!box) return;
+  if (!_prIndex) {
+    box.innerHTML = '<div class="integ-muted">Carregando a base de empresas...</div>';
+    try { _prIndex = await (await prosFetch('/prospect/index')).json(); }
+    catch (e) {
+      box.innerHTML = `<div class="huv-page-title" style="color:var(--text);margin-bottom:10px;">Prospecção</div><div class="integ-empty">${escapeHtml(e.message)}${/publicada/.test(e.message) ? '<br>A base da Receita está sendo preparada e ainda precisa ser enviada ao armazenamento.' : ''}</div>`;
+      return;
+    }
+  }
+  const idx = _prIndex;
+  const mes = idx.mes ? idx.mes.split('-').reverse().join('/') : '';
+  box.innerHTML = `
+    <div class="huv-header" style="margin-bottom:14px;">
+      <div style="flex:1;min-width:220px;">
+        <div class="huv-crumb">Vendas</div>
+        <div class="huv-page-title" style="color:var(--text);">Prospecção</div>
+        <div class="integ-muted" style="margin-top:4px;">${Number(idx.total || 0).toLocaleString('pt-BR')} empresas ativas da Receita Federal (base de ${escapeHtml(mes)}). Busque por atividade (CNAE) e região.</div>
+      </div>
+    </div>
+    <div class="pr-filters">
+      <label>Estado<select class="field-input" id="pr-uf" onchange="prosUfChange()"><option value="">Escolha</option>${PR_UFS.map(u => `<option value="${u}">${u}</option>`).join('')}</select></label>
+      <label style="flex:2;min-width:260px;">Atividade (CNAE)<input class="field-input" id="pr-cnae" list="pr-cnae-list" placeholder="Digite: odontologia, academia, 8630504..." autocomplete="off"><datalist id="pr-cnae-list"></datalist></label>
+      <label>Cidade<select class="field-input" id="pr-city"><option value="">Todas do estado</option></select></label>
+      <label>Bairro<input class="field-input" id="pr-bairro" placeholder="Opcional"></label>
+    </div>
+    <div class="pr-checks">
+      <label class="integ-toggle"><input type="checkbox" id="pr-phone" checked> Só com telefone</label>
+      <label class="integ-toggle"><input type="checkbox" id="pr-mobile"> Só celular (possível WhatsApp)</label>
+      <label class="integ-toggle"><input type="checkbox" id="pr-email"> Só com e-mail</label>
+      <label class="integ-toggle"><input type="checkbox" id="pr-matriz"> Só matriz</label>
+      <button class="btn-add-lead" style="height:40px;padding:0 18px;margin-left:auto;" onclick="prosSearch()">Buscar empresas</button>
+    </div>
+    <div id="pr-result"></div>`;
+}
+
+function prosUfChange() {
+  const uf = document.getElementById('pr-uf').value;
+  const idx = _prIndex;
+  const present = (idx.porEstado || {})[uf] || {};
+  document.getElementById('pr-cnae-list').innerHTML = Object.entries(present)
+    .sort((a, b) => b[1].n - a[1].n)
+    .map(([code, info]) => `<option value="${code} - ${escapeHtml(idx.cnaes[code] || '')}">${info.n.toLocaleString('pt-BR')} empresas</option>`).join('');
+  document.getElementById('pr-city').innerHTML = '<option value="">Todas do estado</option>' + ((idx.municipios || {})[uf] || []).map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+}
+
+// Aceita "8630504 - Atividade..." ou um pedaço do nome da atividade.
+function prosResolveCnae(uf, text) {
+  const present = (_prIndex.porEstado || {})[uf] || {};
+  const code = String(text || '').replace(/\D/g, '').slice(0, 7);
+  if (code.length === 7 && present[code]) return [code];
+  const term = String(text || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  if (!term) return [];
+  return Object.keys(present).filter(c => String(_prIndex.cnaes[c] || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(term)).slice(0, 8);
+}
+
+function prosParseCsv(text) {
+  const out = [];
+  const lines = text.split('\n');
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line) continue;
+    const f = [];
+    let cur = '', q = false;
+    for (let j = 0; j < line.length; j++) {
+      const ch = line[j];
+      if (q) { if (ch === '"' && line[j + 1] === '"') { cur += '"'; j++; } else if (ch === '"') q = false; else cur += ch; }
+      else if (ch === '"') q = true;
+      else if (ch === ';') { f.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    f.push(cur);
+    const o = {};
+    PR_COLS.forEach((c, k) => { o[c] = f[k] || ''; });
+    out.push(o);
+  }
+  return out;
+}
+
+const prosIsMobile = t => /^\(\d{2}\) 9\d{8}$/.test(String(t || '')) || /^\(\d{2}\) [6-9]\d{7}$/.test(String(t || ''));
+
+async function prosSearch() {
+  const uf = document.getElementById('pr-uf').value;
+  const result = document.getElementById('pr-result');
+  if (!uf) return showToast('Escolha o estado.', 'warning');
+  const codes = prosResolveCnae(uf, document.getElementById('pr-cnae').value);
+  if (!codes.length) return showToast('Escolha a atividade (CNAE) na lista.', 'warning');
+  const key = uf + ':' + codes.join(',');
+  _prLoadingKey = key;
+  result.innerHTML = `<div class="integ-muted">Buscando ${codes.length > 1 ? codes.length + ' atividades' : 'empresas'}...</div>`;
+  try {
+    const rows = [];
+    for (const code of codes) {
+      const info = _prIndex.porEstado[uf][code];
+      const res = await prosFetch('/prospect/chunk', { part: info.p, offset: info.o, length: info.l });
+      const text = await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).text();
+      prosParseCsv(text).forEach(r => { r.cnae = code; rows.push(r); });
+    }
+    if (_prLoadingKey !== key) return;
+    _prRows = rows;
+    _prSelected = new Set();
+    _prShown = 200;
+    prosApplyFilters();
+  } catch (e) {
+    result.innerHTML = `<div class="integ-error">Erro: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function prosApplyFilters() {
+  const city = document.getElementById('pr-city').value;
+  const bairro = (document.getElementById('pr-bairro').value || '').trim().toLowerCase();
+  const phone = document.getElementById('pr-phone').checked, mobile = document.getElementById('pr-mobile').checked;
+  const email = document.getElementById('pr-email').checked, matriz = document.getElementById('pr-matriz').checked;
+  _prFiltered = _prRows.filter(r => (!city || r.municipio === city) && (!bairro || r.bairro.toLowerCase().includes(bairro))
+    && (!phone || r.telefone1 || r.telefone2) && (!mobile || prosIsMobile(r.telefone1) || prosIsMobile(r.telefone2))
+    && (!email || r.email) && (!matriz || r.tipo === 'Matriz'));
+  renderProsResult();
+}
+
+function prosToggle(cnpj, on) { if (on) _prSelected.add(cnpj); else _prSelected.delete(cnpj); renderProsResult(); }
+function prosToggleAll(on) { _prFiltered.forEach(r => on ? _prSelected.add(r.cnpj) : _prSelected.delete(r.cnpj)); renderProsResult(); }
+
+function prosFmtCnpj(c) { return String(c).replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5'); }
+
+function renderProsResult() {
+  const box = document.getElementById('pr-result');
+  if (!box) return;
+  const list = _prFiltered;
+  const allSel = list.length && list.every(r => _prSelected.has(r.cnpj));
+  const act = flowAct();
+  box.innerHTML = `
+    <div class="pr-bar">
+      <label class="integ-toggle"><input type="checkbox" ${allSel ? 'checked' : ''} onchange="prosToggleAll(this.checked)"> Selecionar todas</label>
+      <span class="integ-muted">${list.length.toLocaleString('pt-BR')} empresas${_prRows.length !== list.length ? ` (de ${_prRows.length.toLocaleString('pt-BR')} na atividade)` : ''} · ${_prSelected.size} selecionada(s)</span>
+      <span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="huv-btn" onclick="prosApplyFilters()">Aplicar filtros</button>
+        <button class="huv-btn" onclick="prosExport()">Exportar CSV</button>
+        <button class="huv-btn primary" onclick="prosToFunnel()" ${act ? '' : 'disabled title="Escolha o cliente no topo do menu"'}>Enviar para o funil</button>
+      </span>
+    </div>
+    <div class="ct-table">
+      ${list.slice(0, _prShown).map(r => {
+        const cnpj = escapeJsString(r.cnpj);
+        const tels = [r.telefone1, r.telefone2].filter(Boolean).map(t => `${escapeHtml(t)}${prosIsMobile(t) ? ' <span class="chat-tag" style="background:var(--green-dim);color:var(--green);">celular</span>' : ''}`).join('<br>');
+        return `<div class="pr-row ${_prSelected.has(r.cnpj) ? 'selected' : ''}">
+          <input type="checkbox" ${_prSelected.has(r.cnpj) ? 'checked' : ''} onchange="prosToggle('${cnpj}', this.checked)" aria-label="Selecionar">
+          <div style="min-width:0;"><div class="ct-strong">${escapeHtml(r.fantasia || r.razao)}</div><div class="ct-sub">${escapeHtml(r.fantasia ? r.razao : '')} · ${prosFmtCnpj(r.cnpj)} · ${escapeHtml(r.tipo)}${r.abertura ? ' desde ' + escapeHtml(r.abertura) : ''}</div>
+            ${r.socios ? `<div class="ct-sub" title="${escapeHtml(r.socios)}">Sócios: ${escapeHtml(limitText(r.socios, 120))}</div>` : ''}</div>
+          <div class="ct-cell" style="white-space:normal;">${tels || '—'}</div>
+          <div class="ct-sub" style="white-space:normal;">${escapeHtml(r.email || '—')}</div>
+          <div class="ct-sub" style="white-space:normal;">${escapeHtml(r.bairro)}${r.bairro ? ' · ' : ''}${escapeHtml(r.municipio)}/${escapeHtml(r.uf)}</div>
+        </div>`;
+      }).join('') || '<div class="integ-empty">Nenhuma empresa com esses filtros.</div>'}
+    </div>
+    ${list.length > _prShown ? `<div style="text-align:center;padding:12px;"><button class="chat-pill" onclick="_prShown += 300; renderProsResult()">Mostrar mais (${(list.length - _prShown).toLocaleString('pt-BR')})</button></div>` : ''}`;
+}
+
+function prosSelectedRows() {
+  const sel = _prFiltered.filter(r => _prSelected.has(r.cnpj));
+  return sel.length ? sel : [];
+}
+
+function prosExport() {
+  const rows = prosSelectedRows().length ? prosSelectedRows() : _prFiltered;
+  if (!rows.length) return showToast('Nada para exportar.', 'warning');
+  const esc = v => '"' + String(v || '').replace(/"/g, '""') + '"';
+  const csv = PR_COLS.join(';') + '\n' + rows.map(r => PR_COLS.map(c => esc(c === 'cnpj' ? prosFmtCnpj(r.cnpj) : r[c])).join(';')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'prospeccao.csv';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function prosToFunnel() {
+  const act = flowAct();
+  const rows = prosSelectedRows();
+  if (!act) return showToast('Escolha o cliente no topo do menu.', 'warning');
+  if (!rows.length) return showToast('Selecione as empresas.', 'warning');
+  if (rows.length > 500) return showToast('Envie no máximo 500 por vez.', 'warning');
+  const stages = getStages(act) || [];
+  openHuvenModal(`Enviar ${rows.length} empresa(s) para o funil de ${getClientDisplayName(act) || act}`, `
+    <label class="field-label">Coluna</label>
+    <select class="field-input" id="pr-stage" style="margin-bottom:12px;">${stages.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.label)}</option>`).join('')}</select>
+    <label class="field-label">Origem no card</label>
+    <input class="field-input" id="pr-origem" value="Prospecção - ${escapeHtml(limitText(_prIndex.cnaes[rows[0].cnae] || 'Receita', 60))}" style="margin-bottom:12px;">
+    <div class="integ-muted" style="margin-bottom:12px;">Os cards entram sem a 1ª mensagem automática. Se a coluna tiver uma automação, ela começa para esses leads.</div>
+    <button class="btn-save" style="width:auto;padding:9px 16px;" onclick="prosSaveFunnel()">Enviar</button> <span id="pr-fb" class="integ-muted"></span>`);
+}
+
+async function prosSaveFunnel() {
+  const act = flowAct();
+  const rows = prosSelectedRows();
+  const stage = document.getElementById('pr-stage').value;
+  const origem = document.getElementById('pr-origem').value.trim() || 'Prospecção';
+  const stageLabel = autoStageLabel(act, stage);
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const existing = new Set((_leadsCache || []).filter(l => leadMatchesClient(l, act)).map(l => chatPhoneKey(l.phone)).filter(Boolean));
+  const leads = [];
+  rows.forEach((r, i) => {
+    const tel = (prosIsMobile(r.telefone1) ? r.telefone1 : prosIsMobile(r.telefone2) ? r.telefone2 : (r.telefone1 || r.telefone2)).replace(/\D/g, '');
+    if (tel && existing.has(chatPhoneKey(tel))) return;
+    leads.push({
+      id: now.getTime() + '_' + i, name: r.fantasia || r.razao, phone: tel, email: r.email || '',
+      stage, act, origem, redeSocial: 'Prospecção', source: 'prospeccao', importado: true,
+      obs: [`Razão social: ${r.razao}`, `CNPJ: ${prosFmtCnpj(r.cnpj)}`, r.socios ? `Sócios: ${r.socios}` : '', `Endereço: ${[r.endereco, r.bairro, r.municipio + '/' + r.uf].filter(Boolean).join(', ')}`, r.telefone2 && r.telefone2 !== r.telefone1 ? `Outro telefone: ${r.telefone2}` : ''].filter(Boolean).join('\n'),
+      history: [{ stage: stageLabel, at: now.toLocaleString('pt-BR') }],
+      stageChangedAt: nowIso, createdAt: nowIso, updatedAt: nowIso
+    });
+  });
+  const fb = document.getElementById('pr-fb');
+  if (!leads.length) { fb.textContent = 'Todas já estão no funil deste cliente.'; return; }
+  fb.textContent = 'Enviando...';
+  try {
+    await window._fb.saveLeadsBatch(leads);
+    closeHuvenModal();
+    showToast(`${leads.length} empresa(s) no funil${rows.length - leads.length ? ` · ${rows.length - leads.length} já estavam lá` : ''}.`, 'success', 5000);
+    _prSelected = new Set();
+    renderProsResult();
+  } catch (e) { fb.textContent = 'Erro: ' + e.message; }
+}
 
 // ----- Lista de automações -----
 async function renderAutomacoesView() {
@@ -11412,7 +11682,7 @@ function closeMobileMore() {
 }
 
 function setMobileNav(view) {
-  ['report','clientes','automacoes','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','integracoes','cfg','contatos','mais'].forEach(v => {
+  ['report','clientes','automacoes','prospeccao','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','integracoes','cfg','contatos','mais'].forEach(v => {
     const el = document.getElementById('mnav-' + v);
     if (el) el.classList.toggle('active', v === view);
   });
@@ -12121,7 +12391,7 @@ function getCurrentCrmActForSheets() {
 
 function openIntegrationsFromNav() {
   switchView('crm');
-  ['report','clientes','automacoes','crm','ajuda','conta','contatos','integracoes'].forEach(v => {
+  ['report','clientes','automacoes','prospeccao','crm','ajuda','conta','contatos','integracoes'].forEach(v => {
     const el = document.getElementById('nav-' + v);
     if (el) el.classList.toggle('active', v === 'integracoes');
   });
