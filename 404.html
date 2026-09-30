@@ -1524,6 +1524,35 @@ td { font-family: var(--font); font-size: 13px; }
 .auto-box .field-input { padding: 6px 8px; }
 .auto-steps-summary { margin: 4px 0 8px 18px; font-size: 12.5px; color: var(--text); display: flex; flex-direction: column; gap: 3px; }
 
+/* Relatório em PDF (sempre claro, independente do tema) */
+.rp { font-family: 'Manrope', sans-serif; color: #1B1C20; font-size: 12px; line-height: 1.45; }
+.rp-cover { background: #111215; color: #fff; border-radius: 14px; padding: 26px 28px 24px; margin-bottom: 16px; position: relative; overflow: hidden; }
+.rp-cover::after { content: ''; position: absolute; right: -60px; top: -60px; width: 220px; height: 220px; border-radius: 50%; background: radial-gradient(circle, rgba(201,162,74,.35), rgba(201,162,74,0) 70%); }
+.rp-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.rp-logo { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 600; color: #fff; }
+.rp-tag { font-size: 9.5px; font-weight: 800; letter-spacing: 1.3px; text-transform: uppercase; color: #C9A24A; border: 1px solid #3A3526; border-radius: 6px; padding: 3px 7px; }
+.rp-client { font-family: 'Fraunces', serif; font-size: 30px; font-weight: 600; line-height: 1.1; }
+.rp-period { font-size: 11.5px; color: #B9B6AE; margin-top: 8px; }
+.rp-insight { background: #FBF6EA; border: 1px solid #EBDDBA; border-radius: 12px; padding: 12px 14px; font-size: 12.5px; color: #3A3526; margin-bottom: 6px; }
+.rp-h { font-family: 'Fraunces', serif; font-size: 17px; font-weight: 600; color: #111215; margin: 18px 0 9px; }
+.rp-h.small { font-size: 14px; margin-top: 14px; }
+.rp-note { font-size: 11px; color: #6F6D67; margin: -4px 0 10px; }
+.rp-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.rp-kpi { border: 1px solid #E7E3D9; border-radius: 11px; padding: 10px 12px; background: #fff; }
+.rp-kpi .l { font-size: 10px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: #8C8A84; }
+.rp-kpi .v { font-size: 19px; font-weight: 800; color: #111215; margin-top: 3px; }
+.rp-kpi.hi { border-color: #E3CF9E; background: #FDFAF2; }
+.rp-kpi.hi .v { color: #9C7A28; }
+.rp-chart { border: 1px solid #E7E3D9; border-radius: 12px; padding: 10px; background: #fff; }
+.rp-table { width: 100%; border-collapse: collapse; font-size: 10.5px; table-layout: fixed; }
+.rp-table th { text-align: left; font-size: 9px; letter-spacing: .5px; text-transform: uppercase; color: #8C8A84; font-weight: 800; padding: 7px 8px; background: #F6F3EC; border-bottom: 1px solid #E7E3D9; }
+.rp-table td { padding: 7px 8px; border-bottom: 1px solid #EFECE4; vertical-align: top; }
+.rp-table td.mut { color: #6F6D67; }
+.rp-table th, .rp-table td { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; max-width: none !important; word-break: break-word; }
+.rp-table td:first-child { width: 34%; font-weight: 600; }
+.rp-st { font-size: 9.5px; font-weight: 700; border-radius: 20px; padding: 2px 8px; background: #EFECE4; color: #6F6D67; }
+.rp-st.on { background: #E3F4E8; color: #1C7A3E; }
+
 /* Atendimento (análise) */
 .an-filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 16px; }
 .an-filters label { display: flex; flex-direction: column; gap: 5px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
@@ -2405,9 +2434,9 @@ td { font-family: var(--font); font-size: 13px; }
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
           Atualizar
         </button>
-        <button class="btn-update" onclick="extractTrafficData()" title="Extrair dados de tráfego para Excel">
+        <button class="btn-update" onclick="exportDashboardPdf()" title="Baixar relatório em PDF com números e gráficos">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Extrair
+          Relatório PDF
         </button>
       </div>
     </div>
@@ -3747,6 +3776,21 @@ async function loadData() {
 
     applyDashboardMetricVisibility();
 
+    // Guarda o que está na tela para o relatório em PDF.
+    _dashSnap = {
+      client: activeClient.name, act, account, from, to, statusMap, campaigns: data, ads: [],
+      values: {
+        spend: fmtBRL(totalSpend), reach: fmtNum(totalReach), cpm: fmtBRL(avgCpm), ctr: fmt(avgCtr, 2) + '%', freq: fmt(avgFreq, 2),
+        cpl: totalLeads ? fmtBRL(cpl) : '—', conv: totalConv ? fmtNum(totalConv) : '—', cpconv: totalConv ? fmtBRL(cpConv) : '—', leads: totalLeads ? fmtNum(totalLeads) : '—',
+        impressions: totalImpr ? fmtNum(totalImpr) : '—', clicks: totalClicks ? fmtNum(totalClicks) : '—', linkClicks: totalLinkClicks ? fmtNum(totalLinkClicks) : '—',
+        cpc: totalClicks ? fmtBRL(cpc) : '—', cpcLink: totalLinkClicks ? fmtBRL(cpcLink) : '—', landingViews: totalLandingViews ? fmtNum(totalLandingViews) : '—',
+        costLanding: totalLandingViews ? fmtBRL(costLanding) : '—', engagement: totalEngagement ? fmtNum(totalEngagement) : '—'
+      },
+      raw: { totalSpend, totalLeads, totalConv, cpl, cpConv },
+      visible: [...document.querySelectorAll('[data-dashboard-metric]')].filter(el => el.style.display !== 'none' && !(el.closest('[style*="display: none"]'))).map(el => el.getAttribute('data-dashboard-metric')),
+      hideConv: isTravi, hideLeads: isContabiliza
+    };
+
     document.getElementById('campaigns-body').innerHTML = data.map(d => {
       const spend = parseFloat(d.spend || 0);
       const acts = d.actions || [];
@@ -3774,6 +3818,7 @@ async function loadData() {
     adThumbnailCache = { ...adThumbnailCache, ...adThumbs };
     lastAdsData = lastAdsData.map(row => ({ ...row, thumbnail_url: row.thumbnail_url || adThumbnailCache[row.ad_id] || '' }));
     renderAdsTable(lastAdsData);
+    if (_dashSnap) _dashSnap.ads = lastAdsData;
 
   } catch(e) {
     showLoading(false);
@@ -3782,6 +3827,174 @@ async function loadData() {
   }
 }
 
+
+// ===== RELATÓRIO EM PDF DO DASHBOARD =====
+// Monta uma página A4 fora da tela (visual claro, com gráficos refeitos em alta resolução) e gera o PDF com html2pdf.
+const RP_LABELS = { spend: 'Investimento', reach: 'Alcance', cpm: 'CPM', ctr: 'CTR', freq: 'Frequência', cpl: 'Custo por lead', conv: 'Conversas iniciadas', cpconv: 'Custo por conversa', leads: 'Leads', impressions: 'Impressões', clicks: 'Cliques', linkClicks: 'Cliques no link', cpc: 'CPC', cpcLink: 'CPC no link', landingViews: 'Visitas à página', costLanding: 'Custo por visita', engagement: 'Engajamento' };
+const RP_CONV_TYPES = ['onsite_conversion.messaging_conversation_started_7d', 'onsite_conversion.messaging_first_reply', 'messaging_conversation_started_7d'];
+
+async function ensureHtml2Pdf() {
+  if (window.html2pdf) return window.html2pdf;
+  await new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+    s.onload = resolve; s.onerror = () => reject(new Error('Não consegui carregar o gerador de PDF.'));
+    document.head.appendChild(s);
+  });
+  return window.html2pdf;
+}
+
+function exportDashboardPdf() {
+  if (!activeClient) { showError('Selecione um cliente na barra lateral.'); return; }
+  const from = document.getElementById('date-from').value, to = document.getElementById('date-to').value;
+  const ready = _dashSnap && _dashSnap.act === activeClient.account && _dashSnap.from === from && _dashSnap.to === to;
+  openHuvenModal('Relatório em PDF', `
+    <div class="integ-muted" style="margin-bottom:12px;font-size:12.5px;">${ready ? `Relatório de <b>${escapeHtml(activeClient.name)}</b>, de ${from.split('-').reverse().join('/')} a ${to.split('-').reverse().join('/')}, com os números e gráficos da tela.` : 'Clique em <b>Atualizar</b> no Dashboard com o período desejado e depois gere o relatório.'}</div>
+    ${ready ? `<label class="integ-toggle" style="margin-bottom:8px;"><input type="checkbox" id="rp-att" checked> Incluir análise de atendimento (tempo de resposta no WhatsApp)</label>
+    <label class="integ-toggle" style="margin-bottom:14px;"><input type="checkbox" id="rp-ads" checked> Incluir os melhores anúncios</label>
+    <button class="btn-save" style="width:auto;padding:9px 16px;" onclick="buildDashboardPdf()">Gerar PDF</button> <span id="rp-fb" class="integ-muted"></span>` : ''}
+    <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;"><a href="#" onclick="closeHuvenModal();extractTrafficData();return false;" style="color:var(--muted2);">Prefere planilha? Baixar os dados em Excel</a></div>`, 480);
+}
+
+function rpResults(actions) {
+  return { leads: getActionValue(actions || [], ['lead']), conv: getActionValue(actions || [], RP_CONV_TYPES) };
+}
+
+async function buildDashboardPdf() {
+  const snap = _dashSnap;
+  const fb = document.getElementById('rp-fb');
+  const includeAtt = document.getElementById('rp-att') && document.getElementById('rp-att').checked;
+  const includeAds = document.getElementById('rp-ads') && document.getElementById('rp-ads').checked;
+  const say = t => { if (fb) fb.textContent = t; };
+  let root = null;
+  try {
+    say('Preparando...');
+    const html2pdf = await ensureHtml2Pdf();
+    let att = null;
+    if (includeAtt) {
+      say('Calculando o atendimento...');
+      try { att = await computeAttendance(snap.act, snap.from, snap.to, { biz: false }); } catch (e) { att = null; }
+      if (att && !att.totalLeads && !att.turns) att = null;
+    }
+    say('Montando o relatório...');
+    const d2 = iso => iso.split('-').reverse().join('/');
+    const useLeads = !snap.hideLeads && snap.raw.totalLeads > 0;
+    const useConv = !snap.hideConv && snap.raw.totalConv > 0;
+    const resultLabel = useLeads ? 'Leads' : useConv ? 'Conversas' : 'Resultados';
+    const resultOf = a => { const r = rpResults(a); return useLeads ? r.leads : useConv ? r.conv : 0; };
+    const kpiKeys = snap.visible.filter(k => RP_LABELS[k] && snap.values[k] && snap.values[k] !== '—');
+    const val = k => ['ctr', 'freq'].includes(k) ? String(snap.values[k]).replace('.', ',') : snap.values[k];
+    const camps = snap.campaigns.map(c => {
+      const spend = parseFloat(c.spend || 0), res = resultOf(c.actions);
+      return { name: c.campaign_name || '', active: (snap.statusMap[c.campaign_id] || '').toUpperCase() === 'ACTIVE', spend, res, cost: res ? spend / res : 0, ctr: parseFloat(c.ctr || 0), cpm: parseFloat(c.cpm || 0) };
+    }).sort((a, b) => b.spend - a.spend);
+    const ads = mergeAdInsightRows(snap.ads || []).map(a => {
+      const spend = parseFloat(a.spend || 0), res = resultOf(a.actions);
+      return { name: a.ad_name || 'Anúncio', campaign: a.campaign_name || '', spend, res, cost: res ? spend / res : 0, ctr: a.ctr || 0 };
+    }).filter(a => a.spend > 0).sort((a, b) => (b.res - a.res) || (b.spend - a.spend)).slice(0, 10);
+    const best = camps.filter(c => c.res).sort((a, b) => a.cost - b.cost)[0];
+    const insight = [
+      `Investimento de <b>${snap.values.spend}</b> no período`,
+      useLeads ? `gerou <b>${snap.values.leads} leads</b> a <b>${snap.values.cpl}</b> cada` : useConv ? `gerou <b>${snap.values.conv} conversas</b> a <b>${snap.values.cpconv}</b> cada` : `alcançou <b>${snap.values.reach}</b> pessoas`
+    ].join(', ') + '.' + (best && camps.length > 1 ? ` Campanha mais eficiente: <b>${escapeHtml(best.name)}</b> (${fmtBRL(best.cost)} por ${resultLabel === 'Leads' ? 'lead' : 'conversa'}).` : '');
+    const pct = (a, b) => b ? Math.round(a / b * 100) + '%' : '—';
+    const W = 703;
+    root = document.createElement('div');
+    root.className = 'rp';
+    root.style.cssText = `position:fixed;left:-20000px;top:0;width:${W}px;background:#fff;`;
+    root.innerHTML = `
+      <div class="rp-cover">
+        <div class="rp-brand"><span class="rp-logo">Huven</span><span class="rp-tag">Relatório de resultados</span></div>
+        <div class="rp-client">${escapeHtml(snap.client)}</div>
+        <div class="rp-period">${d2(snap.from)} a ${d2(snap.to)} · gerado em ${new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+      </div>
+      <div class="rp-insight">${insight}</div>
+      <div class="rp-h">Resumo do período</div>
+      <div class="rp-kpis">${kpiKeys.map(k => `<div class="rp-kpi ${['spend', 'leads', 'conv', 'cpl', 'cpconv'].includes(k) ? 'hi' : ''}"><div class="l">${RP_LABELS[k]}</div><div class="v">${val(k)}</div></div>`).join('')}</div>
+      ${dailyData.length ? `<div class="rp-h">Evolução diária</div><div class="rp-chart rp-avoid"><canvas id="rp-ch-daily" width="${W * 2}" height="480"></canvas></div>` : ''}
+      ${camps.length ? `<div class="rp-avoid"><div class="rp-h">Investimento por campanha</div><div class="rp-chart"><canvas id="rp-ch-camps" width="${W * 2}" height="${Math.max(220, Math.min(camps.length, 8) * 64 + 60)}"></canvas></div></div>` : ''}
+      ${camps.length ? `<div class="rp-h">Campanhas</div>
+      <table class="rp-table"><thead><tr><th>Campanha</th><th>Status</th><th>Investimento</th><th>${resultLabel}</th><th>Custo/${resultLabel === 'Leads' ? 'lead' : 'resultado'}</th><th>CTR</th><th>CPM</th></tr></thead><tbody>
+        ${camps.map(c => `<tr class="rp-avoid"><td>${escapeHtml(c.name)}</td><td><span class="rp-st ${c.active ? 'on' : ''}">${c.active ? 'Ativa' : 'Pausada'}</span></td><td>${fmtBRL(c.spend)}</td><td>${c.res || '—'}</td><td>${c.res ? fmtBRL(c.cost) : '—'}</td><td>${c.ctr.toFixed(2).replace('.', ',')}%</td><td>${fmtBRL(c.cpm)}</td></tr>`).join('')}
+      </tbody></table>` : ''}
+      ${includeAds && ads.length ? `<div class="rp-h rp-avoid">Melhores anúncios</div>
+      <table class="rp-table"><thead><tr><th>Anúncio</th><th>Campanha</th><th>Investimento</th><th>${resultLabel}</th><th>Custo/resultado</th><th>CTR</th></tr></thead><tbody>
+        ${ads.map(a => `<tr class="rp-avoid"><td>${escapeHtml(a.name)}</td><td class="mut">${escapeHtml(limitText(a.campaign, 40))}</td><td>${fmtBRL(a.spend)}</td><td>${a.res || '—'}</td><td>${a.res ? fmtBRL(a.cost) : '—'}</td><td>${Number(a.ctr).toFixed(2).replace('.', ',')}%</td></tr>`).join('')}
+      </tbody></table>` : ''}
+      ${att ? `
+      <div class="rp-h" style="margin-top:24px;">Atendimento no WhatsApp</div>
+      <div class="rp-note">Tempo entre o lead chegar e a primeira resposta de uma pessoa da equipe (mensagens automáticas não contam), cruzando o Chat do CRM com os cards do funil.</div>
+      <div class="rp-kpis">
+        <div class="rp-kpi"><div class="l">Leads que chegaram</div><div class="v">${att.totalLeads}</div></div>
+        <div class="rp-kpi hi"><div class="l">Tempo até o 1º contato (mediana)</div><div class="v">${anFmt(att.firstMedian)}</div></div>
+        <div class="rp-kpi"><div class="l">Respondidos em até 5 min</div><div class="v">${pct(att.within5, att.answered)}</div></div>
+        <div class="rp-kpi"><div class="l">Respondidos em até 1 h</div><div class="v">${pct(att.within60, att.answered)}</div></div>
+        <div class="rp-kpi"><div class="l">Sem contato humano</div><div class="v">${att.noContact}</div></div>
+        <div class="rp-kpi"><div class="l">Tempo de resposta nas conversas</div><div class="v">${anFmt(att.turnMedian)}</div></div>
+      </div>
+      <div class="rp-avoid"><div class="rp-h small">Quanto tempo levou o 1º contato</div><div class="rp-chart"><canvas id="rp-ch-att" width="${W * 2}" height="400"></canvas></div></div>
+      ${att.agents.length ? `<div class="rp-h small">Por atendente</div><table class="rp-table"><thead><tr><th>Quem respondeu</th><th>Respostas</th><th>Mensagens enviadas</th><th>Tempo de resposta (mediana)</th></tr></thead><tbody>
+        ${att.agents.map(a => `<tr class="rp-avoid"><td>${escapeHtml(a.who)}</td><td>${a.answered}</td><td>${a.sent}</td><td>${anFmt(a.median)}</td></tr>`).join('')}</tbody></table>` : ''}` : ''}`;
+    document.body.appendChild(root);
+
+    // Gráficos (sem animação) viram imagem para sair nítidos no PDF.
+    const font = { family: 'Manrope, sans-serif', size: 22 };
+    const baseOpts = { responsive: false, animation: false, devicePixelRatio: 1, plugins: { legend: { labels: { font, color: '#3A3A3A', boxWidth: 26 } } }, scales: { x: { grid: { display: false }, ticks: { font, color: '#6F6D67' } }, y: { grid: { color: '#EEEAE0' }, ticks: { font, color: '#6F6D67' }, beginAtZero: true } } };
+    const charts = [];
+    const cDaily = root.querySelector('#rp-ch-daily');
+    if (cDaily) {
+      const res = dailyData.map(x => resultOf(x.actions));
+      charts.push(new Chart(cDaily, { type: 'bar', data: { labels: dailyData.map(x => x.date_start.split('-').reverse().slice(0, 2).join('/')), datasets: [
+        { type: 'bar', label: 'Investimento (R$)', data: dailyData.map(x => parseFloat(x.spend || 0)), backgroundColor: 'rgba(201,162,74,.75)', borderRadius: 6, yAxisID: 'y' },
+        ...(useLeads || useConv ? [{ type: 'line', label: resultLabel, data: res, borderColor: '#111215', backgroundColor: '#111215', borderWidth: 4, pointRadius: 4, tension: .35, yAxisID: 'y1' }] : [])
+      ] }, options: { ...baseOpts, scales: { ...baseOpts.scales, y1: { position: 'right', grid: { display: false }, ticks: { font, color: '#111215', precision: 0 }, beginAtZero: true, display: useLeads || useConv } } } }));
+    }
+    const cCamps = root.querySelector('#rp-ch-camps');
+    if (cCamps) {
+      const top = camps.slice(0, 8);
+      charts.push(new Chart(cCamps, { type: 'bar', data: { labels: top.map(c => limitText(c.name, 38)), datasets: [{ label: 'Investimento (R$)', data: top.map(c => c.spend), backgroundColor: '#C9A24A', borderRadius: 6 }] },
+        options: { ...baseOpts, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { grid: { color: '#EEEAE0' }, ticks: { font, color: '#6F6D67' }, beginAtZero: true }, y: { grid: { display: false }, ticks: { font, color: '#3A3A3A' } } } } }));
+    }
+    const cAtt = root.querySelector('#rp-ch-att');
+    if (cAtt && att) {
+      charts.push(new Chart(cAtt, { type: 'bar', data: { labels: att.buckets.map(b => b.label), datasets: [{ data: att.buckets.map(b => b.n), backgroundColor: ['#1FA855', '#5DBB63', '#C9A24A', '#E08A1E', '#E06A3A', '#D64545'], borderRadius: 6 }] },
+        options: { ...baseOpts, plugins: { legend: { display: false } }, scales: { ...baseOpts.scales, y: { ...baseOpts.scales.y, ticks: { ...baseOpts.scales.y.ticks, precision: 0 } } } } }));
+    }
+    charts.forEach(ch => {
+      const img = document.createElement('img');
+      img.src = ch.canvas.toDataURL('image/png');
+      img.style.width = '100%';
+      ch.canvas.replaceWith(img);
+      ch.destroy();
+    });
+    await document.fonts.ready;
+    // O html2pdf copia o conteúdo para a própria área de captura; fora da tela ele sairia em branco.
+    root.remove();
+    root.style.cssText = `width:${W}px;background:#fff;`;
+    say('Gerando PDF...');
+    const file = `Relatorio_${safeFileName(snap.client)}_${snap.from}_a_${snap.to}.pdf`;
+    await html2pdf().set({
+      margin: [12, 12, 14, 12], filename: file, image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', windowWidth: W },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'], avoid: ['.rp-avoid', '.rp-kpi', 'tr'] }
+    }).from(root).toPdf().get('pdf').then(pdf => {
+      const n = pdf.internal.getNumberOfPages();
+      for (let i = 1; i <= n; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(8); pdf.setTextColor(140);
+        pdf.text(`Huven · ${snap.client} · ${d2(snap.from)} a ${d2(snap.to)}`, 12, 290);
+        pdf.text(`Página ${i} de ${n}`, 198, 290, { align: 'right' });
+      }
+    }).save();
+    closeHuvenModal();
+    showToast('Relatório baixado.', 'success');
+  } catch (e) {
+    say('Erro: ' + (e && e.message ? e.message : e));
+  } finally {
+    if (root) root.remove();
+  }
+}
 
 async function extractTrafficData() {
   if (!activeClient) { showError('Selecione um cliente na barra lateral.'); return; }
@@ -3880,6 +4093,7 @@ let mainChart = null;
 let chartType = 'line';
 let activeMetric = 'spend';
 let dailyData = [];
+let _dashSnap = null; // números do Dashboard na tela, usados no relatório em PDF
 let lastAdsData = [];
 let adThumbnailCache = {};
 const DASHBOARD_METRICS_KEY = 'huven_dashboard_visible_metrics_v1';
