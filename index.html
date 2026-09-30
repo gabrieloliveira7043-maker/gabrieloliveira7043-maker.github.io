@@ -13622,6 +13622,10 @@ function whatsappDownList() {
     const cfg = WHATSAPP_SETTINGS[act];
     if (cfg && (s.line || 'main') === 'main' && cfg.mainRemoved) return false;
     if (cfg && (s.line || 'main') !== 'main' && !(cfg.lines || []).some(l => l.id === s.line)) return false;
+    // Desconectado pelo botão do CRM: foi de propósito, não avisa.
+    if (s.manual) return false;
+    // Se outro WhatsApp do mesmo cliente está conectado, o atendimento segue: não avisa.
+    if (_waStatusList.some(o => o !== s && o.id !== '__server' && o.ok === true && (o.act || String(o.id).split('__')[0]) === act)) return false;
     return true;
   });
 }
