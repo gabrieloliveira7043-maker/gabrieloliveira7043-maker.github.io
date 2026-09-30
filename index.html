@@ -1537,6 +1537,13 @@ td { font-family: var(--font); font-size: 13px; }
 .wa-line-picker-hint { width: 100%; font-size: 11.5px; color: var(--muted2); }
 .chat-line-select { width: auto; padding: 4px 8px; font-size: 12px; border-radius: 14px; height: auto; }
 
+/* Automação por coluna (Funil) */
+.col-auto-btn { background: transparent; border: 1px dashed var(--border2); color: var(--muted2); border-radius: 8px; padding: 1px 6px; font-size: 11px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; max-width: 110px; white-space: nowrap; overflow: hidden; font-family: inherit; flex-shrink: 0; }
+.col-auto-btn span { overflow: hidden; text-overflow: ellipsis; font-weight: 700; }
+.col-auto-btn:hover { border-color: var(--amber); color: var(--amber); }
+.col-auto-btn.on { border-style: solid; border-color: rgba(224,164,58,.6); background: rgba(224,164,58,.14); color: #B7791F; }
+.col-auto-btn.off { border-style: solid; color: var(--muted2); }
+
 /* Pipelines do funil */
 .pl-bar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 0 0 12px; }
 .pl-label { font-size: 11px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
@@ -9491,8 +9498,8 @@ async function renderAutomacoesView() {
         <div class="integ-muted" style="margin-top:4px;">Fluxos que rodam sozinhos quando o lead entra numa coluna do funil: esperar, mandar mensagem, imagem, vídeo ou áudio, conferir se respondeu e mover o card.</div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="huv-btn" style="height:40px;padding:0 16px;" onclick="openAiFlowModal()">✨ Criar com IA</button>
-        <button class="btn-add-lead" style="height:40px;padding:0 16px;" onclick="openFlowEditor(null)">+ Nova automação</button>
+        <button class="huv-btn" style="height:40px;padding:0 16px;" onclick="_aiPreset=null;_flowReturn=null;openAiFlowModal()">✨ Criar com IA</button>
+        <button class="btn-add-lead" style="height:40px;padding:0 16px;" onclick="_flowReturn=null;openFlowEditor(null)">+ Nova automação</button>
       </div>
     </div>
     <div class="huv-grid">
@@ -9563,8 +9570,8 @@ function flowFromSteps(f, act) {
   return { nodes, edges };
 }
 
-function openFlowEditor(id) {
-  const act = flowAct();
+function openFlowEditor(id, opts) {
+  const act = (opts && opts.act) || flowAct();
   if (!act) return showToast('Escolha o cliente no topo do menu.', 'warning');
   const src = id ? _flowList.find(x => x.id === id) : null;
   ensureWaSettings(act);
@@ -9597,12 +9604,14 @@ function openFlowEditor(id) {
 // O cliente descreve (ou anexa um PDF) e a IA da Cloudflare devolve os passos; aqui viram blocos ligados no editor.
 // A automação abre desligada: o cliente confere, anexa os arquivos pedidos e liga.
 let _aiPdfText = '';
+let _aiPreset = null; // { act, stage, label } quando a IA é chamada pelo botão da coluna no Funil
 
 function openAiFlowModal() {
-  const act = flowAct();
+  const act = (_aiPreset && _aiPreset.act) || flowAct();
   if (!act) return showToast('Escolha o cliente no topo do menu.', 'warning');
   _aiPdfText = '';
   openHuvenModal('✨ Criar automação com IA', `
+    ${_aiPreset ? `<div class="chat-tag" style="display:inline-block;background:var(--amber-dim);color:var(--amber);margin-bottom:8px;">Coluna: ${escapeHtml(_aiPreset.label)}</div>` : ''}
     <div class="integ-muted" style="font-size:12.5px;margin-bottom:10px;">Descreva o fluxo do seu jeito, em ordem: quando começa, quanto tempo esperar, o que enviar e o que fazer se o lead responder ou não. A IA monta os blocos no editor para você conferir antes de ligar.</div>
     <textarea class="field-input" id="ai-flow-text" rows="7" maxlength="8000" style="width:100%;box-sizing:border-box;resize:vertical;margin-bottom:10px;" placeholder="Ex.: Quando o lead chegar em Novo lead, espera 5 minutos e manda boas-vindas perguntando qual serviço ele procura. Se não responder em 2 horas, manda de novo. Se depois de 1 dia continuar sem responder, manda o vídeo de depoimento e move para Sem resposta. Se responder, move para Em contato."></textarea>
     <label class="field-label">Ou anexe um PDF ou arquivo de texto com o fluxo (opcional)</label>
@@ -9667,8 +9676,9 @@ function aiFlowToGraph(flow, act) {
 }
 
 async function runAiFlow() {
-  const act = flowAct();
-  const desc = document.getElementById('ai-flow-text').value.trim();
+  const act = (_aiPreset && _aiPreset.act) || flowAct();
+  let desc = document.getElementById('ai-flow-text').value.trim();
+  if (_aiPreset && desc) desc = `O fluxo começa quando o lead entra na coluna "${_aiPreset.label}" (id ${_aiPreset.stage}).\n\n` + desc;
   const fb = document.getElementById('ai-flow-fb');
   const btn = document.getElementById('ai-flow-btn');
   const text = [desc, _aiPdfText ? 'Conteúdo do arquivo anexado:\n' + _aiPdfText.slice(0, 9000) : ''].filter(Boolean).join('\n\n');
@@ -9681,6 +9691,8 @@ async function runAiFlow() {
   btn.disabled = true; fb.style.color = 'var(--muted)'; fb.textContent = 'A IA está montando o fluxo... (uns 10 segundos)';
   try {
     const r = await window._fb.whatsapp('/ai/flow', act, { text, stages });
+    if (_aiPreset) r.flow.triggerStage = _aiPreset.stage;
+    _aiPreset = null;
     const graph = aiFlowToGraph(r.flow, act);
     closeHuvenModal();
     _flow = {
@@ -9703,7 +9715,70 @@ function closeFlowEditor(force) {
   if (!force && _flow && _flow._dirty && !confirm('Sair sem salvar as mudanças?')) return;
   _flow = null; _flowSel = null;
   document.getElementById('automacoes-view').classList.remove('editing');
+  if (_flowReturn === 'crm') { _flowReturn = null; switchView('crm'); return; }
   renderAutomacoesView();
+}
+
+// ===== AUTOMAÇÃO POR COLUNA (direto no Funil) =====
+// Cada coluna do kanban tem um botão ⚡: abre o fluxo que roda quando o lead entra/é arrastado para ela,
+// ou cria um novo (montando ou pela IA) já com o gatilho nessa coluna.
+let _colAutos = {};      // act -> { at, list }
+let _flowReturn = null;  // 'crm' quando o editor foi aberto pelo Funil
+
+function loadColumnAutomations(act) {
+  act = normalizeActValue(act);
+  const c = _colAutos[act];
+  if (!act || (c && Date.now() - c.at < 60000) || (c && c.loading)) return;
+  _colAutos[act] = { ...(c || { list: [] }), loading: true, at: c ? c.at : 0 };
+  window._fb.listAutomations(act).then(list => {
+    _colAutos[act] = { at: Date.now(), list: list || [] };
+    renderKanban();
+  }).catch(() => { _colAutos[act] = { at: Date.now(), list: (c && c.list) || [] }; });
+}
+
+function columnAutomation(act, stageId) {
+  const list = (_colAutos[normalizeActValue(act)] || {}).list || [];
+  return list.find(a => a.triggerStage === stageId && a.active) || list.find(a => a.triggerStage === stageId) || null;
+}
+
+function openColumnAutomation(stageId) {
+  const act = normalizeActValue(getActForStages());
+  if (!act) return showToast('Escolha um cliente para criar a automação da coluna.', 'warning');
+  const stage = getAllStages(act).find(s => s.id === stageId) || { label: stageId };
+  const auto = columnAutomation(act, stageId);
+  if (auto) {
+    _flowList = (_colAutos[act] || {}).list || [];
+    _flowReturn = 'crm';
+    openFlowEditor(auto.id, { act });
+    switchView('automacoes');
+    return;
+  }
+  openHuvenModal('Automação da coluna ' + stage.label, `
+    <div class="integ-muted" style="font-size:12.5px;margin-bottom:14px;">Todo lead que cair ou for arrastado para "${escapeHtml(stage.label)}" segue o fluxo que você montar aqui. Ele fica desligado até você ligar.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn-save" style="width:auto;padding:9px 16px;" onclick="newColumnFlow('${escapeJsString(stageId)}', false)">✨ Criar com IA</button>
+      <button class="huv-btn" onclick="newColumnFlow('${escapeJsString(stageId)}', true)">Montar o fluxo</button>
+    </div>`, 460);
+}
+
+function newColumnFlow(stageId, manual) {
+  const act = normalizeActValue(getActForStages());
+  const stage = getAllStages(act).find(s => s.id === stageId) || { label: stageId };
+  closeHuvenModal();
+  _flowReturn = 'crm';
+  if (manual) {
+    _flowList = (_colAutos[act] || {}).list || [];
+    openFlowEditor(null, { act });
+    const trig = _flow.nodes.find(n => n.type === 'trigger');
+    if (trig) trig.data.stage = stageId;
+    _flow.name = 'Fluxo · ' + stage.label;
+    _flow.active = false;
+    switchView('automacoes');
+  } else {
+    _aiPreset = { act, stage: stageId, label: stage.label };
+    switchView('automacoes');
+    openAiFlowModal();
+  }
 }
 
 function renderFlowEditor() {
@@ -10054,6 +10129,7 @@ async function saveFlow() {
     const id = await window._fb.saveAutomation(f.id || null, data);
     f.id = id; f._dirty = false;
     _flowList = await window._fb.listAutomations(act);
+    _colAutos[normalizeActValue(act)] = { at: Date.now(), list: _flowList };
     fb.style.color = 'var(--green)'; fb.textContent = 'Salvo ✓';
     showToast('Automação salva. Vale para os leads que entrarem na coluna a partir de agora.', 'success', 5000);
   } catch (e) { fail('Erro: ' + e.message); }
@@ -12616,6 +12692,7 @@ function renderKanban() {
     leads = leads.filter(l => leadPipeline(l) === boardPipe);
   }
   renderPipelineBar(filterAct);
+  if (filterAct) loadColumnAutomations(filterAct);
   leads = sortCrmLeadsForKanban(leads, filterAct);
 
   let STAGES = getStages(filterAct || (activeClient ? activeClient.account : ''), boardPipe);
@@ -12697,6 +12774,15 @@ function renderKanban() {
     }
     headerLeft.appendChild(titleDiv);
     headerLeft.appendChild(editBtn);
+    if (filterAct) {
+      const colAuto = columnAutomation(filterAct, stage.id);
+      const autoBtn = document.createElement('button');
+      autoBtn.className = 'col-auto-btn' + (colAuto ? (colAuto.active ? ' on' : ' off') : '');
+      autoBtn.title = colAuto ? `Automação desta coluna: ${colAuto.name || 'sem nome'} (${colAuto.active ? 'ligada' : 'desligada'}). Clique para editar.` : 'Criar automação para esta coluna';
+      autoBtn.innerHTML = '⚡' + (colAuto ? `<span>${escapeHtml(limitText(colAuto.name || 'Fluxo', 12))}</span>` : '');
+      autoBtn.addEventListener('click', e => { e.stopPropagation(); openColumnAutomation(stage.id); });
+      headerLeft.appendChild(autoBtn);
+    }
     if (col._totalSpan) headerLeft.appendChild(col._totalSpan);
     header.appendChild(headerLeft);
     header.appendChild(countSpan);
