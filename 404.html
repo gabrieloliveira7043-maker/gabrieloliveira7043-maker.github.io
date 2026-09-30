@@ -7046,6 +7046,18 @@ function onCampaignStartModeChange() {
 }
 
 // Reaproveita uma campanha: abre o editor com as mesmas mensagens, arquivo, regras e contatos.
+function aiCampaignCopy() {
+  if (!_campaignDraft) return;
+  openAiCopyModal({
+    act: _campaignDraft.act, kind: 'campaign', count: 4, title: '✨ Mensagens da campanha com IA',
+    hint: 'A IA escreve 4 variações diferentes da mesma mensagem (cada contato recebe uma sorteada, o que ajuda contra bloqueio).',
+    onResult: (texts, tip) => {
+      for (let i = 0; i < WHATSAPP_MAX_VARIATIONS; i++) { const el = document.getElementById('camp-var-' + i); if (el) el.value = texts[i] || ''; }
+      showToast('Mensagens escritas pela IA. Revise antes de enviar.' + (tip ? ' Dica: ' + tip : ''), 'success', 9000);
+    }
+  });
+}
+
 // Editar campanha em andamento, pausada ou rascunho: nome, mensagens, arquivo, WhatsApp e ritmo de envio.
 // Os contatos não mudam (quem já recebeu não recebe de novo). Vale a partir do próximo envio.
 function editCampaign(id) {
@@ -7127,6 +7139,7 @@ function openCampaignEditor(copyFrom, opts = {}) {
       <div id="camp-media-status" style="${hint}"></div>
     </div>
     <div id="camp-text-hint" style="${hint}">Cadastre variações: cada contato recebe uma sorteada. Use {primeiro_nome} e {nome}; se o contato não tiver nome, o marcador some.</div>
+    <button class="huv-btn" style="margin-bottom:8px;" onclick="aiCampaignCopy()">✨ Gerar mensagens com IA</button>
     ${whatsappVariationsHtml('camp', copyFrom && Array.isArray(copyFrom.templates) ? copyFrom.templates : [])}
 
     <div id="camp-audience-wrap">
@@ -9612,18 +9625,90 @@ function openFlowEditor(id, opts) {
 // A automação abre desligada: o cliente confere, anexa os arquivos pedidos e liga.
 let _aiPdfText = '';
 let _aiPreset = null; // { act, stage, label } quando a IA é chamada pelo botão da coluna no Funil
+let _aiFlowMode = 'plan';
+
+function setAiFlowMode(mode) {
+  _aiFlowMode = mode;
+  document.getElementById('ai-mode-plan').classList.toggle('active', mode === 'plan');
+  document.getElementById('ai-mode-describe').classList.toggle('active', mode === 'describe');
+  document.getElementById('ai-plan-box').style.display = mode === 'plan' ? 'block' : 'none';
+  document.getElementById('ai-describe-box').style.display = mode === 'describe' ? 'block' : 'none';
+}
+
+// ----- Briefing de copy (objetivo, público, oferta, tom): o último usado fica lembrado por cliente -----
+const AI_TONES = ['Acolhedor e próximo', 'Consultivo', 'Direto e objetivo', 'Descontraído', 'Formal'];
+function aiLastBrief(act) {
+  try { return JSON.parse(localStorage.getItem('huven_ai_brief_' + normalizeActValue(act)) || '{}'); } catch (e) { return {}; }
+}
+function aiBriefFieldsHtml(prefix, act) {
+  const b = aiLastBrief(act);
+  return `
+    <label class="field-label">Objetivo</label>
+    <input class="field-input" id="${prefix}-objetivo" maxlength="300" value="${escapeHtml(b.objetivo || '')}" placeholder="Ex.: agendar uma avaliação gratuita" style="margin-bottom:8px;">
+    <label class="field-label">Para quem (público)</label>
+    <input class="field-input" id="${prefix}-publico" maxlength="200" value="${escapeHtml(b.publico || '')}" placeholder="Ex.: quem pediu orçamento de implante pelo Instagram" style="margin-bottom:8px;">
+    <label class="field-label">Oferta ou diferencial (opcional)</label>
+    <input class="field-input" id="${prefix}-oferta" maxlength="300" value="${escapeHtml(b.oferta || '')}" placeholder="Ex.: avaliação sem custo, parcelamento em 12x, 15 anos de experiência" style="margin-bottom:8px;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <label style="flex:1;min-width:160px;"><span class="field-label">Tom</span><select class="field-input" id="${prefix}-tom">${AI_TONES.map(t => `<option ${(b.tom || AI_TONES[0]) === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+      <label style="flex:2;min-width:200px;"><span class="field-label">Chamada para ação (opcional)</span><input class="field-input" id="${prefix}-cta" maxlength="150" value="${escapeHtml(b.cta || '')}" placeholder="Ex.: responder com o melhor horário"></label>
+    </div>
+    <label class="field-label" style="margin-top:8px;">Informações extras (opcional)</label>
+    <textarea class="field-input" id="${prefix}-extra" rows="2" maxlength="600" style="width:100%;box-sizing:border-box;resize:vertical;margin-bottom:10px;" placeholder="Ex.: nome da clínica, bairro, o que NÃO dizer...">${escapeHtml(b.extra || '')}</textarea>`;
+}
+function readAiBrief(prefix, act) {
+  const v = id => (document.getElementById(prefix + '-' + id)?.value || '').trim();
+  const brief = { objetivo: v('objetivo'), publico: v('publico'), oferta: v('oferta'), tom: v('tom'), cta: v('cta'), extra: v('extra') };
+  try { localStorage.setItem('huven_ai_brief_' + normalizeActValue(act), JSON.stringify(brief)); } catch (e) {}
+  return brief;
+}
+
+// Janela de copy com IA (campanhas e blocos do fluxo). onResult(texts, tip).
+let _aiCopyCtx = null;
+function openAiCopyModal(opts) {
+  _aiCopyCtx = opts;
+  openHuvenModal(opts.title || '✨ Escrever com IA', `
+    <div class="integ-muted" style="font-size:12.5px;margin-bottom:10px;">${escapeHtml(opts.hint || 'Conte o objetivo e a IA escreve as mensagens. Você revisa antes de usar.')}</div>
+    ${aiBriefFieldsHtml('ai-copy', opts.act)}
+    <button class="btn-save" id="ai-copy-btn" style="width:auto;padding:9px 16px;" onclick="runAiCopy()">Gerar mensagens</button> <span id="ai-copy-fb" class="integ-muted"></span>`, 560);
+}
+async function runAiCopy() {
+  const o = _aiCopyCtx;
+  if (!o) return;
+  const brief = readAiBrief('ai-copy', o.act);
+  const fb = document.getElementById('ai-copy-fb');
+  const btn = document.getElementById('ai-copy-btn');
+  if (brief.objetivo.length < 5) { fb.style.color = 'var(--red)'; fb.textContent = 'Conte o objetivo.'; return; }
+  btn.disabled = true; fb.style.color = 'var(--muted)'; fb.textContent = 'Escrevendo... (uns 5 segundos)';
+  try {
+    const r = await window._fb.whatsapp('/ai/copy', o.act, { kind: o.kind, count: o.count, brief, context: o.context || '' });
+    closeHuvenModal();
+    o.onResult(r.texts, r.tip);
+  } catch (e) { fb.style.color = 'var(--red)'; fb.textContent = e.message; btn.disabled = false; }
+}
 
 function openAiFlowModal() {
   const act = (_aiPreset && _aiPreset.act) || flowAct();
   if (!act) return showToast('Escolha o cliente no topo do menu.', 'warning');
   _aiPdfText = '';
+  _aiFlowMode = 'plan';
   openHuvenModal('✨ Criar automação com IA', `
     ${_aiPreset ? `<div class="chat-tag" style="display:inline-block;background:var(--amber-dim);color:var(--amber);margin-bottom:8px;">Coluna: ${escapeHtml(_aiPreset.label)}</div>` : ''}
+    <div class="pr-tabs" style="margin-bottom:12px;">
+      <button class="pr-tab active" id="ai-mode-plan" onclick="setAiFlowMode('plan')">A IA planeja o fluxo</button>
+      <button class="pr-tab" id="ai-mode-describe" onclick="setAiFlowMode('describe')">Eu descrevo o fluxo</button>
+    </div>
+    <div id="ai-plan-box">
+      <div class="integ-muted" style="font-size:12.5px;margin-bottom:10px;">Diga só o objetivo. A IA decide quantas mensagens, o que cada uma diz (abertura, valor, prova, oferta, despedida), os intervalos e o que fazer se o lead responder.</div>
+      ${aiBriefFieldsHtml('ai-plan', act)}
+    </div>
+    <div id="ai-describe-box" style="display:none;">
     <div class="integ-muted" style="font-size:12.5px;margin-bottom:10px;">Descreva o fluxo do seu jeito, em ordem: quando começa, quanto tempo esperar, o que enviar e o que fazer se o lead responder ou não. A IA monta os blocos no editor para você conferir antes de ligar.</div>
     <textarea class="field-input" id="ai-flow-text" rows="7" maxlength="8000" style="width:100%;box-sizing:border-box;resize:vertical;margin-bottom:10px;" placeholder="Ex.: Quando o lead chegar em Novo lead, espera 5 minutos e manda boas-vindas perguntando qual serviço ele procura. Se não responder em 2 horas, manda de novo. Se depois de 1 dia continuar sem responder, manda o vídeo de depoimento e move para Sem resposta. Se responder, move para Em contato."></textarea>
     <label class="field-label">Ou anexe um PDF ou arquivo de texto com o fluxo (opcional)</label>
     <input type="file" class="field-input" id="ai-flow-file" accept="application/pdf,.pdf,text/plain,.txt" onchange="readAiFlowFile(this)" style="margin-bottom:6px;">
     <div id="ai-flow-file-fb" class="integ-muted" style="font-size:12px;margin-bottom:12px;"></div>
+    </div>
     <button class="btn-save" id="ai-flow-btn" style="width:auto;padding:9px 16px;" onclick="runAiFlow()">Criar automação</button> <span id="ai-flow-fb" class="integ-muted"></span>`, 560);
 }
 
@@ -9685,10 +9770,15 @@ function aiFlowToGraph(flow, act) {
 async function runAiFlow() {
   const act = (_aiPreset && _aiPreset.act) || flowAct();
   let desc = document.getElementById('ai-flow-text').value.trim();
+  if (_aiFlowMode === 'plan') {
+    const b = readAiBrief('ai-plan', act);
+    if (b.objetivo.length < 5) { const f = document.getElementById('ai-flow-fb'); f.style.color = 'var(--red)'; f.textContent = 'Conte o objetivo.'; return; }
+    desc = [`Objetivo: ${b.objetivo}`, b.publico && `Público: ${b.publico}`, b.oferta && `Oferta/diferencial: ${b.oferta}`, b.tom && `Tom: ${b.tom}`, b.cta && `Chamada para ação: ${b.cta}`, b.extra && `Extras: ${b.extra}`].filter(Boolean).join('\n');
+  }
   if (_aiPreset && desc) desc = `O fluxo começa quando o lead entra na coluna "${_aiPreset.label}" (id ${_aiPreset.stage}).\n\n` + desc;
   const fb = document.getElementById('ai-flow-fb');
   const btn = document.getElementById('ai-flow-btn');
-  const text = [desc, _aiPdfText ? 'Conteúdo do arquivo anexado:\n' + _aiPdfText.slice(0, 9000) : ''].filter(Boolean).join('\n\n');
+  const text = [desc, _aiFlowMode !== 'plan' && _aiPdfText ? 'Conteúdo do arquivo anexado:\n' + _aiPdfText.slice(0, 9000) : ''].filter(Boolean).join('\n\n');
   if (text.length < 15) { fb.style.color = 'var(--red)'; fb.textContent = 'Descreva o fluxo ou anexe um arquivo.'; return; }
   if (!pipelinesFor(act)) {
     try { _pipelinesCache[normalizeActValue(act)] = (await window._fb.getPipelines(act)) || { list: [] }; } catch (e) {}
@@ -9697,7 +9787,7 @@ async function runAiFlow() {
   pipelineList(act).forEach(p => getStages(act, p.id).forEach(s => stages.push({ id: s.id, label: s.label, pipeline: p.name })));
   btn.disabled = true; fb.style.color = 'var(--muted)'; fb.textContent = 'A IA está montando o fluxo... (uns 10 segundos)';
   try {
-    const r = await window._fb.whatsapp('/ai/flow', act, { text, stages });
+    const r = await window._fb.whatsapp('/ai/flow', act, { text, stages, mode: _aiFlowMode === 'plan' ? 'plan' : 'describe' });
     if (_aiPreset) r.flow.triggerStage = _aiPreset.stage;
     _aiPreset = null;
     const graph = aiFlowToGraph(r.flow, act);
@@ -10029,6 +10119,50 @@ function setFlowData(key, value) {
   renderFlowNodes();
 }
 
+// Contexto do bloco para a IA: posição entre as mensagens, espera antes e se está num caminho "respondeu/não respondeu".
+function flowNodeContext(nodeId) {
+  const f = _flow;
+  const byId = Object.fromEntries(f.nodes.map(n => [n.id, n]));
+  const path = [];
+  let cur = nodeId, guard = 0;
+  while (guard++ < 60) {
+    const e = f.edges.find(x => x.to === cur);
+    if (!e) break;
+    path.unshift({ node: byId[e.from], port: e.port });
+    cur = e.from;
+  }
+  const msgsBefore = path.filter(p => p.node && p.node.type === 'message');
+  const lastWait = [...path].reverse().find(p => p.node && p.node.type === 'wait');
+  const branch = [...path].reverse().find(p => p.port === 'yes' || p.port === 'no');
+  const trig = f.nodes.find(n => n.type === 'trigger');
+  return [
+    `Automação "${f.name || ''}", começa quando o lead entra na coluna "${autoStageLabel(f.act, trig && trig.data && trig.data.stage)}".`,
+    `Esta é a mensagem número ${msgsBefore.length + 1} do fluxo.`,
+    msgsBefore.length ? `Mensagens anteriores: ${msgsBefore.map(p => '"' + String((p.node.data.templates || [])[0] || '').slice(0, 160) + '"').join(' / ')}.` : 'É a primeira mensagem para este lead.',
+    lastWait ? `Ela sai depois de esperar ${lastWait.node.data.amount} ${({ min: 'minutos', h: 'horas', d: 'dias' })[lastWait.node.data.unit] || 'horas'}.` : '',
+    branch ? (branch.port === 'yes' ? 'O lead JÁ respondeu: continue a conversa, sem repetir a apresentação.' : 'O lead ainda NÃO respondeu às mensagens anteriores: não repita o mesmo texto, traga outro ângulo.') : ''
+  ].filter(Boolean).join(' ');
+}
+
+function aiFlowNodeCopy() {
+  const n = _flow && _flow.nodes.find(x => x.id === _flowSel);
+  if (!n) return;
+  const nodeId = n.id;
+  openAiCopyModal({
+    act: _flow.act, kind: 'message', count: 2, title: '✨ Texto desta mensagem com IA', context: flowNodeContext(nodeId),
+    hint: 'A IA escreve esta mensagem considerando a posição dela no fluxo (as anteriores, a espera e se o lead respondeu).',
+    onResult: texts => {
+      const node = _flow && _flow.nodes.find(x => x.id === nodeId);
+      if (!node) return;
+      node.data = { ...(node.data || {}), templates: texts.slice(0, 3) };
+      _flow._dirty = true;
+      _flowSel = nodeId;
+      renderFlowNodes(); renderFlowInspector();
+      showToast('Texto sugerido pela IA. Revise e salve a automação.', 'success');
+    }
+  });
+}
+
 function setFlowTemplate(i, value) {
   const n = _flow.nodes.find(x => x.id === _flowSel);
   if (!n) return;
@@ -10076,6 +10210,7 @@ function renderFlowInspector() {
     html += `<label class="auto-label" style="margin-top:10px;">${kind === 'text' ? 'Mensagem' : kind === 'audio' ? 'Texto enviado depois do áudio (opcional)' : 'Legenda (opcional)'}</label>
       ${temps.map((t, i) => `<textarea class="field-input" rows="3" style="margin-bottom:6px;" placeholder="${i === 0 ? 'Oi {primeiro_nome}, ...' : 'Outra versão (sorteada)'}" oninput="setFlowTemplate(${i}, this.value)">${escapeHtml(t || '')}</textarea>`).join('')}
       ${temps.length < 3 ? `<button class="ci-add" onclick="setFlowTemplate(${temps.length}, ''); renderFlowInspector()">+ outra versão</button>` : ''}
+      <button class="ci-add" style="margin-left:6px;" onclick="aiFlowNodeCopy()">✨ Sugerir texto com IA</button>
       <div class="integ-muted" style="margin-top:6px;">Use {primeiro_nome} e {nome}. Com várias versões, uma é sorteada a cada envio.</div>`;
   }
   if (n.type !== 'trigger') html += `<button class="huv-btn" style="margin-top:16px;color:var(--red);border-color:var(--red);" onclick="deleteFlowNode('${n.id}')">Excluir bloco</button>`;
