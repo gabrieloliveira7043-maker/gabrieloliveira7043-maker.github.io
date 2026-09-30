@@ -1537,6 +1537,12 @@ td { font-family: var(--font); font-size: 13px; }
 .wa-line-picker-hint { width: 100%; font-size: 11.5px; color: var(--muted2); }
 .chat-line-select { width: auto; padding: 4px 8px; font-size: 12px; border-radius: 14px; height: auto; }
 
+/* Notificações: clique leva ao lead, arrastar tira da tela */
+.toast.clickable { cursor: pointer; }
+.toast { touch-action: pan-y; }
+@keyframes kcFlash { 0%, 100% { box-shadow: var(--card-shadow); } 30%, 70% { box-shadow: 0 0 0 3px #C9A24A, 0 8px 24px rgba(201,162,74,.35); } }
+.kanban-card.kc-flash { animation: kcFlash 1.1s ease 3; }
+
 /* Automação por coluna (Funil) */
 .col-auto-btn { background: transparent; border: 1px dashed var(--border2); color: var(--muted2); border-radius: 8px; padding: 1px 6px; font-size: 11px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; max-width: 110px; white-space: nowrap; overflow: hidden; font-family: inherit; flex-shrink: 0; }
 .col-auto-btn span { overflow: hidden; text-overflow: ellipsis; font-weight: 700; }
@@ -11649,7 +11655,7 @@ function renderReminders() {
   if (!due.length) { if (el) el.remove(); return; }
   if (!el) { el = document.createElement('div'); el.id = 'rem-stack'; el.className = 'rem-stack'; document.body.appendChild(el); }
   due.forEach(n => { if (!_remShown.has(n.id)) { _remShown.add(n.id); if (typeof playLeadNotificationSound === 'function') try { playLeadNotificationSound(); } catch (e) {} } });
-  el.innerHTML = due.slice(0, 4).map(n => `<div class="rem-card">
+  el.innerHTML = due.slice(0, 4).map(n => `<div class="rem-card" data-rem="${escapeHtml(n.id)}">
     <button class="wa-alert-close" style="position:static;float:right;font-size:16px;line-height:1;" title="Esconder" onclick="_remShown.add('${escapeJsString(n.id)}:hidden');renderReminders()">×</button><div style="font-size:11px;font-weight:800;color:#B7791F;margin-bottom:3px;">🔔 LEMBRETE${isAdmin ? ' · ' + escapeHtml(getClientDisplayName(n.act) || '') : ''} · ${escapeHtml(n.chatName || '')}</div>
     <div style="white-space:pre-wrap;">${escapeHtml(limitText(n.text || '', 240))}</div>
     <div class="rem-actions">
@@ -11657,6 +11663,8 @@ function renderReminders() {
       <button class="chat-pill" onclick="finishReminder('${escapeJsString(n.id)}')">Concluir</button>
       <button class="chat-pill" onclick="snoozeReminder('${escapeJsString(n.id)}')">Adiar 1 h</button>
     </div></div>`).join('') + (due.length > 4 ? `<div class="rem-card" style="text-align:center;">+${due.length - 4} lembretes</div>` : '');
+  // Arrastar o cartão para o lado esconde o lembrete (ele continua na conversa).
+  el.querySelectorAll('.rem-card[data-rem]').forEach(card => enableSwipeDismiss(card, () => { _remShown.add(card.getAttribute('data-rem') + ':hidden'); renderReminders(); }));
 }
 
 async function snoozeReminder(id) {
@@ -12515,7 +12523,7 @@ window.saveFieldsConfig = saveFieldsConfig;
 
 
 // ===== TOAST SYSTEM =====
-function showToast(msg, type = 'info', duration = 3500) {
+function showToast(msg, type = 'info', duration = 3500, opts) {
   const container = document.getElementById('toast-container');
   if (!container) { alert(msg); return; }
   const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
@@ -12529,11 +12537,40 @@ function showToast(msg, type = 'info', duration = 3500) {
   text.textContent = String(msg || '');
   toast.appendChild(icon);
   toast.appendChild(text);
+  if (opts && typeof opts.onClick === 'function') {
+    toast.classList.add('clickable');
+    toast.title = opts.clickLabel || 'Abrir';
+    toast.addEventListener('click', () => { if (toast._swiped) return; opts.onClick(); toast.remove(); });
+  }
+  enableSwipeDismiss(toast);
   container.appendChild(toast);
   setTimeout(() => {
     toast.classList.add('out');
     setTimeout(() => toast.remove(), 300);
   }, duration);
+}
+
+// Arrastar para o lado (dedo ou mouse) tira o aviso da tela.
+function enableSwipeDismiss(el, onDismiss) {
+  let startX = null, dx = 0;
+  const start = x => { startX = x; dx = 0; el.style.transition = 'none'; };
+  const move = x => { if (startX === null) return; dx = x - startX; if (Math.abs(dx) > 6) el._swiped = true; el.style.transform = `translateX(${dx}px)`; el.style.opacity = String(Math.max(0.2, 1 - Math.abs(dx) / 220)); };
+  const end = () => {
+    if (startX === null) return;
+    startX = null;
+    el.style.transition = 'transform .2s ease, opacity .2s ease';
+    if (Math.abs(dx) > 80) {
+      el.style.transform = `translateX(${dx > 0 ? 420 : -420}px)`; el.style.opacity = '0';
+      setTimeout(() => { if (onDismiss) onDismiss(); else el.remove(); }, 200);
+    } else {
+      el.style.transform = ''; el.style.opacity = '';
+      setTimeout(() => { el._swiped = false; }, 50);
+    }
+  };
+  el.addEventListener('touchstart', e => start(e.touches[0].clientX), { passive: true });
+  el.addEventListener('touchmove', e => move(e.touches[0].clientX), { passive: true });
+  el.addEventListener('touchend', end);
+  el.addEventListener('touchcancel', end);
 }
 window.showToast = showToast;
 
@@ -13748,7 +13785,7 @@ function renderNotificationsCenter() {
     return;
   }
   list.innerHTML = notifications.map(n => `
-    <div class="notification-item ${n.read ? '' : 'unread'}">
+    <div class="notification-item ${n.read ? '' : 'unread'}" style="cursor:pointer;" title="Abrir no funil" onclick="openNotificationLead('${escapeJsString(n.id)}')">
       <span class="notification-dot"></span>
       <div style="min-width:0;flex:1;">
         <div class="notification-title">${escapeHtml(limitText(n.leadName || 'Lead novo', 120))}</div>
@@ -13756,6 +13793,51 @@ function renderNotificationsCenter() {
         <div class="notification-time">${formatNotificationTime(n.createdAt)}</div>
       </div>
     </div>`).join('');
+}
+
+// Abre o funil no cliente, pipeline e mês do lead, rola até o card e destaca.
+function openLeadInFunnel(leadOrKey) {
+  const key = typeof leadOrKey === 'string' ? leadOrKey : getLeadUniqueKey(leadOrKey);
+  const lead = (getLeads() || []).find(l => getLeadUniqueKey(l) === key || l.id === key);
+  closeNotificationsCenter();
+  if (!lead) { switchView('crm'); if (typeof setMobileNav === 'function') setMobileNav('crm'); showToast('Esse lead não está mais no CRM (pode ter sido excluído).', 'warning'); return; }
+  const act = normalizeActValue(lead.act);
+  if (isAdmin && act && typeof pickClient === 'function') {
+    const crmSel = document.getElementById('crm-client-select');
+    if (!crmSel || crmSel.value !== act) pickClient(act);
+    if (crmSel && [...crmSel.options].some(o => o.value === act)) crmSel.value = act;
+  }
+  try { localStorage.setItem('huven_pipeline_' + act, leadPipeline(lead)); } catch (e) {}
+  const monthSel = document.getElementById('crm-month-filter');
+  const month = typeof leadMonthKey === 'function' ? leadMonthKey(lead) : '';
+  if (monthSel) monthSel.value = [...monthSel.options].some(o => o.value === month) ? month : 'all';
+  switchView('crm');
+  if (typeof setMobileNav === 'function') setMobileNav('crm');
+  renderKanban(); renderFunilChart(); renderFunilEvolucao();
+  if (monthSel && month && monthSel.value !== month && [...monthSel.options].some(o => o.value === month)) { monthSel.value = month; renderKanban(); }
+  // O funil recarrega os leads ao abrir: espera o card aparecer (até ~4 s) para rolar e destacar.
+  // Se o funil redesenhar os cards nesse meio tempo, o destaque é aplicado de novo no card novo.
+  let tries = 0, scrolled = null;
+  const find = () => {
+    const card = document.querySelector(`.kanban-card[data-id="${CSS.escape(lead.id)}"]`);
+    if (card && card !== scrolled) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      card.classList.add('kc-flash');
+      setTimeout(() => card.classList.remove('kc-flash'), 3400);
+      scrolled = card;
+    }
+    if (++tries < 20) setTimeout(find, 200);
+  };
+  setTimeout(find, 150);
+}
+
+function openNotificationLead(id) {
+  const items = getStoredLeadNotifications();
+  const n = items.find(x => x.id === id);
+  if (!n) return;
+  saveStoredLeadNotifications(items.map(x => x.id === id ? { ...x, read: true } : x));
+  updateLeadNotificationUi();
+  openLeadInFunnel(n.leadKey);
 }
 
 function markLeadNotificationsRead() {
@@ -13861,15 +13943,18 @@ function notifyNewLeadArrival(leads) {
 
   addLeadNotifications(leads);
   playLeadNotificationSound();
-  if (typeof showToast === 'function') showToast(title + ' · ' + msg, 'success', isCrmViewOpen() ? 6500 : 30000);
+  const target = first.id ? first : null;
+  if (typeof showToast === 'function') showToast(title + ' · ' + msg + ' · toque para ver', 'success', isCrmViewOpen() ? 6500 : 30000,
+    { onClick: () => target ? openLeadInFunnel(target) : switchView('crm'), clickLabel: 'Abrir no funil' });
 
   if ('Notification' in window && Notification.permission === 'granted') {
     try {
-      new Notification(title, {
+      const n = new Notification(title, {
         body: msg,
         tag: 'huven-crm-lead-arrival',
         renotify: true
       });
+      n.onclick = () => { window.focus(); if (target) openLeadInFunnel(target); else switchView('crm'); n.close(); };
     } catch(e) {}
   }
 }
@@ -14006,7 +14091,7 @@ function renderWhatsAppAlert() {
 
   let el = document.getElementById('wa-alert');
   if ((!down.length && !server) || Date.now() < _waAlertHiddenUntil) { if (el) el.remove(); return; }
-  if (!el) { el = document.createElement('div'); el.id = 'wa-alert'; el.className = 'wa-alert'; document.body.appendChild(el); }
+  if (!el) { el = document.createElement('div'); el.id = 'wa-alert'; el.className = 'wa-alert'; document.body.appendChild(el); enableSwipeDismiss(el, hideWhatsAppAlert); }
 
   const parts = [];
   if (server) {
