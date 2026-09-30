@@ -1461,6 +1461,9 @@ td { font-family: var(--font); font-size: 13px; }
 .notifications-list, .csp-list, .chat-list, .chat-msgs, .chat-info, .kanban-cards, .modal-box, .modal-overlay, .config-panel, #huven-modal > div, .mnav-sheet, .integ-code, .client-switch-pop, .sidebar { scrollbar-width: none; -ms-overflow-style: none; }
 .notifications-list::-webkit-scrollbar, .csp-list::-webkit-scrollbar, .chat-list::-webkit-scrollbar, .chat-msgs::-webkit-scrollbar, .chat-info::-webkit-scrollbar, .kanban-cards::-webkit-scrollbar, .modal-box::-webkit-scrollbar, .modal-overlay::-webkit-scrollbar, .config-panel::-webkit-scrollbar, #huven-modal > div::-webkit-scrollbar, .mnav-sheet::-webkit-scrollbar, .integ-code::-webkit-scrollbar, .client-switch-pop::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
+.ads-row { display: grid; grid-template-columns: 1.4fr 2fr auto; gap: 12px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.ads-row:last-child { border-bottom: none; }
+
 /* Clientes (admin) */
 .huv-view { padding: 28px 36px; }
 .huv-header { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
@@ -2937,6 +2940,7 @@ td { font-family: var(--font); font-size: 13px; }
           <button class="integ-tab active" data-tab="lp" onclick="setIntegTab('lp')">Landing pages</button>
           <button class="integ-tab" data-tab="meta" onclick="setIntegTab('meta')">Formulários da Meta</button>
           <button class="integ-tab" data-tab="sheets" onclick="setIntegTab('sheets')">Planilhas (Apps Script)</button>
+          <button class="integ-tab" data-tab="ads" onclick="setIntegTab('ads')">Dashboard (contas de anúncios)</button>
         </div>
         <div id="integ-body"></div>
       </div>
@@ -7881,6 +7885,7 @@ function renderIntegracoesView() {
   document.querySelectorAll('.integ-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === _integTab));
   if (_integTab === 'lp') renderIntegLp();
   else if (_integTab === 'meta') renderIntegMeta();
+  else if (_integTab === 'ads') renderIntegAds();
   else renderIntegSheets();
 }
 
@@ -8260,6 +8265,66 @@ async function saveMetaForms(pageId) {
     const p = _metaSaved.find(x => x.id === pageId); if (p) p.forms = forms; else _metaSaved.push({ id: pageId, forms });
     showToast('Formulários salvos.', 'success');
   } catch (e) { showToast('Erro: ' + e.message, 'warning'); }
+}
+
+// ----- Dashboard: qual acesso da Meta é usado e quais contas ele enxerga -----
+async function renderIntegAds() {
+  const body = document.getElementById('integ-body');
+  if (!isAdmin) { body.innerHTML = '<div class="integ-empty">Somente o admin vê esta parte.</div>'; return; }
+  body.innerHTML = '<div class="integ-muted">Perguntando à Meta...</div>';
+  let who;
+  try {
+    const res = await metaFetch(`${WORKER_URL}?whoami=1`);
+    const out = await res.json();
+    if (out.error) throw new Error(out.error.message);
+    who = out.data;
+  } catch (e) {
+    body.innerHTML = `<div class="integ-error">Não consegui falar com a Meta: ${escapeHtml(e.message)}</div>`;
+    return;
+  }
+  const reachable = new Map((who.accounts || []).map(a => [a.id, a]));
+  const hasRead = (who.permissions || []).some(p => p === 'ads_read' || p === 'ads_management');
+  const clients = getSidebarClientEntries().sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
+  const rows = clients.map(([act, name]) => {
+    const ad = getAdAccountFor(act);
+    const acc = ad ? reachable.get(ad) : null;
+    const state = !ad ? ['Sem conta configurada', 'off'] : acc ? ['Com acesso', 'ok'] : ['Sem acesso', 'bad'];
+    return `<div class="ads-row">
+      <span class="ct-strong">${escapeHtml(name)}</span>
+      <span class="ct-sub">${escapeHtml(ad || '—')}${acc && acc.business ? ' · Business: ' + escapeHtml(acc.business) : ''}</span>
+      <span><span class="integ-chip ${state[1] === 'ok' ? 'ok' : 'off'}" style="${state[1] === 'bad' ? 'background:var(--red-dim);color:var(--red);' : ''}">${state[0]}</span></span>
+    </div>`;
+  }).join('');
+  const missing = clients.filter(([act]) => { const ad = getAdAccountFor(act); return ad && !reachable.has(ad); });
+  body.innerHTML = `
+    <div class="integ-intro">
+      <div>
+        <div class="integ-h2">Acesso que o Dashboard usa na Meta</div>
+        <div class="integ-muted">O Dashboard lê os anúncios com um acesso fixo (token). Ele só enxerga as contas de anúncios liberadas para esse usuário.</div>
+      </div>
+    </div>
+    <div class="integ-card">
+      <div class="integ-card-head">
+        <div style="flex:1;">
+          <div class="integ-title">${escapeHtml(who.name || '—')}</div>
+          <div class="integ-muted">ID ${escapeHtml(who.id || '')} · enxerga ${reachable.size} conta(s) de anúncios</div>
+        </div>
+        <span class="integ-chip ${hasRead ? 'ok' : 'off'}">${hasRead ? 'Pode ler anúncios' : 'Sem permissão de anúncios'}</span>
+      </div>
+      <div class="integ-muted">Permissões: ${escapeHtml((who.permissions || []).join(', ') || '—')}</div>
+    </div>
+    <div class="integ-h2" style="margin:18px 0 8px;">Clientes ${missing.length ? `<span class="integ-chip" style="background:var(--red-dim);color:var(--red);margin-left:6px;">${missing.length} sem acesso</span>` : ''}</div>
+    <div class="ct-table">${rows}</div>
+    <details class="integ-card" style="margin-top:14px;" ${missing.length ? 'open' : ''}>
+      <summary class="integ-title" style="cursor:pointer;">Como liberar uma conta nova para o Dashboard</summary>
+      <ol class="integ-steps">
+        <li>No <a href="https://business.facebook.com/settings/system-users" target="_blank" rel="noopener">Business Manager da Huven > Usuários > Usuários do sistema</a>, abra <b>${escapeHtml(who.name || 'o usuário acima')}</b> (se ele não estiver nessa lista, é uma pessoa: procure em Usuários > Pessoas).</li>
+        <li>Clique em <b>Atribuir ativos</b> > <b>Contas de anúncios</b>, marque a conta do cliente e ligue pelo menos <b>Ver desempenho</b>. Salve.</li>
+        <li>Se a conta não aparecer para atribuir, ela ainda não está no Business da Huven: em <b>Contas > Contas de anúncios > Adicionar > Solicitar acesso</b>, cole o ID e peça para o dono aprovar.</li>
+        <li>Se já estiver atribuída e continuar "Sem acesso" com o erro "#200 Ad account owner has NOT grant…", a conta pertence ao Business do cliente: no app da Meta usado pelo Dashboard, peça o <b>acesso avançado de ads_read</b> (Análise do app > Permissões e recursos).</li>
+        <li>Volte aqui e abra esta aba de novo para conferir.</li>
+      </ol>
+    </details>`;
 }
 
 // ----- Planilhas (Apps Script) -----
