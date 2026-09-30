@@ -1066,6 +1066,13 @@ html[data-theme="light"] .login-overlay { background: var(--paper); }
 .chat-bubble.deleted { font-style:italic; color:var(--muted2); }
 .chat-bubble img.chat-sticker { width:140px; height:140px; object-fit:contain; background:transparent; }
 .chat-stk-pop { padding:0; }
+.emoji-tabs { display:flex; gap:2px; padding:6px 8px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--surface); z-index:1; }
+.emoji-tab { background:none; border:none; font-size:17px; padding:4px 7px; border-radius:8px; cursor:pointer; opacity:.55; }
+.emoji-tab.active, .emoji-tab:hover { opacity:1; background:var(--surface2); }
+.emoji-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(38px, 1fr)); gap:2px; padding:8px; }
+.emoji-btn { background:none; border:none; font-size:22px; line-height:1; padding:6px 0; border-radius:8px; cursor:pointer; }
+.emoji-btn:hover { background:var(--surface2); }
+@media (max-width: 600px) { .chat-input { flex-wrap:wrap; gap:6px; } .chat-input textarea { order:-1; flex-basis:100%; } .chat-input #chat-send-btn { margin-left:auto; } }
 .stk-head { display:flex; gap:6px; align-items:center; padding:8px 10px; border-bottom:1px solid var(--border); font-size:13px; color:var(--text); }
 .stk-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(72px, 1fr)); gap:6px; padding:8px; }
 .stk-item { position:relative; aspect-ratio:1; border-radius:10px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
@@ -11241,7 +11248,7 @@ function openChat(key) {
       <div class="chat-input">
         <label class="chat-pill chat-tool" title="Enviar foto, vídeo ou áudio">📎<input type="file" accept="image/jpeg,image/png,image/webp,video/mp4,audio/*" style="display:none;" onchange="attachChatMedia(this)"></label>
         <button class="chat-pill chat-tool" title="Respostas prontas (ou digite / no começo da mensagem)" onclick="toggleQuickReplies()">⚡</button>
-        <button class="chat-pill chat-tool" title="Figurinhas" onclick="toggleStickerPack()">🙂</button>
+        <button class="chat-pill chat-tool" title="Emojis e figurinhas" onclick="toggleEmojiPicker()">🙂</button>
         <textarea id="chat-text" class="field-input" rows="1" placeholder="Mensagem ( / respostas prontas)" onkeydown="chatTextKey(event)" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,140)+'px';chatQrInput(this)" onblur="setTimeout(() => { if (_qrBySlash) closeQuickReplies(); }, 200)"></textarea>
         <button class="chat-pill chat-tool" title="Nota interna ou lembrete (só a equipe vê)" onclick="openChatNote()">📝</button>
         <button class="chat-pill chat-tool" title="Agendar mensagem" onclick="openScheduleMessage()">🕐</button>
@@ -11709,6 +11716,65 @@ async function deleteQuickReply(id) {
   } catch (e) { showToast('Erro: ' + e.message, 'error'); }
 }
 
+// ===== CHAT: EMOJIS =====
+// Painel com categorias; "Recentes" guarda os últimos usados neste navegador. A última aba é o pack de figurinhas.
+const EMOJI_SETS = {
+  'Rostos': '😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 🙃 😉 😌 😍 🥰 😘 😗 😙 😚 😋 😛 😝 😜 🤪 🤨 🧐 🤓 😎 🥸 🤩 🥳 😏 😒 😞 😔 😟 😕 🙁 😣 😖 😫 😩 🥺 😢 😭 😤 😠 😡 🤯 😳 🥵 🥶 😱 😨 😰 😥 😓 🤗 🤔 🫡 🤭 🫢 🤫 🤥 😶 😐 😑 😬 🙄 😯 😦 😧 😮 😲 🥱 😴 🤤 😪 😵 🤐 🥴 🤢 🤮 🤧 😷 🤒 🤕 🤑 🤠',
+  'Gestos': '👍 👎 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 👈 👉 👆 👇 ☝️ 👋 🤚 🖐️ ✋ 🖖 👏 🙌 🫶 👐 🤲 🤝 🙏 ✍️ 💪 🦾 👀 🧠 🫂 🙋 🙋‍♀️ 🙋‍♂️ 🤷 🤷‍♀️ 🤷‍♂️ 🙆 🙅 💁 🙇 🤦',
+  'Corações': '❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 💟 ♥️ 💋 🌹 🌷 🌻 🌸 ✨ 🔥 ⭐ 🌟 💫 🎉 🎊 🥂 🍾 🎁 🎈',
+  'Objetos': '📱 💻 🖥️ 📞 ☎️ 📅 📆 ⏰ ⌛ ⏳ 📍 🗺️ 🏠 🏡 🏢 🏥 🏦 🏪 🚗 🚙 🏍️ ✈️ 💰 💵 💳 💸 🧾 📈 📊 📉 📝 📋 📎 📌 🔑 🗝️ 🔒 🛒 🛍️ 🎯 🏆 🥇 📣 📢 🔔 💡 📷 🎥 🎤 🎧 📚 ✏️ 🦷 💊 🩺 ☕ 🍕 🍔 🍰 🍫',
+  'Símbolos': '✅ ☑️ ✔️ ❌ ❎ ⚠️ 🚫 ⛔ ❗ ❓ ‼️ ⁉️ 💯 🔴 🟠 🟡 🟢 🔵 🟣 ⚫ ⚪ 🔶 🔷 ▶️ ⏩ ⏪ 🔁 🔄 ➡️ ⬅️ ⬆️ ⬇️ ↗️ 🆕 🆓 🆗 🆙 🔝 🔜 💲 ➕ ➖ ✖️ 🟰 #️⃣ 1️⃣ 2️⃣ 3️⃣ 4️⃣ 5️⃣'
+};
+let _emojiTab = 'Recentes';
+
+function emojiRecents() { try { return JSON.parse(localStorage.getItem('huven_emoji_recent') || '[]'); } catch (e) { return []; } }
+
+function toggleEmojiPicker() {
+  const pop = document.getElementById('chat-stk-pop');
+  if (!pop) return;
+  if (pop.classList.contains('open')) { pop.classList.remove('open'); return; }
+  closeQuickReplies();
+  if (_emojiTab === 'Recentes' && !emojiRecents().length) _emojiTab = 'Rostos';
+  renderEmojiPicker();
+  pop.classList.add('open');
+}
+
+function renderEmojiPicker() {
+  const pop = document.getElementById('chat-stk-pop');
+  if (!pop) return;
+  if (_emojiTab === 'Figurinhas') {
+    if (!_stkCache[_chatAct]) {
+      pop.innerHTML = emojiTabsHtml() + '<div class="integ-muted" style="padding:12px;">Carregando figurinhas...</div>';
+      window._fb.getStickerPack(_chatAct).catch(() => []).then(items => { _stkCache[_chatAct] = items; if (_emojiTab === 'Figurinhas') renderEmojiPicker(); });
+      return;
+    }
+    renderStickerPack();
+    return;
+  }
+  const list = _emojiTab === 'Recentes' ? emojiRecents() : EMOJI_SETS[_emojiTab].split(' ');
+  pop.innerHTML = emojiTabsHtml() + `<div class="emoji-grid">${list.length ? list.map(e => `<button class="emoji-btn" onmousedown="event.preventDefault();insertEmoji('${e}')">${e}</button>`).join('') : '<div class="integ-muted" style="grid-column:1/-1;padding:8px;">Os emojis que você usar aparecem aqui.</div>'}</div>`;
+}
+
+function emojiTabsHtml() {
+  const tabs = ['Recentes', ...Object.keys(EMOJI_SETS), 'Figurinhas'];
+  const icons = { Recentes: '🕘', Rostos: '😀', Gestos: '👍', Corações: '❤️', Objetos: '📱', Símbolos: '✅', Figurinhas: '🖼️' };
+  return `<div class="emoji-tabs">${tabs.map(t => `<button class="emoji-tab ${_emojiTab === t ? 'active' : ''}" title="${t}" onmousedown="event.preventDefault();_emojiTab='${t}';renderEmojiPicker()">${icons[t]}</button>`).join('')}</div>`;
+}
+
+// Coloca o emoji onde está o cursor da mensagem e guarda nos recentes.
+function insertEmoji(e) {
+  const ta = document.getElementById('chat-text');
+  if (!ta) return;
+  const start = ta.selectionStart ?? ta.value.length, end = ta.selectionEnd ?? ta.value.length;
+  ta.value = ta.value.slice(0, start) + e + ta.value.slice(end);
+  const pos = start + e.length;
+  ta.focus();
+  ta.setSelectionRange(pos, pos);
+  ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 140) + 'px';
+  const rec = [e, ...emojiRecents().filter(x => x !== e)].slice(0, 32);
+  try { localStorage.setItem('huven_emoji_recent', JSON.stringify(rec)); } catch (err) {}
+}
+
 // ===== CHAT: FIGURINHAS =====
 // Um pack por cliente, usado por toda a equipe. As imagens viram figurinha do WhatsApp (512×512, WEBP).
 let _stkCache = {};
@@ -11738,6 +11804,7 @@ function renderStickerPack() {
       <label class="chat-pill" style="cursor:pointer;">+ Adicionar<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple style="display:none;" onchange="addStickerFiles(this)"></label></div>
     <div class="stk-grid">${items.length ? items.map(it => `<div class="stk-item" title="${_stkManage ? 'Remover' : 'Enviar'}" onclick="${_stkManage ? `removeSticker('${escapeJsString(it.id)}')` : `sendSticker('${escapeJsString(it.id)}')`}"><img src="${escapeHtml(it.url)}" alt="" loading="lazy">${_stkManage ? '<span class="stk-del">✕</span>' : ''}</div>`).join('')
       : '<div class="integ-muted" style="grid-column:1/-1;padding:10px;font-size:12.5px;">O pack está vazio. Clique em "+ Adicionar" e escolha imagens (PNG, JPG ou WEBP), ou salve figurinhas que os contatos mandarem.</div>'}</div>`;
+  if (_emojiTab === 'Figurinhas' && !pop.querySelector('.emoji-tabs')) pop.insertAdjacentHTML('afterbegin', emojiTabsHtml());
 }
 
 // Converte qualquer imagem para figurinha: 512×512, fundo transparente, WEBP.
