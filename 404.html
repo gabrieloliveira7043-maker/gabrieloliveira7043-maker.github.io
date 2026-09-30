@@ -3327,6 +3327,25 @@ function animVal(id, val) {
   setTimeout(() => { el.textContent = val; el.style.transition = 'all 0.35s ease'; el.style.opacity = '1'; el.style.transform = 'translateY(0)'; }, 80);
 }
 
+// Quando a Meta não devolve dados, conta o porquê: conta desativada, sem acesso ou só sem anúncios no período.
+const AD_ACCOUNT_STATUS = { 1: 'ativa', 2: 'desativada', 3: 'com pagamento pendente', 7: 'em análise de risco', 8: 'com pagamento em aberto', 9: 'em período de carência', 100: 'encerrando', 101: 'encerrada', 201: 'ativa', 202: 'encerrada' };
+async function explainEmptyAdAccount(account, from, to) {
+  const period = `${from.split('-').reverse().join('/')} e ${to.split('-').reverse().join('/')}`;
+  try {
+    const res = await metaFetch(`${WORKER_URL}?account=${account}&info=1`);
+    const out = await res.json();
+    if (out.error) return `A Meta não liberou a conta ${account}: ${out.error.message}`;
+    const a = out.data || {};
+    const status = AD_ACCOUNT_STATUS[a.account_status] || ('situação ' + a.account_status);
+    if (a.account_status && a.account_status !== 1 && a.account_status !== 201) {
+      return `A conta de anúncios "${a.name || account}" está ${status} na Meta, por isso não há dados.`;
+    }
+    return `A conta de anúncios "${a.name || account}" está ${status}, mas não teve anúncios rodando entre ${period}. Se os anúncios deste cliente rodam em outra conta, ajuste em Conta → Clientes.`;
+  } catch (e) {
+    return 'Nenhum dado encontrado para esse período.';
+  }
+}
+
 async function loadData() {
   if (!activeClient) { showError('Selecione um cliente na barra lateral.'); return; }
   const from = document.getElementById('date-from').value;
@@ -3351,7 +3370,7 @@ async function loadData() {
 
     if (insJson.error) { showError('Erro da API Meta: ' + insJson.error.message); return; }
     const data = insJson.data || [];
-    if (!data.length) { showError('Nenhum dado encontrado para esse período.'); return; }
+    if (!data.length) { showError(await explainEmptyAdAccount(account, from, to)); return; }
 
     const statusMap = {};
     (campJson.data || []).forEach(c => { statusMap[c.id] = c.effective_status; });
