@@ -1527,6 +1527,15 @@ td { font-family: var(--font); font-size: 13px; }
 .auto-box .field-input { padding: 6px 8px; }
 .auto-steps-summary { margin: 4px 0 8px 18px; font-size: 12.5px; color: var(--text); display: flex; flex-direction: column; gap: 3px; }
 
+/* Pipelines do funil */
+.pl-bar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 0 0 12px; }
+.pl-label { font-size: 11px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+.pl-tab { border: 1px solid var(--border2); background: var(--surface); color: var(--text); border-radius: 10px; padding: 7px 12px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: 6px; }
+.pl-tab.active { background: var(--btn-bg); color: var(--btn-text); border-color: var(--btn-bg); }
+.pl-count { font-size: 11px; font-weight: 800; opacity: .7; }
+.pl-tab.pl-add { border-style: dashed; color: var(--muted2); }
+.pl-tab.pl-gear { padding: 7px 10px; }
+
 /* Relatório em PDF (sempre claro, independente do tema) */
 .rp { font-family: 'Manrope', sans-serif; color: #1B1C20; font-size: 12px; line-height: 1.45; }
 .rp-cover { background: #111215; color: #fff; border-radius: 14px; padding: 26px 28px 24px; margin-bottom: 16px; position: relative; overflow: hidden; }
@@ -2067,6 +2076,14 @@ td { font-family: var(--font); font-size: 13px; }
     },
     async updateInboxChat(act, chatKey, data) {
       await updateDoc(doc(db, 'inbox', normalizeAct(act), 'chats', chatKey), data);
+    },
+    // Pipelines do funil (pipelines/{act}).
+    async getPipelines(act) {
+      const snap = await getDoc(doc(db, 'pipelines', normalizeAct(act)));
+      return snap.exists() ? snap.data() : null;
+    },
+    async savePipelines(act, cfg) {
+      await setDoc(doc(db, 'pipelines', normalizeAct(act)), { ...cfg, act: normalizeAct(act), updatedAt: new Date().toISOString() });
     },
     // Análise de atendimento: conversas com movimento desde uma data e as mensagens de cada uma.
     async listInboxChatsSince(act, sinceIso, max) {
@@ -2705,6 +2722,7 @@ td { font-family: var(--font); font-size: 13px; }
           </button>
         </div>
       </div>
+      <div class="pl-bar" id="crm-pipelines" style="display:none;"></div>
       <div class="crm-new-lead-banner" id="crm-new-lead-banner">
         <span id="crm-new-lead-banner-text">Novo lead chegou no CRM.</span>
         <button class="crm-new-lead-ack" onclick="clearUnreadLeadNotifications()">Ok, vi</button>
@@ -4504,7 +4522,9 @@ function renderFunilChart() {
   document.getElementById('funil-chart-container').style.display = 'block';
 
   const act = filterAct || (activeClient ? activeClient.account : '');
-  const stages = getStages(act);
+  const chartPipe = filterAct ? currentPipeline(filterAct) : 'principal';
+  if (filterAct) leads = leads.filter(l => leadPipeline(l) === chartPipe);
+  const stages = getStages(act, chartPipe);
   const total = leads.length;
 
   const labels = stages.map(s => s.label);
@@ -4583,7 +4603,9 @@ function renderFunilEvolucao() {
   if(wrapper) wrapper.style.display = 'block';
 
   const act = filterActE || (activeClient ? activeClient.account : '');
-  const stages = getStages(act);
+  const evoPipe = filterActE ? currentPipeline(filterActE) : 'principal';
+  if (filterActE) leads = leads.filter(l => leadPipeline(l) === evoPipe);
+  const stages = getStages(act, evoPipe);
   const counts = {};
   stages.forEach(s => { counts[s.id] = 0; });
   leads.forEach(l => { if (counts[l.stage] !== undefined) counts[l.stage]++; });
@@ -5291,7 +5313,7 @@ function getArteAzulejoStageForBoard(lead, boardAct) {
   const act = normalizeLeadAccountId(lead) || (lead && lead.act) || boardAct || '';
   const rawStage = String((lead && lead.stage) || '').trim();
   if (!isArteAzulejoClient(act)) {
-    const stages = getStages(act);
+    const stages = getStages(act, leadPipeline(lead));
     const normalized = typeof normalizeLeadStageForClient === 'function'
       ? normalizeLeadStageForClient(lead, act)
       : rawStage;
@@ -5342,7 +5364,169 @@ function saveCustomStages(act, stages) {
   if (isArteAzulejoClient(act)) localStorage.setItem(getArteStagesMigrationKey(act), '1');
 }
 
-function getStages(act) {
+// ===== PIPELINES DO FUNIL =====
+// "Principal" é o funil de sempre (colunas de getStages) e recebe os leads que chegam sozinhos.
+// Outros pipelines (ex.: Prospecção) ficam no banco em pipelines/{act} = { principalName, list: [{ id, name, stages }] }.
+// O lead guarda "pipeline" (sem o campo = Principal). Os ids das colunas são únicos entre pipelines.
+let _pipelinesCache = {};
+let _pipelinesLoading = {};
+const leadPipeline = lead => (lead && lead.pipeline) || 'principal';
+
+function pipelinesFor(act) { return _pipelinesCache[normalizeActValue(act)] || null; }
+
+function pipelineList(act) {
+  const cfg = pipelinesFor(act) || {};
+  return [{ id: 'principal', name: cfg.principalName || 'Principal' }].concat((cfg.list || []).map(p => ({ id: p.id, name: p.name })));
+}
+
+function pipelineName(act, id) { return (pipelineList(act).find(p => p.id === (id || 'principal')) || { name: 'Principal' }).name; }
+
+// Todas as colunas de todos os pipelines (para achar o nome de uma coluna pelo id).
+function getAllStages(act) {
+  const out = [...getStages(act)];
+  ((pipelinesFor(act) || {}).list || []).forEach(p => (p.stages || []).forEach(s => { if (!out.some(x => x.id === s.id)) out.push({ ...s, pipeline: p.id, pipelineName: p.name }); }));
+  return out;
+}
+
+function currentPipeline(act) {
+  act = normalizeActValue(act);
+  if (!act) return 'principal';
+  let id = 'principal';
+  try { id = localStorage.getItem('huven_pipeline_' + act) || 'principal'; } catch (e) {}
+  return pipelineList(act).some(p => p.id === id) ? id : 'principal';
+}
+
+function setCurrentPipeline(act, id) {
+  try { localStorage.setItem('huven_pipeline_' + normalizeActValue(act), id); } catch (e) {}
+  renderKanban(); renderFunilChart(); renderFunilEvolucao();
+}
+
+// Carrega os pipelines do cliente uma vez e redesenha quem pediu.
+function ensurePipelines(act, onLoad) {
+  act = normalizeActValue(act);
+  if (!act || _pipelinesCache[act] || !window._fb || typeof window._fb.getPipelines !== 'function') return;
+  if (_pipelinesLoading[act]) { if (onLoad) _pipelinesLoading[act].then(onLoad); return; }
+  _pipelinesLoading[act] = window._fb.getPipelines(act).then(cfg => { _pipelinesCache[act] = cfg || { list: [] }; }).catch(() => { _pipelinesCache[act] = { list: [] }; });
+  if (onLoad) _pipelinesLoading[act].then(onLoad);
+}
+
+async function savePipelinesCfg(act, cfg) {
+  act = normalizeActValue(act);
+  _pipelinesCache[act] = cfg;
+  await window._fb.savePipelines(act, cfg);
+}
+
+// Salva as colunas do pipeline certo (Principal continua no formato antigo).
+function saveStagesFor(act, pipelineId, stages) {
+  if (!pipelineId || pipelineId === 'principal') return saveCustomStages(act, stages);
+  const cfg = JSON.parse(JSON.stringify(pipelinesFor(act) || { list: [] }));
+  const p = (cfg.list || []).find(x => x.id === pipelineId);
+  if (!p) return;
+  p.stages = stages;
+  savePipelinesCfg(act, cfg).catch(e => showToast('Colunas não salvas: ' + e.message, 'error'));
+}
+
+// <select> de destino no funil: um grupo por pipeline, valor "pipeline|coluna".
+function funnelTargetOptions(act, selected) {
+  const pls = pipelineList(act);
+  const opts = p => getStages(act, p.id).map(s => { const v = p.id + '|' + s.id; return `<option value="${escapeHtml(v)}" ${v === selected ? 'selected' : ''}>${escapeHtml(s.label)}</option>`; }).join('');
+  return pls.length === 1 ? opts(pls[0]) : pls.map(p => `<optgroup label="${escapeHtml(p.name)}">${opts(p)}</optgroup>`).join('');
+}
+
+function parseFunnelTarget(value) {
+  const [pipeline, stage] = String(value || '').split('|');
+  return stage ? { pipeline: pipeline || 'principal', stage } : { pipeline: 'principal', stage: pipeline };
+}
+
+function pipelineTarget(act, pipelineId) {
+  const first = (getStages(act, pipelineId) || [])[0];
+  return (pipelineId || 'principal') + '|' + (first ? first.id : '');
+}
+
+// Prospecção vai, por padrão, para um pipeline com "prospec" no nome (se existir).
+function prosDefaultTarget(act) {
+  ensurePipelines(act);
+  const p = pipelineList(act).find(x => /prospec/i.test(x.name));
+  return pipelineTarget(act, p ? p.id : currentPipeline(act));
+}
+
+// Barra acima do kanban: um botão por pipeline, "+ Pipeline" e ⚙ para renomear/excluir.
+function renderPipelineBar(act) {
+  const bar = document.getElementById('crm-pipelines');
+  if (!bar) return;
+  if (!act) { bar.style.display = 'none'; return; }
+  const cur = currentPipeline(act);
+  let leads = getLeads().filter(l => leadMatchesClient(l, act));
+  try { leads = filterLeadsByCrmMonth(leads); } catch (e) {}
+  const count = id => leads.filter(l => leadPipeline(l) === id).length;
+  const a = escapeJsString(normalizeActValue(act));
+  bar.style.display = 'flex';
+  bar.innerHTML = `<span class="pl-label">Pipeline</span>` + pipelineList(act).map(p => `<button class="pl-tab ${p.id === cur ? 'active' : ''}" onclick="setCurrentPipeline('${a}','${escapeJsString(p.id)}')">${escapeHtml(p.name)} <span class="pl-count">${count(p.id)}</span></button>`).join('')
+    + `<button class="pl-tab pl-add" onclick="openPipelineEditor('${a}')">+ Pipeline</button>`
+    + `<button class="pl-tab pl-gear" title="Renomear ou excluir este pipeline" onclick="openPipelineEditor('${a}','${escapeJsString(cur)}')">⚙</button>`;
+}
+
+function openPipelineEditor(act, id) {
+  const editing = id ? pipelineList(act).find(p => p.id === id) : null;
+  const isPrincipal = id === 'principal';
+  const stagesNow = editing ? getStages(act, id) : [];
+  openHuvenModal(editing ? 'Pipeline ' + editing.name : 'Novo pipeline', `
+    <label class="field-label">Nome</label>
+    <input class="field-input" id="pl-name" maxlength="40" value="${escapeHtml(editing ? editing.name : '')}" placeholder="Ex.: Prospecção, Inbound, Pós-venda" style="margin-bottom:12px;">
+    ${editing ? `<div class="integ-muted" style="font-size:12.5px;margin-bottom:12px;">${stagesNow.length} colunas: ${escapeHtml(stagesNow.map(s => s.label).join(', '))}. Para mudar as colunas, abra o pipeline e use "⚙ Colunas".${isPrincipal ? '<br>Este é o pipeline que recebe os leads novos (WhatsApp, Meta, landing page e planilha).' : ''}</div>`
+      : `<label class="field-label">Colunas (uma por linha)</label>
+    <textarea class="field-input" id="pl-stages" rows="6" style="width:100%;box-sizing:border-box;resize:vertical;margin-bottom:6px;">Novo lead\nPrimeiro contato\nEm conversa\nProposta enviada\nFechado\nPerdido</textarea>
+    <div class="integ-muted" style="font-size:12px;margin-bottom:12px;">Os leads entram aqui quando você escolhe este pipeline ao enviar da Prospecção ou de Contatos, ao criar um lead com ele aberto ou ao mover o card.</div>`}
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <button class="btn-save" style="width:auto;padding:9px 16px;" onclick="savePipelineEditor('${escapeJsString(act)}', ${id ? `'${escapeJsString(id)}'` : 'null'})">${editing ? 'Salvar' : 'Criar pipeline'}</button>
+      ${editing && !isPrincipal ? `<button class="chat-pill" style="color:var(--red);" onclick="deletePipeline('${escapeJsString(act)}','${escapeJsString(id)}')">Excluir pipeline</button>` : ''}
+      <span id="pl-fb" class="integ-muted"></span>
+    </div>`, 480);
+}
+
+async function savePipelineEditor(act, id) {
+  const name = document.getElementById('pl-name').value.trim();
+  const fb = document.getElementById('pl-fb');
+  if (!name) { fb.textContent = 'Dê um nome ao pipeline.'; return; }
+  const cfg = JSON.parse(JSON.stringify(pipelinesFor(act) || { list: [] }));
+  cfg.list = cfg.list || [];
+  let newId = null;
+  if (id === 'principal') cfg.principalName = name;
+  else if (id) { const p = cfg.list.find(x => x.id === id); if (p) p.name = name; }
+  else {
+    const labels = document.getElementById('pl-stages').value.split('\n').map(x => x.trim()).filter(Boolean).slice(0, 15);
+    if (!labels.length) { fb.textContent = 'Informe pelo menos uma coluna.'; return; }
+    newId = 'pl' + Date.now().toString(36);
+    cfg.list.push({ id: newId, name, stages: labels.map((label, i) => ({ id: newId + '_' + i, label, cls: stageColor(i) })) });
+  }
+  fb.textContent = 'Salvando...';
+  try {
+    await savePipelinesCfg(act, cfg);
+    closeHuvenModal();
+    if (newId) setCurrentPipeline(act, newId); else { renderKanban(); renderFunilChart(); renderFunilEvolucao(); }
+    showToast(newId ? 'Pipeline criado.' : 'Pipeline salvo.', 'success');
+  } catch (e) { fb.textContent = 'Erro: ' + e.message; }
+}
+
+async function deletePipeline(act, id) {
+  const leadsIn = getLeads().filter(l => leadMatchesClient(l, act) && leadPipeline(l) === id);
+  if (leadsIn.length) { showToast(`Este pipeline tem ${leadsIn.length} lead(s). Mova ou exclua os leads antes de excluir o pipeline.`, 'warning', 6000); return; }
+  if (!confirm('Excluir este pipeline?')) return;
+  const cfg = JSON.parse(JSON.stringify(pipelinesFor(act) || { list: [] }));
+  cfg.list = (cfg.list || []).filter(p => p.id !== id);
+  try {
+    await savePipelinesCfg(act, cfg);
+    closeHuvenModal();
+    setCurrentPipeline(act, 'principal');
+    showToast('Pipeline excluído.', 'success');
+  } catch (e) { showToast('Erro: ' + e.message, 'error'); }
+}
+
+function getStages(act, pipelineId) {
+  if (pipelineId && pipelineId !== 'principal') {
+    const p = ((pipelinesFor(act) || {}).list || []).find(x => x.id === pipelineId);
+    if (p && Array.isArray(p.stages) && p.stages.length) return p.stages;
+  }
   const custom = getCustomStages(act);
   if (isArteAzulejoClient(act)) return getStagesForArteAzulejo(act, custom);
   if (custom && custom.length) return custom;
@@ -5383,7 +5567,7 @@ function getActForStages() {
 function editStageLabel(stageId) {
   const act = getActForStages();
   if (!act) { alert('Selecione um cliente específico primeiro.'); return; }
-  const currentStages = getStages(act);
+  const currentStages = getStages(act, currentPipeline(act));
   const stage = currentStages.find(s => s.id === stageId);
   if (!stage) return;
   const titleEl = document.getElementById('col-title-' + stageId);
@@ -5398,7 +5582,7 @@ function editStageLabel(stageId) {
   const save = () => {
     const newLabel = input.value.trim() || currentLabel;
     const updated = currentStages.map(s => s.id === stageId ? { ...s, label: newLabel } : s);
-    saveCustomStages(act, updated);
+    saveStagesFor(act, currentPipeline(act), updated);
     renderKanban(); renderFunilChart(); renderFunilEvolucao();
   };
   input.addEventListener('blur', save);
@@ -5411,7 +5595,7 @@ function editStageLabel(stageId) {
 function openStagesModal() {
   const act = getActForStages();
   if (!act) { alert('Selecione um cliente específico para gerenciar as colunas.'); return; }
-  const stages = getStages(act);
+  const stages = getStages(act, currentPipeline(act));
   const list = document.getElementById('stages-list');
   if (!list) return;
   list.innerHTML = '';
@@ -5476,7 +5660,7 @@ function saveStagesFromModal() {
     stages.push({ id, label, cls: stageColor(i) });
   });
   if (stages.length < 1) { alert('Adicione pelo menos uma coluna.'); return; }
-  saveCustomStages(act, stages);
+  saveStagesFor(act, currentPipeline(act), stages);
   const modal = document.getElementById('stages-modal');
   if (modal) modal.style.display = 'none';
   renderKanban(); renderFunilChart(); renderFunilEvolucao();
@@ -5550,7 +5734,7 @@ function normalizeStageTextForMatch(value) {
 function normalizeLeadStageForClient(lead, act) {
   const current = String((lead && lead.stage) || '').trim();
   if (!current) return current;
-  const stages = getStages(act || '');
+  const stages = getStages(act || '', leadPipeline(lead));
   const candidates = [
     current,
     lead && lead.stageLabel,
@@ -5999,7 +6183,7 @@ function renderContatos() {
   if (empty) empty.style.display = 'none';
 
   const STAGE_LABELS = { __wa_contact__: 'Contato do WhatsApp' };
-  [...new Set(_contatosFiltered.map(e => e.act).filter(Boolean))].forEach(a => getStages(a).forEach(s => { if (!STAGE_LABELS[s.id]) STAGE_LABELS[s.id] = s.label; }));
+  [...new Set(_contatosFiltered.map(e => e.act).filter(Boolean))].forEach(a => getAllStages(a).forEach(s => { if (!STAGE_LABELS[s.id]) STAGE_LABELS[s.id] = s.label; }));
   const waIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.855L0 24l6.292-1.508A11.947 11.947 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.848 0-3.579-.498-5.073-1.367l-.361-.214-3.737.895.952-3.638-.235-.374A9.953 9.953 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>';
 
   const fmtDate = iso => { const d = new Date(iso); return isNaN(d) ? '—' : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }); };
@@ -6271,13 +6455,13 @@ function openSendToFunnel() {
   const selected = _contatosEntries.filter(e => _contatosSelected.has(e.key));
   const newOnes = selected.filter(e => e.kind === 'contact').length;
   const leadsIn = selected.length - newOnes;
-  const stages = getStages(act) || [];
+  ensurePipelines(act);
   openHuvenModal(`Enviar ${selected.length} contato(s) para o funil`, `
     <label class="field-label">Mês no kanban</label>
     <input type="month" class="field-input" id="funnel-month" value="${getCurrentMonthKey()}" style="margin-bottom:10px;">
     <label class="field-label">Coluna</label>
     <select class="field-input" id="funnel-stage" style="margin-bottom:12px;">
-      ${stages.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.label)}</option>`).join('')}
+      ${funnelTargetOptions(act, pipelineTarget(act, currentPipeline(act)))}
     </select>
     <div style="font-size:12px;color:var(--text);line-height:1.6;margin-bottom:10px;">
       ${newOnes ? `• ${newOnes} contato(s) da base viram lead nesse mês e coluna.<br>` : ''}
@@ -6294,7 +6478,7 @@ function openSendToFunnel() {
 async function applySendToFunnel() {
   const act = contatosAct();
   const month = document.getElementById('funnel-month').value;
-  const stage = document.getElementById('funnel-stage').value;
+  const { stage, pipeline } = parseFunnelTarget(document.getElementById('funnel-stage').value);
   const moveMonth = !!document.getElementById('funnel-move-month')?.checked;
   const firstMsg = !!document.getElementById('funnel-first-msg')?.checked;
   const fb = document.getElementById('funnel-fb');
@@ -6302,7 +6486,7 @@ async function applySendToFunnel() {
   const [y, m] = month.split('-').map(Number);
   const nowIso = new Date().toISOString();
   const createdAt = month === getCurrentMonthKey() ? nowIso : new Date(y, m - 1, 1, 12, 0, 0).toISOString();
-  const stageLabel = (getStages(act).find(s => s.id === stage) || {}).label || stage;
+  const stageLabel = (getStages(act, pipeline).find(s => s.id === stage) || {}).label || stage;
   const historyItem = { stage: stageLabel, at: new Date().toLocaleString('pt-BR') };
   const selected = _contatosEntries.filter(e => _contatosSelected.has(e.key));
   const items = [];
@@ -6311,7 +6495,7 @@ async function applySendToFunnel() {
       const lead = {
         id: Date.now().toString() + '_' + i,
         name: e.name, phone: String(e.phone || ''), email: '',
-        stage, act, tags: e.tags || [], stageChangedAt: nowIso,
+        stage, pipeline, act, tags: e.tags || [], stageChangedAt: nowIso,
         origem: 'Base de contatos', source: 'contatos',
         history: [historyItem],
         createdAt, updatedAt: nowIso
@@ -6320,7 +6504,7 @@ async function applySendToFunnel() {
       items.push(lead);
     } else if (e.lead._docId) {
       const upd = { _docId: e.lead._docId, updatedAt: nowIso };
-      if (e.lead.stage !== stage) { upd.stage = stage; upd.stageChangedAt = nowIso; upd.history = [...(e.lead.history || []), historyItem]; }
+      if (e.lead.stage !== stage || leadPipeline(e.lead) !== pipeline) { upd.stage = stage; upd.pipeline = pipeline; upd.stageChangedAt = nowIso; upd.history = [...(e.lead.history || []), historyItem]; }
       if (moveMonth) upd.createdAt = createdAt;
       if (Object.keys(upd).length > 2) items.push(upd);
     }
@@ -8382,12 +8566,16 @@ function automationAct() {
 }
 
 function autoStageLabel(act, id) {
-  return ((getStages(act) || []).find(s => s.id === id) || {}).label || id || '—';
+  const s = (getAllStages(act) || []).find(x => x.id === id);
+  return s ? (s.pipelineName ? s.pipelineName + ' › ' : '') + s.label : (id || '—');
 }
 
 function autoStageOptions(act, selected, emptyLabel) {
+  ensurePipelines(act);
+  const pls = pipelineList(act);
+  const opts = p => (getStages(act, p.id) || []).map(s => `<option value="${escapeHtml(s.id)}" ${s.id === selected ? 'selected' : ''}>${escapeHtml(s.label)}</option>`).join('');
   return (emptyLabel ? `<option value="">${escapeHtml(emptyLabel)}</option>` : '') +
-    (getStages(act) || []).map(s => `<option value="${escapeHtml(s.id)}" ${s.id === selected ? 'selected' : ''}>${escapeHtml(s.label)}</option>`).join('');
+    (pls.length === 1 ? opts(pls[0]) : pls.map(p => `<optgroup label="${escapeHtml(p.name)}">${opts(p)}</optgroup>`).join(''));
 }
 
 function autoStepSummary(act, st) {
@@ -8872,7 +9060,7 @@ function prosOneToFunnel() {
   const stages = getStages(act) || [];
   openHuvenModal(`Enviar ${_prOne.fantasia || _prOne.razao} para o funil de ${getClientDisplayName(act) || act}`, `
     <label class="field-label">Coluna</label>
-    <select class="field-input" id="pr-stage" style="margin-bottom:12px;">${stages.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.label)}</option>`).join('')}</select>
+    <select class="field-input" id="pr-stage" style="margin-bottom:12px;">${funnelTargetOptions(act, prosDefaultTarget(act))}</select>
     <label class="field-label">Origem no card</label>
     <input class="field-input" id="pr-origem" value="Prospecção" style="margin-bottom:12px;">
     <button class="btn-save" style="width:auto;padding:9px 16px;" onclick="prosOneSaveFunnel()">Enviar</button> <span id="pr-fb" class="integ-muted"></span>`);
@@ -8881,16 +9069,16 @@ function prosOneToFunnel() {
 async function prosOneSaveFunnel() {
   const act = flowAct();
   const c = _prOne;
-  const stage = document.getElementById('pr-stage').value;
+  const { stage, pipeline } = parseFunnelTarget(document.getElementById('pr-stage').value);
   const origem = document.getElementById('pr-origem').value.trim() || 'Prospecção';
   const tel = (prosIsMobile(c.telefone1) ? c.telefone1 : prosIsMobile(c.telefone2) ? c.telefone2 : (c.telefone1 || c.telefone2 || '')).replace(/\D/g, '');
   const fb = document.getElementById('pr-fb');
   if (tel && (_leadsCache || []).some(l => leadMatchesClient(l, act) && chatPhoneKey(l.phone) === chatPhoneKey(tel))) { fb.textContent = 'Essa empresa já está no funil deste cliente.'; return; }
   const now = new Date(), nowIso = now.toISOString();
   const lead = {
-    id: now.getTime() + '_0', name: c.fantasia || c.razao, phone: tel, email: c.email || '', stage, act, origem, redeSocial: 'Prospecção', source: 'prospeccao', importado: true,
+    id: now.getTime() + '_0', name: c.fantasia || c.razao, phone: tel, email: c.email || '', stage, pipeline, act, origem, redeSocial: 'Prospecção', source: 'prospeccao', importado: true,
     obs: prosOneText(c).split('\n').slice(1).join('\n'),
-    history: [{ stage: autoStageLabel(act, stage), at: now.toLocaleString('pt-BR') }],
+    history: [{ stage: (getStages(act, pipeline).find(x => x.id === stage) || {}).label || stage, at: now.toLocaleString('pt-BR') }],
     stageChangedAt: nowIso, createdAt: nowIso, updatedAt: nowIso
   };
   fb.textContent = 'Enviando...';
@@ -9143,7 +9331,7 @@ function prosToFunnel() {
   const stages = getStages(act) || [];
   openHuvenModal(`Enviar ${rows.length} empresa(s) para o funil de ${getClientDisplayName(act) || act}`, `
     <label class="field-label">Coluna</label>
-    <select class="field-input" id="pr-stage" style="margin-bottom:12px;">${stages.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.label)}</option>`).join('')}</select>
+    <select class="field-input" id="pr-stage" style="margin-bottom:12px;">${funnelTargetOptions(act, prosDefaultTarget(act))}</select>
     <label class="field-label">Origem no card</label>
     <input class="field-input" id="pr-origem" value="Prospecção - ${escapeHtml(limitText(_prIndex.cnaes[rows[0].cnae] || 'Receita', 60))}" style="margin-bottom:12px;">
     <div class="integ-muted" style="margin-bottom:12px;">Os cards entram sem a 1ª mensagem automática. Se a coluna tiver uma automação, ela começa para esses leads.</div>
@@ -9153,9 +9341,9 @@ function prosToFunnel() {
 async function prosSaveFunnel() {
   const act = flowAct();
   const rows = prosSelectedRows();
-  const stage = document.getElementById('pr-stage').value;
+  const { stage, pipeline } = parseFunnelTarget(document.getElementById('pr-stage').value);
   const origem = document.getElementById('pr-origem').value.trim() || 'Prospecção';
-  const stageLabel = autoStageLabel(act, stage);
+  const stageLabel = (getStages(act, pipeline).find(x => x.id === stage) || {}).label || stage;
   const now = new Date();
   const nowIso = now.toISOString();
   const existing = new Set((_leadsCache || []).filter(l => leadMatchesClient(l, act)).map(l => chatPhoneKey(l.phone)).filter(Boolean));
@@ -9165,7 +9353,7 @@ async function prosSaveFunnel() {
     if (tel && existing.has(chatPhoneKey(tel))) return;
     leads.push({
       id: now.getTime() + '_' + i, name: r.fantasia || r.razao, phone: tel, email: r.email || '',
-      stage, act, origem, redeSocial: 'Prospecção', source: 'prospeccao', importado: true,
+      stage, pipeline, act, origem, redeSocial: 'Prospecção', source: 'prospeccao', importado: true,
       obs: [`Razão social: ${r.razao}`, `CNPJ: ${prosFmtCnpj(r.cnpj)}`, r.socios ? `Sócios: ${r.socios}` : '', `Endereço: ${[r.endereco, r.bairro, r.municipio + '/' + r.uf].filter(Boolean).join(', ')}`, r.telefone2 && r.telefone2 !== r.telefone1 ? `Outro telefone: ${r.telefone2}` : ''].filter(Boolean).join('\n'),
       history: [{ stage: stageLabel, at: now.toLocaleString('pt-BR') }],
       stageChangedAt: nowIso, createdAt: nowIso, updatedAt: nowIso
@@ -10571,7 +10759,7 @@ function renderChatInfo() {
     box.innerHTML = `<div class="ci-block">${label('Lead')}<div class="ci-muted">Esta conversa ainda não está no funil.</div><button class="huv-btn primary" style="margin-top:10px;" onclick="createLeadFromChat()">Criar lead no funil</button></div>${tagsHtml}`;
     return;
   }
-  const stages = getStages(normalizeActValue(lead.act)) || [];
+  const stages = getStages(normalizeActValue(lead.act), leadPipeline(lead)) || [];
   const lid = escapeJsString(lead.id);
   const fmt = iso => { const d = new Date(iso); return isNaN(d) ? '—' : d.toLocaleDateString('pt-BR'); };
   const hist = (Array.isArray(lead.history) ? lead.history : []).slice(-6).reverse();
@@ -10633,7 +10821,7 @@ function renderChatHeader() {
   const c = _chatItems.find(x => x.id === _chatOpenKey) || { id: _chatOpenKey };
   const lead = chatLeadFor(c, chatLeadIndex(_chatAct));
   const me = chatMe();
-  const stage = lead ? (getStages(lead.act).find(s => s.id === lead.stage) || {}).label : '';
+  const stage = lead ? (getAllStages(lead.act).find(s => s.id === lead.stage) || {}).label : '';
   const tagById = Object.fromEntries((_contactTagsCache[_chatAct] || []).map(t => [t.id, t]));
   const tagChips = chatTagIds(c, lead, lead ? null : chatContactFor(c, chatContactIndex(_chatAct))).map(id => tagById[id]).filter(Boolean).map(t => tagChipHtml(t)).join('');
   const assignBtn = c.assignedTo === me.uid
@@ -12089,9 +12277,15 @@ function renderKanban() {
   } catch (e) {
     console.warn('Filtro mensal do CRM ignorado:', e);
   }
+  const boardPipe = filterAct ? currentPipeline(filterAct) : 'principal';
+  if (filterAct) {
+    ensurePipelines(filterAct, () => { renderKanban(); renderFunilChart(); renderFunilEvolucao(); });
+    leads = leads.filter(l => leadPipeline(l) === boardPipe);
+  }
+  renderPipelineBar(filterAct);
   leads = sortCrmLeadsForKanban(leads, filterAct);
 
-  let STAGES = getStages(filterAct || (activeClient ? activeClient.account : ''));
+  let STAGES = getStages(filterAct || (activeClient ? activeClient.account : ''), boardPipe);
   if (!Array.isArray(STAGES) || !STAGES.length) STAGES = STAGES_DEFAULT;
 
   // Update CRM title
@@ -12204,14 +12398,14 @@ function renderKanban() {
       if (dragCol && dragCol !== stage.id) {
         const act = getActForStages();
         if (!act) return;
-        const stages = getStages(act);
+        const stages = getStages(act, currentPipeline(act));
         const fromIdx = stages.findIndex(s => s.id === dragCol);
         const toIdx = stages.findIndex(s => s.id === stage.id);
         if (fromIdx === -1 || toIdx === -1) return;
         const reordered = [...stages];
         const [moved] = reordered.splice(fromIdx, 1);
         reordered.splice(toIdx, 0, moved);
-        saveCustomStages(act, reordered);
+        saveStagesFor(act, currentPipeline(act), reordered);
         dragCol = null;
         renderKanban(); renderFunilChart(); renderFunilEvolucao();
       } else {
@@ -12437,7 +12631,7 @@ function dropCard(stageId, targetId = null, placement = 'after') {
   const targetLead = targetIdx !== -1 ? leads[targetIdx] : null;
   const targetAct = targetLead ? (normalizeLeadAccountId(targetLead) || targetLead.act) : (selectedAct || normalizeLeadAccountId(movedLead) || movedLead.act);
   const targetStageLeads = sortCrmLeadsForKanban(
-    leads.filter(l => l.id !== movedLead.id && leadMatchesClient(l, targetAct) && getArteAzulejoStageForBoard(l, targetAct) === stageId),
+    leads.filter(l => l.id !== movedLead.id && leadMatchesClient(l, targetAct) && leadPipeline(l) === leadPipeline(movedLead) && getArteAzulejoStageForBoard(l, targetAct) === stageId),
     targetAct
   );
   let insertAt = targetStageLeads.length;
@@ -12448,7 +12642,7 @@ function dropCard(stageId, targetId = null, placement = 'after') {
   targetStageLeads.splice(insertAt, 0, movedLead);
   targetStageLeads.forEach((lead, order) => { lead._crmOrder = order + 1; });
   if (typeof muteLeadNotifier === 'function') muteLeadNotifier(12000);
-  const STAGES = getStages(targetAct || leads[idx].act);
+  const STAGES = getStages(targetAct || leads[idx].act, leadPipeline(movedLead));
   const stageLabel = STAGES.find(s => s.id === stageId)?.label || stageId;
   if (targetAct && !movedLead.act) movedLead.act = targetAct;
   leads[idx].stage = stageId;
@@ -12490,7 +12684,7 @@ function openLeadModal() {
   };
   // update stage options usando stages reais do cliente (inclui customizados)
   const stageSelect = document.getElementById('lead-stage');
-  const stages = act ? getStages(act) : (clinica ? STAGES_CLINICA : STAGES_DEFAULT);
+  const stages = act ? getStages(act, currentPipeline(act)) : (clinica ? STAGES_CLINICA : STAGES_DEFAULT);
   stageSelect.innerHTML = stages.map(s => `<option value="${s.id}">${s.label}</option>`).join('');
   if (act) applyFieldConfig(act);
   document.getElementById('lead-modal').classList.add('open');
@@ -12524,7 +12718,7 @@ function editLead(id) {
     document.getElementById('field-motivo-perda').style.display = isPerdido ? 'block' : 'none';
   };
   const stageSelect = document.getElementById('lead-stage');
-  const stages = (lead && lead.act) ? getStages(lead.act) : (clinica ? STAGES_CLINICA : STAGES_DEFAULT);
+  const stages = (lead && lead.act) ? getStages(lead.act, leadPipeline(lead)) : (clinica ? STAGES_CLINICA : STAGES_DEFAULT);
   stageSelect.innerHTML = stages.map(s => `<option value="${s.id}">${s.label}</option>`).join('');
   stageSelect.value = getArteAzulejoStageForBoard(lead, lead.act);
   document.getElementById('modal-title').textContent = 'Editar lead';
@@ -12550,7 +12744,8 @@ async function saveLead() {
     ? document.getElementById('crm-client-select').value
     : (activeClient ? activeClient.account : 'geral')));
 
-  const STAGES = getStages(act);
+  const pipeline = existing ? leadPipeline(existing) : currentPipeline(act);
+  const STAGES = getStages(act, pipeline);
   const stageLabel = STAGES.find(s => s.id === newStage)?.label || newStage;
   const history = existing ? (existing.history || []) : [];
   if (!existing) {
@@ -12573,6 +12768,7 @@ async function saveLead() {
     proximaAcao: document.getElementById('lead-proxima-acao') ? document.getElementById('lead-proxima-acao').value.trim() : (existing ? existing.proximaAcao || '' : ''),
     proximaData: document.getElementById('lead-proxima-data') ? document.getElementById('lead-proxima-data').value : (existing ? existing.proximaData || '' : ''),
     stage: newStage,
+    pipeline,
     act, history,
     ...((!existing || existing.stage !== newStage) ? { stageChangedAt: new Date().toISOString() } : (existing.stageChangedAt ? { stageChangedAt: existing.stageChangedAt } : {})),
     createdAt: createdAtFromDateInput(document.getElementById('lead-created-at') ? document.getElementById('lead-created-at').value : '', existing ? existing.createdAt : null),
@@ -12729,7 +12925,7 @@ function showHistory(id) {
 function openMoveModal(id) {
   const lead = getLeads().find(l => l.id === id);
   if (!lead) return;
-  const STAGES = getStages(lead.act);
+  const STAGES = getStages(lead.act, leadPipeline(lead));
   document.getElementById('move-lead-id').value = id;
   document.getElementById('move-lead-name').textContent = lead.name;
 
@@ -12746,25 +12942,32 @@ function openMoveModal(id) {
       <div class="move-stage-dot" style="background:${stageColors[s.id] || 'var(--accent)'}"></div>
       ${s.label}
       ${lead.stage === s.id ? '<span style="margin-left:auto;font-size:11px;color:var(--accent2);">atual</span>' : ''}
-    </button>`).join('');
+    </button>`).join('') + (() => {
+      const others = pipelineList(lead.act).filter(p => p.id !== leadPipeline(lead));
+      return others.length ? `<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:14px 0 6px;">Mover para outro pipeline</div>` + others.map(p => {
+        const first = (getStages(lead.act, p.id) || [])[0];
+        return first ? `<button class="move-stage-btn" onclick="moveLeadTo('${escapeJsString(id)}','${escapeJsString(first.id)}','${escapeJsString(p.id)}')"><div class="move-stage-dot" style="background:var(--accent)"></div>${escapeHtml(p.name)} <span style="margin-left:auto;font-size:11px;color:var(--muted);">${escapeHtml(first.label)}</span></button>` : '';
+      }).join('') : '';
+    })();
 
   document.getElementById('move-modal').classList.add('open');
 }
 
-function moveLeadTo(id, stageId) {
+function moveLeadTo(id, stageId, pipelineId) {
   const leads = getLeads();
   const idx = leads.findIndex(l => l.id === id);
-  if (idx !== -1 && leads[idx].stage !== stageId) {
+  if (idx !== -1 && pipelineId) leads[idx].pipeline = pipelineId;
+  if (idx !== -1 && (leads[idx].stage !== stageId || pipelineId)) {
     if (typeof muteLeadNotifier === 'function') muteLeadNotifier(12000);
     const targetAct = normalizeLeadAccountId(leads[idx]) || leads[idx].act || getActForStages();
     if (targetAct && !leads[idx].act) leads[idx].act = targetAct;
-    const STAGES = getStages(targetAct);
-    const stageLabel = STAGES.find(s => s.id === stageId)?.label || stageId;
+    const STAGES = getStages(targetAct, leadPipeline(leads[idx]));
+    const stageLabel = (pipelineId ? pipelineName(targetAct, pipelineId) + ' › ' : '') + (STAGES.find(s => s.id === stageId)?.label || stageId);
     leads[idx].stage = stageId;
     leads[idx].updatedAt = new Date().toISOString();
     leads[idx].stageChangedAt = leads[idx].updatedAt;
     const targetStageLeads = sortCrmLeadsForKanban(
-      leads.filter(l => leadMatchesClient(l, targetAct) && getArteAzulejoStageForBoard(l, targetAct) === stageId),
+      leads.filter(l => leadMatchesClient(l, targetAct) && leadPipeline(l) === leadPipeline(leads[idx]) && getArteAzulejoStageForBoard(l, targetAct) === stageId),
       targetAct
     );
     targetStageLeads.forEach((lead, order) => { lead._crmOrder = order + 1; });
@@ -13334,7 +13537,7 @@ async function computeAttendance(act, fromDay, toDay, cfg, onProgress) {
     const after = msgs.filter(m => Date.parse(m.at) >= arrival - 60000);
     const human = after.find(anIsHuman);
     const auto = after.find(m => m.fromMe && m.source);
-    const stage = (getStages(act).find(s => s.id === lead.stage) || {}).label || '';
+    const stage = (getAllStages(act).find(s => s.id === lead.stage) || {}).label || '';
     return {
       lead, name: lead.name || chatFormatPhone(lead.phone) || 'Sem nome', stage, origem: lead.origem || lead.redeSocial || '', arrival, chatKey: key,
       hasChat: !!(key && chatByKey[key]),
