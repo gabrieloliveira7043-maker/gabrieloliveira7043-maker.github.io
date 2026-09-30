@@ -10716,11 +10716,25 @@ async function importMetaLeads(pageId) {
   const saved = _metaSaved.find(p => p.id === pageId) || {};
   if (!await showConfirm(`Os leads dos últimos ${days} dia(s) desta página entram no funil de ${getClientDisplayName(saved.act) || 'cliente'}, na coluna configurada. Leads que já estão no CRM são pulados. Se a 1ª mensagem automática ou alguma automação estiver ligada para esse cliente, ela vale para esses leads também.`, 'Importar leads da Meta', 'Importar', false)) return;
   const box = document.getElementById('mp-diag-' + pageId);
-  box.innerHTML = '<div class="integ-muted" style="margin-top:10px;">Importando... pode levar alguns minutos.</div>';
+  const say = t => { box.innerHTML = `<div class="integ-muted" style="margin-top:10px;">${t}</div>`; };
+  say('Buscando os leads nos formulários...');
   try {
-    const r = await window._fb.adminApi('/meta/import', { pageId, days });
-    box.innerHTML = `<div class="integ-forms" style="margin-top:10px;font-size:13px;">✅ ${r.created} lead(s) criados no CRM · ${r.skipped} já estavam · ${r.failed} com erro (de ${r.found} encontrados nos últimos ${r.days} dias).</div>`;
-    showToast(`${r.created} lead(s) da Meta importados.`, 'success');
+    // Em lotes, por causa do limite de chamadas do servidor: primeiro lista, depois cria de 4 em 4.
+    const leads = [];
+    let offset = 0;
+    while (offset !== null) {
+      const r = await window._fb.adminApi('/meta/import-list', { pageId, days, offset });
+      leads.push(...(r.leads || []));
+      offset = r.nextOffset;
+    }
+    let created = 0, skipped = 0, failed = 0;
+    for (let i = 0; i < leads.length; i += 4) {
+      say(`Importando ${Math.min(i + 4, leads.length)} de ${leads.length}...`);
+      const r = await window._fb.adminApi('/meta/import-leads', { pageId, leads: leads.slice(i, i + 4) });
+      created += r.created; skipped += r.skipped; failed += r.failed;
+    }
+    box.innerHTML = `<div class="integ-forms" style="margin-top:10px;font-size:13px;">✅ ${created} lead(s) criados no CRM · ${skipped} já estavam · ${failed} com erro (de ${leads.length} encontrados nos últimos ${days} dias).</div>`;
+    showToast(`${created} lead(s) da Meta importados.`, 'success');
   } catch (e) { box.innerHTML = `<div class="integ-error" style="margin-top:10px;">${escapeHtml(e.message)}</div>`; }
 }
 
