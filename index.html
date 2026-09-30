@@ -1481,6 +1481,15 @@ td { font-family: var(--font); font-size: 13px; }
 /* Prospecção */
 .pr-filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
 .pr-filters label { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 160px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+.pr-cnae-menu { display: none; position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; z-index: 50; max-height: 320px; overflow-y: auto; background: var(--surface); border: 1px solid var(--border2); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.25); text-transform: none; letter-spacing: 0; scrollbar-width: none; }
+.pr-cnae-menu::-webkit-scrollbar { display: none; }
+.pr-cnae-menu.open { display: block; }
+.pr-cnae-opt { padding: 9px 12px; cursor: pointer; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
+.pr-cnae-opt:last-child { border-bottom: none; }
+.pr-cnae-opt:hover { background: var(--surface2); }
+.pr-cnae-opt b { font-size: 13px; color: var(--text); font-weight: 700; }
+.pr-cnae-opt span { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.pr-cnae-empty { padding: 12px; font-size: 12.5px; color: var(--muted); font-weight: 600; text-transform: none; letter-spacing: 0; }
 .pr-checks { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 10px 14px; margin-bottom: 14px; }
 .pr-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
 .pr-row { display: grid; grid-template-columns: 28px minmax(220px, 2.4fr) 1.1fr 1.3fr 1.2fr; gap: 12px; align-items: start; padding: 11px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
@@ -8231,7 +8240,7 @@ async function renderProspeccaoView() {
     </div>
     <div class="pr-filters">
       <label>Estado<select class="field-input" id="pr-uf" onchange="prosUfChange()"><option value="">Escolha</option>${PR_UFS.map(u => `<option value="${u}">${u}</option>`).join('')}</select></label>
-      <label style="flex:2;min-width:260px;">Atividade (CNAE)<input class="field-input" id="pr-cnae" list="pr-cnae-list" placeholder="Digite: odontologia, academia, 8630504..." autocomplete="off"><datalist id="pr-cnae-list"></datalist></label>
+      <label style="flex:2;min-width:260px;position:relative;">Atividade (CNAE)<input class="field-input" id="pr-cnae" placeholder="Digite: odontologia, academia, 8630504..." autocomplete="off" oninput="prosCnaeSuggest()" onfocus="prosCnaeSuggest()" onblur="setTimeout(prosCnaeHide, 200)" onkeydown="if(event.key==='Enter'){event.preventDefault();prosCnaeHide();prosSearch();}"><div id="pr-cnae-menu" class="pr-cnae-menu"></div></label>
       <label>Cidade<select class="field-input" id="pr-city"><option value="">Todas do estado</option></select></label>
       <label>Bairro<input class="field-input" id="pr-bairro" placeholder="Opcional"></label>
     </div>
@@ -8249,20 +8258,85 @@ function prosUfChange() {
   const uf = document.getElementById('pr-uf').value;
   const idx = _prIndex;
   const present = (idx.porEstado || {})[uf] || {};
-  document.getElementById('pr-cnae-list').innerHTML = Object.entries(present)
-    .sort((a, b) => b[1].n - a[1].n)
-    .map(([code, info]) => `<option value="${code} - ${escapeHtml(idx.cnaes[code] || '')}">${info.n.toLocaleString('pt-BR')} empresas</option>`).join('');
+  document.getElementById('pr-cnae').value = '';
   document.getElementById('pr-city').innerHTML = '<option value="">Todas do estado</option>' + ((idx.municipios || {})[uf] || []).map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
 }
 
 // Aceita "8630504 - Atividade..." ou um pedaço do nome da atividade.
 function prosResolveCnae(uf, text) {
   const present = (_prIndex.porEstado || {})[uf] || {};
-  const code = String(text || '').replace(/\D/g, '').slice(0, 7);
-  if (code.length === 7 && present[code]) return [code];
-  const term = String(text || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
-  if (!term) return [];
-  return Object.keys(present).filter(c => String(_prIndex.cnaes[c] || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(term)).slice(0, 8);
+  const code = String(text || '').trim().match(/^\d{7}/);
+  if (code && present[code[0]]) return [code[0]];
+  return prosCnaeMatches(uf, text).slice(0, 8);
+}
+
+const prosNorm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+// Nomes populares que não aparecem no texto oficial do CNAE.
+const PR_SYNONYMS = {
+  academia: ['9313100'], crossfit: ['9313100'], pilates: ['9313100'],
+  salao: ['9602501', '9602502'], cabeleireiro: ['9602501'], barbearia: ['9602501'], manicure: ['9602501'], beleza: ['9602501', '9602502'], estetica: ['9602502'],
+  advogado: ['6911701'], advocacia: ['6911701'], contador: ['6920601'], contabilidade: ['6920601'], escritorio: ['6920601', '6911701'],
+  clinica: ['8630503', '8630502', '8630501', '8630504'], medico: ['8630503', '8630502', '8630501'], consultorio: ['8630503', '8630504'], dentista: ['8630504'],
+  psicologo: ['8650003'], fisioterapeuta: ['8650004'], nutricionista: ['8650002'],
+  petshop: ['4789004', '9609208'], pet: ['4789004', '9609208'], banho: ['9609208'], veterinario: ['7500100'], veterinaria: ['7500100'],
+  mercado: ['4712100', '4711302'], supermercado: ['4711302'], mercearia: ['4712100'], farmacia: ['4771701'], drogaria: ['4771701'],
+  oficina: ['4520001'], mecanica: ['4520001'], roupa: ['4781400'], roupas: ['4781400'], moda: ['4781400'], boutique: ['4781400'],
+  construtora: ['4120400'], escola: ['8513900', '8520100'], colegio: ['8513900', '8520100'], autoescola: ['8599601'],
+  lanchonete: ['5611203'], hamburgueria: ['5611203', '5611201'], pizzaria: ['5611201'], bar: ['5611204'], hotel: ['5510801'], pousada: ['5510801'],
+  imobiliaria: ['6821801', '6822600'], corretor: ['6821801'], arquiteto: ['7111100'], engenheiro: ['7112000'], agencia: ['7311400'], otica: ['4774100'],
+  'material de construcao': ['4744099', '4744005']
+};
+
+// Atividades do estado que batem com o texto: ignora acentos, aceita variações da palavra
+// ("odontologia" encontra "odontológica") e nomes populares ("academia", "salão"). Mais empresas primeiro.
+function prosCnaeMatches(uf, text) {
+  const present = (_prIndex.porEstado || {})[uf] || {};
+  const q = prosNorm(text).trim().replace(/\s+/g, ' ');
+  const syn = new Set();
+  Object.entries(PR_SYNONYMS).forEach(([k, codes]) => { if (q === k || q.split(' ').includes(k) || (k.includes(' ') && q.includes(k))) codes.forEach(c => present[c] && syn.add(c)); });
+  const own = prosCnaeTextMatches(uf, text);
+  return [...syn, ...own.filter(c => !syn.has(c))];
+}
+
+function prosCnaeTextMatches(uf, text) {
+  const present = (_prIndex.porEstado || {})[uf] || {};
+  const q = prosNorm(text).trim();
+  if (!q) return [];
+  let codes;
+  if (/^\d+$/.test(q.replace(/[.\-\/\s]/g, ''))) {
+    const digits = q.replace(/\D/g, '');
+    codes = Object.keys(present).filter(c => c.startsWith(digits));
+  } else {
+    const stems = q.split(/[^a-z0-9]+/).filter(w => w.length >= 3).map(w => w.slice(0, Math.max(4, w.length - 3)));
+    if (!stems.length) return [];
+    codes = Object.keys(present).filter(c => {
+      const words = prosNorm(_prIndex.cnaes[c]).split(/[^a-z0-9]+/);
+      return stems.every(st => words.some(w => w.startsWith(st)));
+    });
+  }
+  return codes.sort((a, b) => present[b].n - present[a].n);
+}
+
+function prosCnaeSuggest() {
+  const menu = document.getElementById('pr-cnae-menu');
+  const uf = document.getElementById('pr-uf').value;
+  const text = document.getElementById('pr-cnae').value;
+  if (!uf) { menu.innerHTML = '<div class="pr-cnae-empty">Escolha o estado primeiro.</div>'; menu.classList.add('open'); return; }
+  if (/^\d{7} - /.test(text) || !text.trim()) { prosCnaeHide(); return; }
+  const present = _prIndex.porEstado[uf] || {};
+  const codes = prosCnaeMatches(uf, text).slice(0, 30);
+  menu.innerHTML = codes.length
+    ? codes.map(c => `<div class="pr-cnae-opt" onmousedown="event.preventDefault();prosPickCnae('${c}')"><b>${escapeHtml(_prIndex.cnaes[c] || c)}</b><span>${c} · ${present[c].n.toLocaleString('pt-BR')} empresas</span></div>`).join('')
+    : '<div class="pr-cnae-empty">Nenhuma atividade encontrada neste estado. Tente outra palavra.</div>';
+  menu.classList.add('open');
+}
+
+function prosCnaeHide() { const m = document.getElementById('pr-cnae-menu'); if (m) m.classList.remove('open'); }
+
+function prosPickCnae(code) {
+  document.getElementById('pr-cnae').value = code + ' - ' + (_prIndex.cnaes[code] || '');
+  prosCnaeHide();
 }
 
 // Lê uma linha do CSV da base (separador ";" com aspas).
