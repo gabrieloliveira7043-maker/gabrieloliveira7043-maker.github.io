@@ -7125,6 +7125,8 @@ async function saveCampaignEdit() {
   if (mediaType !== 'text' && !d.media) { setFb('#f87171', 'Envie o arquivo de ' + CAMPAIGN_MEDIA_LABELS[mediaType].toLowerCase() + '.'); return; }
   const campLines = readWaLinePicker('camp-lines');
   if (waHasMultiple(d.act) && !campLines) { setFb('#f87171', 'Escolha por qual WhatsApp disparar.'); return; }
+  const cloudTpl = readCampCloudTemplate();
+  if (!cloudTpl.ok) { setFb('#f87171', cloudTpl.error); return; }
   const read = readCampaignDispatch();
   if (read.error) { setFb('#f87171', read.error); return; }
   const dispatch = { ...read.dispatch };
@@ -7136,6 +7138,7 @@ async function saveCampaignEdit() {
       media: mediaType !== 'text' && d.media ? { type: d.media.type, url: d.media.url, mimetype: d.media.mimetype, fileName: d.media.fileName } : null,
       dispatch,
       lines: campLines || c.lines || [waDefaultLine(d.act)],
+      cloudTemplate: cloudTpl.template,
       editedAt: new Date().toISOString()
     });
     showToast('Campanha atualizada. As mudanças valem a partir do próximo envio.', 'success');
@@ -7161,8 +7164,10 @@ function openCampaignEditor(copyFrom, opts = {}) {
   const months = [...new Set(getLeads().filter(l => leadMatchesClient(l, act)).map(leadMonthKey).filter(Boolean))].sort().reverse();
   const hint = 'font-size:11px;color:var(--muted);margin:4px 0 10px;line-height:1.5;';
   const section = 'font-size:13px;font-weight:600;color:var(--text);margin:18px 0 6px;';
-  _campaignDraft = { act, source: 'crm', recipients: [], label: '', media: null, copyFrom: copyFrom || null };
-  ensureWaSettings(act).then(() => { const b = document.getElementById('camp-lines-box'); if (b && !b.innerHTML.trim()) b.innerHTML = waLinePickerHtml(act, 'camp-lines', copyFrom && copyFrom.lines, 'Por qual WhatsApp disparar?'); });
+  _campaignDraft = { act, source: 'crm', recipients: [], label: '', media: null, copyFrom: copyFrom || null, cloudPreset: (copyFrom && copyFrom.cloudTemplate) || null };
+  ensureWaSettings(act).then(() => { const b = document.getElementById('camp-lines-box'); if (b && !b.innerHTML.trim()) b.innerHTML = waLinePickerHtml(act, 'camp-lines', copyFrom && copyFrom.lines, 'Por qual WhatsApp disparar?'); renderCampCloudBox(); });
+  // Marcou/desmarcou uma linha oficial: mostra ou esconde a escolha do modelo.
+  if (!editor._cloudHook) { editor._cloudHook = true; editor.addEventListener('change', ev => { if (ev.target && ev.target.name === 'camp-lines') renderCampCloudBox(); }); }
   editor.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
       <div style="font-size:15px;font-weight:600;color:var(--text);">${editing ? 'Editar campanha' : copyFrom ? 'Reutilizar campanha' : 'Nova campanha'}</div>
@@ -7172,6 +7177,7 @@ function openCampaignEditor(copyFrom, opts = {}) {
     <input class="field-input" id="camp-name" placeholder="Ex.: Promoção de outubro" style="margin-bottom:6px;" value="${editing ? escapeHtml(copyFrom.name || '') : copyFrom ? escapeHtml((copyFrom.name || 'Campanha') + ' (nova)') : ''}">
     ${editing ? `<div style="${hint}">Você pode mudar o nome, as mensagens, o arquivo, o WhatsApp e o ritmo de envio. Os contatos continuam os mesmos (${Number(copyFrom.total) || 0}, dos quais ${Number(copyFrom.sent) || 0} já receberam). As mudanças valem a partir do próximo envio.</div>` : copyFrom ? `<div style="${hint}">Baseada em "${escapeHtml(copyFrom.name || 'Campanha')}". Mude o que quiser: mensagens (adicione ou apague variações), arquivo, contatos e regras.</div>` : ''}
     <div id="camp-lines-box">${waLinePickerHtml(act, 'camp-lines', copyFrom && copyFrom.lines, 'Por qual WhatsApp disparar?')}</div>
+    <div id="camp-cloud-box"></div>
 
     <div style="${section}">Conteúdo</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
@@ -7699,11 +7705,13 @@ async function saveCampaign(start) {
   const templates = readWhatsAppVariations('camp');
   const mediaType = _campaignDraft.mediaType || 'text';
   if (!name) { setFb('#f87171', 'Dê um nome à campanha.'); return; }
-  if (mediaType === 'text' && !templates.length) { setFb('#f87171', 'Escreva pelo menos uma mensagem.'); return; }
+  if (mediaType === 'text' && !templates.length && !(campCloudLines(_campaignDraft.act).length && (readWaLinePicker('camp-lines') || [waDefaultLine(_campaignDraft.act)]).every(waIsCloud))) { setFb('#f87171', 'Escreva pelo menos uma mensagem.'); return; }
   if (mediaType !== 'text' && !_campaignDraft.media) { setFb('#f87171', 'Envie o arquivo de ' + CAMPAIGN_MEDIA_LABELS[mediaType].toLowerCase() + '.'); return; }
   if (!_campaignDraft.recipients.length) { setFb('#f87171', 'A lista de contatos está vazia.'); return; }
   const campLines = readWaLinePicker('camp-lines');
   if (waHasMultiple(_campaignDraft.act) && !campLines) { setFb('#f87171', 'Escolha por qual WhatsApp disparar (pode marcar mais de um para mesclar).'); return; }
+  const cloudTpl = readCampCloudTemplate();
+  if (!cloudTpl.ok) { setFb('#f87171', cloudTpl.error); return; }
   const read = readCampaignDispatch();
   if (read.error) { setFb('#f87171', read.error); return; }
   const startInfo = readCampaignStart();
@@ -7722,6 +7730,7 @@ async function saveCampaign(start) {
       } : null,
       dispatch: read.dispatch,
       lines: campLines || [waDefaultLine(_campaignDraft.act)],
+      cloudTemplate: cloudTpl.template,
       startAt: startInfo.startAt,
       audienceType: _campaignDraft.source,
       audienceLabel: _campaignDraft.label
@@ -11393,6 +11402,7 @@ function openChat(key) {
     <div class="chat-head" id="chat-head"></div>
     <div class="chat-msgs" id="chat-msgs"><div class="chat-empty">Carregando mensagens...</div></div>
     <div id="chat-media-chip" style="display:none;padding:6px 14px;font-size:12px;color:var(--text);border-top:1px solid var(--border);"></div>
+    <div id="chat-cloud-hint" style="display:none;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:6px 14px;font-size:12px;color:var(--muted2);border-top:1px solid var(--border);background:var(--surface2);"></div>
     <div class="chat-compose">
       <div class="chat-qr-pop" id="chat-qr-pop"></div>
       <div class="chat-qr-pop chat-stk-pop" id="chat-stk-pop"></div>
@@ -11497,6 +11507,7 @@ async function createLeadFromChat() {
 
 function renderChatHeader() {
   renderChatInfo();
+  updateChatCloudHint();
   const head = document.getElementById('chat-head');
   if (!head || !_chatOpenKey) return;
   const c = _chatItems.find(x => x.id === _chatOpenKey) || { id: _chatOpenKey };
@@ -11587,10 +11598,11 @@ function renderChatMessages() {
     }
     // Enviada por nós e ainda dentro do prazo do WhatsApp: botão para editar (texto, 15 min) ou apagar (2 dias).
     const age = Date.now() - d.getTime();
-    const canEdit = m.fromMe && (m.type || 'text') === 'text' && age < 15 * 60000 && !/^(crm|sch)\d/.test(m.id);
-    const canDel = m.fromMe && age < 2 * 86400000 && !/^(crm|sch)\d/.test(m.id);
+    const cloudChat = waIsCloud(waLineOfKey(_chatOpenKey)); // a API oficial não edita nem apaga
+    const canEdit = !cloudChat && m.fromMe && (m.type || 'text') === 'text' && age < 15 * 60000 && !/^(crm|sch)\d/.test(m.id);
+    const canDel = !cloudChat && m.fromMe && age < 2 * 86400000 && !/^(crm|sch)\d/.test(m.id);
     const menu = canEdit || canDel ? `<button class="chat-msg-more" title="Editar ou apagar" onclick="openChatMsgMenu(event, '${escapeJsString(m.id)}', ${canEdit}, ${canDel})">⋯</button>` : '';
-    parts.push(`<div class="chat-bubble ${m.fromMe ? 'out' : 'in'}">${menu}${media}${escapeHtml(m.text || '')}<div class="chat-meta">${who ? escapeHtml(who) + ' · ' : ''}${m.edited ? 'editada · ' : ''}${time}</div></div>`);
+    parts.push(`<div class="chat-bubble ${m.fromMe ? 'out' : 'in'}">${menu}${media}${escapeHtml(m.text || '')}${m.failed ? `<div style="font-size:11px;color:var(--red);margin-top:4px;">⚠️ Não entregue: ${escapeHtml(m.error || '')}</div>` : ''}<div class="chat-meta">${who ? escapeHtml(who) + ' · ' : ''}${m.edited ? 'editada · ' : ''}${time}</div></div>`);
   });
   pendingSched.forEach(s => {
     const when = new Date(s.sendAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -12269,6 +12281,374 @@ async function sendNewChat() {
   }
 }
 
+// ===== API OFICIAL DO WHATSAPP (Cloud API) =====
+// Linhas com id "api..." falam pela API oficial da Meta. A Huven cola as credenciais (admin); o cliente vê os modelos.
+// Fora da janela de 24 h só sai modelo aprovado: o da campanha, ou o "modelo padrão" da linha.
+const waIsCloud = id => /^api/.test(String(id || ''));
+const isAdminUser = () => ((window._fb && window._fb.getProfile && window._fb.getProfile()) || {}).role === 'admin';
+const CLOUD_STATUS = { APPROVED: ['Aprovado', 'var(--green, #34d399)'], PENDING: ['Em análise', '#fbbf24'], REJECTED: ['Recusado', '#f87171'], PAUSED: ['Pausado', '#fbbf24'], DISABLED: ['Desativado', '#f87171'], IN_APPEAL: ['Em recurso', '#fbbf24'] };
+const CLOUD_QUALITY = { GREEN: 'Qualidade alta', YELLOW: 'Qualidade média', RED: 'Qualidade baixa' };
+let _cloudTplCache = {};
+let _cloudCtx = null;
+
+async function cloudTemplatesFor(act, line, refresh) {
+  const k = act + '|' + line;
+  if (!refresh && _cloudTplCache[k]) return _cloudTplCache[k];
+  const r = await window._fb.whatsapp('/whatsapp/cloud-templates', act, { line });
+  _cloudTplCache[k] = r.templates || [];
+  return _cloudTplCache[k];
+}
+
+function cloudStatusChip(status, rejected) {
+  const [label, color] = CLOUD_STATUS[status] || [status || '?', 'var(--muted)'];
+  return `<span class="chat-tag" style="background:var(--surface3);color:${color};" title="${escapeHtml(rejected || '')}">${escapeHtml(label)}${rejected ? ' · ' + escapeHtml(rejected) : ''}</span>`;
+}
+
+// Campos das variáveis {{1}}, {{2}}... de um modelo. Cada uma aceita texto fixo ou {nome} / {primeiro_nome}.
+function cloudDefaultParams(tpl, values) {
+  return Array.from({ length: (tpl && tpl.vars) || 0 }, (_, i) => values && values[i] != null ? values[i] : (i === 0 ? '{primeiro_nome}' : ''));
+}
+
+// Campos das variáveis + prévia que acompanha a digitação.
+const _cloudPrev = {};
+function cloudParamsHtml(prefix, tpl, values, name, intro) {
+  if (!tpl) return '';
+  const vals = cloudDefaultParams(tpl, values);
+  _cloudPrev[prefix] = { tpl, name };
+  let html = tpl.vars ? `<div class="integ-muted" style="font-size:11.5px;margin:6px 0 4px;">${escapeHtml(intro || 'O que vai em cada variável: escreva um texto ou use {primeiro_nome} e {nome} (o nome do contato).')}</div>` : '';
+  for (let i = 1; i <= tpl.vars; i++) {
+    html += `<label style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:12.5px;color:var(--text);"><span style="min-width:44px;">{{${i}}}</span><input class="field-input" id="${prefix}-p${i}" value="${escapeHtml(vals[i - 1])}" style="flex:1;" oninput="updateCloudPreview('${prefix}')"></label>`;
+  }
+  return html + `<div class="integ-muted" id="${prefix}-prev" style="font-size:12px;margin-top:4px;white-space:pre-wrap;">Prévia: ${escapeHtml(cloudPreview(tpl, vals, name))}</div>`;
+}
+
+function updateCloudPreview(prefix) {
+  const p = _cloudPrev[prefix], el = document.getElementById(prefix + '-prev');
+  if (p && el) el.textContent = 'Prévia: ' + cloudPreview(p.tpl, readCloudParams(prefix, p.tpl), p.name);
+}
+
+function readCloudParams(prefix, tpl) {
+  const out = [];
+  for (let i = 1; i <= ((tpl && tpl.vars) || 0); i++) out.push((document.getElementById(`${prefix}-p${i}`)?.value || '').trim());
+  return out;
+}
+
+function cloudTplObject(tpl, params) {
+  return tpl ? { name: tpl.name, language: tpl.language, params, body: tpl.body } : null;
+}
+
+function cloudPreview(tpl, params, name) {
+  if (!tpl) return '';
+  const first = String(name || 'Maria Silva').split(/\s+/)[0];
+  const fill = v => String(v || '').split('{nome}').join(name || 'Maria Silva').split('{primeiro_nome}').join(first) || '-';
+  return (tpl.body || '').replace(/\{\{(\d+)\}\}/g, (_, n) => fill(params[Number(n) - 1]));
+}
+
+// ----- Configurar a linha (admin) -----
+async function openCloudSetup(act, line) {
+  if (!isAdminUser()) return;
+  let info = {}, cfg = null;
+  openHuvenModal(line ? 'API oficial: credenciais' : 'Conectar API oficial do WhatsApp', '<div class="integ-muted">Carregando...</div>', 600);
+  try {
+    info = await window._fb.whatsapp('/whatsapp/cloud-setup-info', act);
+    if (line) cfg = await window._fb.whatsapp('/whatsapp/cloud-info', act, { line });
+  } catch (e) { document.getElementById('huven-modal-body').innerHTML = `<div class="integ-error">${escapeHtml(e.message)}</div>`; return; }
+  const a = escapeJsString(act), l = escapeJsString(line || '');
+  const copyBtn = v => `<button class="chat-pill" onclick="navigator.clipboard.writeText('${escapeJsString(v)}');showToast('Copiado.','success',1500)">Copiar</button>`;
+  document.getElementById('huven-modal-body').innerHTML = `
+    <div class="integ-muted" style="font-size:12.5px;line-height:1.55;margin-bottom:12px;">
+      Os dados ficam no painel da Meta do cliente: <b>WhatsApp → Configuração da API</b> (ID do número e ID da conta) e um <b>token permanente</b> de um usuário do sistema do Business Manager com as permissões whatsapp_business_messaging e whatsapp_business_management.
+    </div>
+    <label class="field-label">Nome desta linha no CRM</label>
+    <input class="field-input" id="cloud-label" placeholder="Ex.: Comercial (oficial)" value="${escapeHtml(line ? waLineLabel(act, line) : 'API oficial')}" style="margin-bottom:8px;">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;"><label class="field-label">ID do número de telefone</label><input class="field-input" id="cloud-pnid" inputmode="numeric" value="${escapeHtml((cfg && cfg.phoneNumberId) || '')}"></div>
+      <div style="flex:1;min-width:200px;"><label class="field-label">ID da conta do WhatsApp Business</label><input class="field-input" id="cloud-waba" inputmode="numeric" value="${escapeHtml((cfg && cfg.wabaId) || '')}"></div>
+    </div>
+    <label class="field-label" style="margin-top:8px;">Token de acesso permanente</label>
+    <input class="field-input" id="cloud-token" type="password" autocomplete="off" placeholder="${cfg ? 'Deixe vazio para manter o token salvo' : 'EAA...'}">
+    <label class="field-label" style="margin-top:8px;">Chave secreta do app (só se o número estiver em outro app da Meta, não no da Huven)</label>
+    <input class="field-input" id="cloud-secret" type="password" autocomplete="off" placeholder="${cfg && cfg.hasAppSecret ? 'Já salva. Deixe vazio para manter' : 'Opcional'}">
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-top:12px;font-size:12.5px;color:var(--text);line-height:1.6;">
+      <b>Webhook</b> (no app da Meta: WhatsApp → Configuração → Webhook, marque o campo <b>messages</b>)<br>
+      URL de retorno: <code style="word-break:break-all;">${escapeHtml(info.webhookUrl)}</code> ${copyBtn(info.webhookUrl)}<br>
+      Token de verificação: <code>${escapeHtml(info.verifyToken)}</code> ${copyBtn(info.verifyToken)}
+    </div>
+    ${cfg ? `<div class="integ-muted" style="font-size:12px;margin-top:10px;">Número: <b>${escapeHtml(cfg.displayPhone)}</b> · ${escapeHtml(cfg.verifiedName)}${cfg.quality ? ' · ' + escapeHtml(CLOUD_QUALITY[cfg.quality] || cfg.quality) : ''} · aviso de mensagens ${cfg.subscribed ? 'ligado' : '<b style="color:var(--red);">não ligado</b>'}${cfg.savedBy ? ' · salvo por ' + escapeHtml(cfg.savedBy) : ''}</div>` : ''}
+    <div style="display:flex;gap:8px;align-items:center;margin-top:14px;">
+      <button class="btn-save" id="cloud-save-btn" style="width:auto;padding:9px 16px;" onclick="saveCloudSetup('${a}','${l}')">${cfg ? 'Salvar' : 'Conferir e conectar'}</button>
+      <span id="cloud-save-fb" class="integ-muted" style="font-size:12.5px;"></span>
+    </div>`;
+}
+
+async function saveCloudSetup(act, line) {
+  const fb = document.getElementById('cloud-save-fb');
+  const btn = document.getElementById('cloud-save-btn');
+  const val = id => (document.getElementById(id)?.value || '').trim();
+  btn.disabled = true; fb.style.color = 'var(--muted)'; fb.textContent = 'Conferindo com a Meta...';
+  try {
+    const r = await window._fb.whatsapp('/whatsapp/cloud-save', act, { line: line || undefined, label: val('cloud-label'), phoneNumberId: val('cloud-pnid'), wabaId: val('cloud-waba'), token: val('cloud-token'), appSecret: val('cloud-secret') });
+    try { Object.assign(WHATSAPP_SETTINGS, await window._fb.getWhatsAppSettings()); } catch (e) {}
+    closeHuvenModal();
+    refreshWaLinesFor(act);
+    showToast(`API oficial conectada: ${r.displayPhone} (${r.verifiedName}).${r.subscribed ? '' : ' Atenção: a Meta não ligou o aviso de mensagens (' + r.subscribeError + ').'}`, r.subscribed ? 'success' : 'warning', 9000);
+    if (!line) openCloudTemplates(act, r.line);
+  } catch (e) { fb.style.color = 'var(--red)'; fb.textContent = e.message; btn.disabled = false; }
+}
+
+// ----- Modelos e modelo padrão -----
+async function openCloudTemplates(act, line) {
+  _cloudCtx = { act, line };
+  openHuvenModal(`Modelos · ${waLineLabel(act, line)}`, '<div class="integ-muted">Buscando os modelos na Meta...</div>', 680);
+  let info, list;
+  try { [info, list] = await Promise.all([window._fb.whatsapp('/whatsapp/cloud-info', act, { line }), cloudTemplatesFor(act, line, true)]); }
+  catch (e) { document.getElementById('huven-modal-body').innerHTML = `<div class="integ-error">${escapeHtml(e.message)}</div>`; return; }
+  _cloudCtx.info = info;
+  renderCloudTemplates(list);
+}
+
+function renderCloudTemplates(list) {
+  const { act, line, info } = _cloudCtx;
+  const a = escapeJsString(act), l = escapeJsString(line);
+  const approved = list.filter(t => t.status === 'APPROVED');
+  const def = info.defaultTemplate;
+  const defTpl = def && approved.find(t => t.name === def.name && t.language === def.language);
+  document.getElementById('huven-modal-body').innerHTML = `
+    <div class="integ-muted" style="font-size:12.5px;line-height:1.55;margin-bottom:10px;">
+      ${escapeHtml(info.displayPhone)} · ${escapeHtml(info.verifiedName)}${info.quality ? ' · ' + escapeHtml(CLOUD_QUALITY[info.quality] || info.quality) : ''}.
+      Pela API oficial, texto livre só vale até 24 h depois da última mensagem do contato. Para começar uma conversa (1ª mensagem, campanhas, automações e agendadas fora dessa janela) vai um <b>modelo aprovado pela Meta</b>.
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px;">
+      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;">Modelo padrão</div>
+      <div class="integ-muted" style="font-size:12px;margin-bottom:8px;">Usado automaticamente quando uma mensagem precisa sair fora da janela de 24 h (1ª mensagem, automações e agendadas). Campanhas escolhem o modelo delas.</div>
+      <select class="field-input" id="cloud-def" onchange="renderCloudDefaultParams()">
+        <option value="">Nenhum (fora da janela, o envio não sai)</option>
+        ${approved.map(t => `<option value="${escapeHtml(t.name + '|' + t.language)}" ${defTpl === t ? 'selected' : ''}>${escapeHtml(t.name)} (${escapeHtml(t.language)})</option>`).join('')}
+      </select>
+      <div id="cloud-def-params"></div>
+      <button class="huv-btn" style="margin-top:8px;" onclick="saveCloudDefault()">Salvar modelo padrão</button>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div style="font-size:13px;font-weight:600;color:var(--text);">Modelos desta conta (${list.length})</div>
+      <div style="display:flex;gap:6px;"><button class="chat-pill" onclick="refreshCloudTemplates()">Atualizar</button><button class="chat-pill" onclick="toggleCloudNewTpl()">+ Novo modelo</button></div>
+    </div>
+    <div id="cloud-new-tpl" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div style="flex:2;min-width:200px;"><label class="field-label">Nome (sem acento, vira minúsculas_com_underline)</label><input class="field-input" id="cnt-name" placeholder="boas_vindas_lead"></div>
+        <div style="flex:1;min-width:140px;"><label class="field-label">Categoria</label><select class="field-input" id="cnt-cat"><option value="MARKETING">Marketing (ofertas, convites)</option><option value="UTILITY">Utilidade (confirmações, avisos do pedido)</option></select></div>
+      </div>
+      <label class="field-label" style="margin-top:8px;">Cabeçalho (opcional, até 60 caracteres)</label>
+      <input class="field-input" id="cnt-header" maxlength="60">
+      <label class="field-label" style="margin-top:8px;">Texto da mensagem</label>
+      <textarea class="field-input" id="cnt-body" rows="4" maxlength="1024" placeholder="Oi {{1}}, tudo bem? Vi que você se cadastrou para saber mais sobre ... Posso te explicar como funciona?" oninput="renderCloudNewExamples()"></textarea>
+      <div class="integ-muted" style="font-size:11.5px;margin:4px 0;">Use {{1}}, {{2}}... para o que muda em cada envio (ex.: o nome). A Meta pede um exemplo de cada um e não aceita o texto começando ou terminando com variável.</div>
+      <div id="cnt-examples"></div>
+      <label class="field-label" style="margin-top:8px;">Rodapé (opcional)</label>
+      <input class="field-input" id="cnt-footer" maxlength="60" placeholder="Responda SAIR para não receber mais">
+      <div style="display:flex;gap:8px;align-items:center;margin-top:10px;"><button class="btn-save" id="cnt-btn" style="width:auto;padding:9px 16px;" onclick="createCloudTemplate()">Enviar para aprovação</button><span id="cnt-fb" class="integ-muted" style="font-size:12.5px;"></span></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">${list.map(t => `
+      <div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px;">
+          <b style="font-size:13px;color:var(--text);">${escapeHtml(t.name)}</b>${cloudStatusChip(t.status, t.rejected)}
+          <span class="chat-tag" style="background:var(--surface3);color:var(--muted2);">${t.category === 'MARKETING' ? 'Marketing' : t.category === 'UTILITY' ? 'Utilidade' : escapeHtml(t.category || '')} · ${escapeHtml(t.language)}</span>
+          <span style="flex:1;"></span>
+          <button class="chat-pill" style="color:var(--red);" onclick="deleteCloudTemplate('${escapeJsString(t.name)}')">Apagar</button>
+        </div>
+        ${t.header ? `<div style="font-size:12.5px;font-weight:600;color:var(--text);">${escapeHtml(t.header)}</div>` : ''}
+        <div style="font-size:12.5px;color:var(--text);white-space:pre-wrap;">${escapeHtml(t.body)}</div>
+        ${t.footer ? `<div class="integ-muted" style="font-size:11.5px;">${escapeHtml(t.footer)}</div>` : ''}
+      </div>`).join('') || '<div class="integ-muted">Nenhum modelo ainda. Crie o primeiro: a Meta costuma aprovar em minutos.</div>'}</div>`;
+  renderCloudDefaultParams();
+}
+
+function cloudSelectedTpl(selectId, list) {
+  const v = document.getElementById(selectId)?.value || '';
+  if (!v) return null;
+  const [name, language] = v.split('|');
+  return (list || []).find(t => t.name === name && t.language === language) || null;
+}
+
+function renderCloudDefaultParams() {
+  const { act, line, info } = _cloudCtx;
+  const tpl = cloudSelectedTpl('cloud-def', _cloudTplCache[act + '|' + line]);
+  const def = info.defaultTemplate;
+  const values = tpl && def && def.name === tpl.name ? def.params : null;
+  const box = document.getElementById('cloud-def-params');
+  if (box) box.innerHTML = tpl ? cloudParamsHtml('cloud-def', tpl, values) : '';
+}
+
+async function saveCloudDefault() {
+  const { act, line } = _cloudCtx;
+  const tpl = cloudSelectedTpl('cloud-def', _cloudTplCache[act + '|' + line]);
+  const template = cloudTplObject(tpl, readCloudParams('cloud-def', tpl));
+  try {
+    const r = await window._fb.whatsapp('/whatsapp/cloud-default', act, { line, template });
+    _cloudCtx.info.defaultTemplate = r.defaultTemplate;
+    showToast(template ? 'Modelo padrão salvo.' : 'Modelo padrão removido.', 'success');
+    renderCloudDefaultParams();
+  } catch (e) { showToast('Erro: ' + e.message, 'error'); }
+}
+
+async function refreshCloudTemplates() {
+  const { act, line } = _cloudCtx;
+  try { renderCloudTemplates(await cloudTemplatesFor(act, line, true)); }
+  catch (e) { showToast('Erro: ' + e.message, 'error'); }
+}
+
+function toggleCloudNewTpl() {
+  const box = document.getElementById('cloud-new-tpl');
+  if (box) box.style.display = box.style.display === 'none' ? 'block' : 'none';
+}
+
+function renderCloudNewExamples() {
+  const text = document.getElementById('cnt-body')?.value || '';
+  const n = Math.max(0, ...[...text.matchAll(/\{\{(\d+)\}\}/g)].map(m => Number(m[1])));
+  const box = document.getElementById('cnt-examples');
+  if (!box) return;
+  const prev = [...box.querySelectorAll('input')].map(i => i.value);
+  let html = '';
+  for (let i = 1; i <= Math.min(n, 10); i++) html += `<label style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:12.5px;color:var(--text);"><span style="min-width:110px;">Exemplo de {{${i}}}</span><input class="field-input" value="${escapeHtml(prev[i - 1] || (i === 1 ? 'Maria' : ''))}" style="flex:1;"></label>`;
+  box.innerHTML = html;
+}
+
+async function createCloudTemplate() {
+  const { act, line } = _cloudCtx;
+  const fb = document.getElementById('cnt-fb');
+  const btn = document.getElementById('cnt-btn');
+  const val = id => (document.getElementById(id)?.value || '').trim();
+  btn.disabled = true; fb.style.color = 'var(--muted)'; fb.textContent = 'Enviando para a Meta...';
+  try {
+    const r = await window._fb.whatsapp('/whatsapp/cloud-template-create', act, {
+      line, name: val('cnt-name'), category: val('cnt-cat'), header: val('cnt-header'), body: val('cnt-body'), footer: val('cnt-footer'),
+      examples: [...document.querySelectorAll('#cnt-examples input')].map(i => i.value.trim())
+    });
+    showToast(`Modelo "${r.name}" enviado. Status: ${(CLOUD_STATUS[r.status] || [r.status])[0]}. Clique em Atualizar daqui a pouco para ver a aprovação.`, 'success', 8000);
+    renderCloudTemplates(await cloudTemplatesFor(act, line, true));
+  } catch (e) { fb.style.color = 'var(--red)'; fb.textContent = e.message; btn.disabled = false; }
+}
+
+async function deleteCloudTemplate(name) {
+  const { act, line } = _cloudCtx;
+  if (!await showConfirm(`O modelo "${name}" será apagado na Meta (em todos os idiomas). Campanhas que usam esse modelo param de enviar.`, 'Apagar modelo', 'Apagar', true)) return;
+  try {
+    await window._fb.whatsapp('/whatsapp/cloud-template-delete', act, { line, name });
+    if (_cloudCtx.info.defaultTemplate && _cloudCtx.info.defaultTemplate.name === name) _cloudCtx.info.defaultTemplate = null;
+    renderCloudTemplates(await cloudTemplatesFor(act, line, true));
+    showToast('Modelo apagado.', 'success');
+  } catch (e) { showToast('Erro: ' + e.message, 'error'); }
+}
+
+// ----- Campanha: modelo para as linhas oficiais -----
+function campCloudLines(act) {
+  const chosen = readWaLinePicker('camp-lines') || [waDefaultLine(act)];
+  return chosen.filter(waIsCloud);
+}
+
+async function renderCampCloudBox(preset) {
+  const box = document.getElementById('camp-cloud-box');
+  const d = _campaignDraft;
+  if (!box || !d) return;
+  const cl = campCloudLines(d.act);
+  if (!cl.length) { box.innerHTML = ''; d.cloudLine = null; return; }
+  const line = cl[0];
+  const keep = preset || d.cloudPreset || null;
+  box.innerHTML = '<div class="integ-muted" style="font-size:12px;">Buscando os modelos aprovados...</div>';
+  let list = [];
+  try { list = (await cloudTemplatesFor(d.act, line)).filter(t => t.status === 'APPROVED'); }
+  catch (e) { box.innerHTML = `<div class="integ-error">${escapeHtml(e.message)}</div>`; return; }
+  d.cloudLine = line;
+  const sel = keep ? list.find(t => t.name === keep.name && t.language === keep.language) : null;
+  box.innerHTML = `<div class="wa-line-picker" style="margin-top:8px;">
+    <div class="wa-line-picker-title">Modelo da API oficial</div>
+    <div class="wa-line-picker-hint" style="margin-bottom:6px;">Pela API oficial, a campanha envia um modelo aprovado pela Meta (as mensagens abaixo valem só para os números conectados por QR Code). A Meta cobra cada envio de modelo na conta do cliente.</div>
+    <select class="field-input" id="camp-cloud-tpl" onchange="renderCampCloudParams()">
+      <option value="">Escolha o modelo</option>
+      ${list.map(t => `<option value="${escapeHtml(t.name + '|' + t.language)}" ${sel === t ? 'selected' : ''}>${escapeHtml(t.name)} (${escapeHtml(t.language)}) · ${t.category === 'MARKETING' ? 'Marketing' : 'Utilidade'}</option>`).join('')}
+    </select>
+    ${list.length ? '' : `<div class="integ-muted" style="font-size:12px;margin-top:6px;">Nenhum modelo aprovado ainda. Crie em Conexões → ${escapeHtml(waLineLabel(d.act, line))} → Modelos.</div>`}
+    <div id="camp-cloud-params"></div>
+  </div>`;
+  renderCampCloudParams(sel && keep ? keep.params : null);
+}
+
+function renderCampCloudParams(values) {
+  const d = _campaignDraft;
+  const box = document.getElementById('camp-cloud-params');
+  if (!d || !box) return;
+  const tpl = cloudSelectedTpl('camp-cloud-tpl', _cloudTplCache[d.act + '|' + d.cloudLine]);
+  if (!tpl) { box.innerHTML = ''; return; }
+  box.innerHTML = cloudParamsHtml('camp-cloud', tpl, values);
+}
+
+// Devolve { ok, template } (template null quando não há linha oficial na campanha).
+function readCampCloudTemplate() {
+  const d = _campaignDraft;
+  if (!d || !campCloudLines(d.act).length) return { ok: true, template: null };
+  const tpl = cloudSelectedTpl('camp-cloud-tpl', _cloudTplCache[d.act + '|' + d.cloudLine]);
+  if (!tpl) return { ok: false, error: 'Escolha o modelo aprovado da API oficial.' };
+  return { ok: true, template: cloudTplObject(tpl, readCloudParams('camp-cloud', tpl)) };
+}
+
+// ----- Chat: conversa pela linha oficial -----
+function chatCloudWindowOpen(c) {
+  return !!(c && c.lastInAt && Date.now() - Date.parse(c.lastInAt) < 24 * 3600 * 1000);
+}
+
+function updateChatCloudHint() {
+  const el = document.getElementById('chat-cloud-hint');
+  if (!el) return;
+  const c = _chatItems.find(x => x.id === _chatOpenKey) || { id: _chatOpenKey };
+  const line = c.line || waLineOfKey(c.id);
+  if (!waIsCloud(line)) { el.style.display = 'none'; return; }
+  const open = chatCloudWindowOpen(c);
+  el.style.display = 'flex';
+  el.innerHTML = open
+    ? `<span>API oficial · conversa aberta até ${escapeHtml(new Date(Date.parse(c.lastInAt) + 24 * 3600 * 1000).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }))}</span>`
+    : `<span>API oficial · fora da janela de 24 h: só dá para enviar um modelo aprovado.</span><button class="chat-pill" onclick="openChatTemplate()">📋 Enviar modelo</button>`;
+}
+
+async function openChatTemplate() {
+  const c = _chatItems.find(x => x.id === _chatOpenKey) || { id: _chatOpenKey };
+  const line = c.line || waLineOfKey(c.id);
+  const act = _chatAct;
+  openHuvenModal('Enviar modelo', '<div class="integ-muted">Buscando os modelos aprovados...</div>', 520);
+  let list = [];
+  try { list = (await cloudTemplatesFor(act, line)).filter(t => t.status === 'APPROVED'); }
+  catch (e) { document.getElementById('huven-modal-body').innerHTML = `<div class="integ-error">${escapeHtml(e.message)}</div>`; return; }
+  _cloudCtx = { act, line, chat: c, list };
+  document.getElementById('huven-modal-body').innerHTML = list.length ? `
+    <select class="field-input" id="chat-tpl" onchange="renderChatTplParams()">${list.map(t => `<option value="${escapeHtml(t.name + '|' + t.language)}">${escapeHtml(t.name)} (${escapeHtml(t.language)})</option>`).join('')}</select>
+    <div id="chat-tpl-params"></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:12px;"><button class="btn-save" id="chat-tpl-btn" style="width:auto;padding:9px 16px;" onclick="sendChatTemplate()">Enviar</button><span id="chat-tpl-fb" class="integ-muted" style="font-size:12.5px;"></span></div>`
+    : `<div class="integ-muted">Nenhum modelo aprovado nesta linha. Crie em Conexões → ${escapeHtml(waLineLabel(act, line))} → Modelos.</div>`;
+  if (list.length) renderChatTplParams();
+}
+
+function renderChatTplParams() {
+  const { list } = _cloudCtx;
+  const tpl = cloudSelectedTpl('chat-tpl', list);
+  const first = chatFirstName();
+  const values = tpl ? Array.from({ length: tpl.vars }, (_, i) => i === 0 ? first : '') : [];
+  const box = document.getElementById('chat-tpl-params');
+  if (!box || !tpl) return;
+  box.innerHTML = cloudParamsHtml('chat-tpl', tpl, values, first, 'Preencha as variáveis:');
+}
+
+async function sendChatTemplate() {
+  const { act, list } = _cloudCtx;
+  const tpl = cloudSelectedTpl('chat-tpl', list);
+  if (!tpl || !_chatOpenKey) return;
+  const btn = document.getElementById('chat-tpl-btn');
+  const fb = document.getElementById('chat-tpl-fb');
+  btn.disabled = true; fb.textContent = 'Enviando...';
+  try {
+    await window._fb.whatsapp('/whatsapp/chat-send', act, { chatKey: _chatOpenKey, text: '', template: cloudTplObject(tpl, readCloudParams('chat-tpl', tpl)) });
+    closeHuvenModal();
+    showToast('Modelo enviado.', 'success');
+  } catch (e) { fb.style.color = 'var(--red)'; fb.textContent = e.message; btn.disabled = false; }
+}
+
 // ===== WHATSAPP (Evolution API) =====
 const WHATSAPP_STATE_LABELS = {
   open: ['Conectado', '#34d399'],
@@ -12304,7 +12684,7 @@ function waLinePickerHtml(act, name, selected, title) {
   const sel = new Set((Array.isArray(selected) && selected.length ? selected : [lines[0].id]));
   return `<div class="wa-line-picker">
     <div class="wa-line-picker-title">${escapeHtml(title || 'Por qual WhatsApp enviar?')}</div>
-    ${lines.map(l => `<label class="integ-toggle"><input type="checkbox" name="${escapeHtml(name)}" value="${escapeHtml(l.id)}" ${sel.has(l.id) ? 'checked' : ''}> ${escapeHtml(l.label)}</label>`).join('')}
+    ${lines.map(l => `<label class="integ-toggle"><input type="checkbox" name="${escapeHtml(name)}" value="${escapeHtml(l.id)}" ${sel.has(l.id) ? 'checked' : ''}> ${escapeHtml(l.label)}${waIsCloud(l.id) ? ' <span class="integ-muted">(API oficial)</span>' : ''}</label>`).join('')}
     <div class="wa-line-picker-hint">Marcando mais de um, os envios se alternam entre os números (mesclar). Cada contato continua sempre pelo mesmo número.</div>
   </div>`;
 }
@@ -12337,13 +12717,23 @@ async function renderWaLinesBox(act, el) {
     const st = states.find(x => x.line === l.id) || { state: 'not_created' };
     const id = escapeJsString(l.id);
     const num = st.number ? chatFormatPhone(st.number) : '';
+    if (waIsCloud(l.id)) {
+      const ok = st.state === 'open';
+      return `<div class="wa-line-row">
+      <div style="flex:1;min-width:0;"><div class="wa-line-name">${escapeHtml(l.label)} <span class="chat-tag" style="background:var(--blue-dim);color:var(--blue);">API oficial</span></div><div class="wa-line-sub"><span style="color:${ok ? '#34d399' : '#fbbf24'};font-weight:600;">● ${ok ? 'Conectado' : 'Falta configurar'}</span>${num ? ' · ' + escapeHtml(num) : ''}${st.profileName ? ' · ' + escapeHtml(st.profileName) : ''}${st.quality ? ' · ' + escapeHtml(CLOUD_QUALITY[st.quality] || st.quality) : ''}</div></div>
+      ${ok ? `<button style="${wbtn}" onclick="openCloudTemplates('${a}','${id}')">Modelos</button>` : ''}
+      ${isAdminUser() ? `<button class="chat-pill" onclick="openCloudSetup('${a}','${id}')">Credenciais</button>` : ''}
+      <button class="chat-pill" onclick="renameWaLine('${a}','${id}')">Renomear</button>
+      ${waLines(act).length > 1 ? `<button class="chat-pill" style="color:var(--red);border-color:rgba(248,113,113,.4);" onclick="removeWaLine('${a}','${id}')">Excluir</button>` : ''}
+    </div>`;
+    }
     return `<div class="wa-line-row">
       <div style="flex:1;min-width:0;"><div class="wa-line-name">${escapeHtml(l.label)}</div><div class="wa-line-sub">${whatsappStateBadge(st)}${num ? ' · ' + escapeHtml(num) : ''}</div></div>
       ${st.state === 'open' ? `<button style="${wbtn}" onclick="disconnectWhatsApp('${a}','${id}')">Desconectar</button>` : `<button style="${wbtn}" onclick="openWhatsAppConnect('${a}','${escapeJsString(getClientDisplayName(act) + ' · ' + l.label)}','${id}')">Conectar</button>`}
       <button class="chat-pill" onclick="renameWaLine('${a}','${id}')">Renomear</button>
       ${waLines(act).length > 1 ? `<button class="chat-pill" style="color:var(--red);border-color:rgba(248,113,113,.4);" onclick="removeWaLine('${a}','${id}')">Excluir</button>` : ''}
     </div>`;
-  }).join('') + `<button class="chat-pill" style="margin-top:6px;" onclick="addWaLine('${a}')">+ Conectar outro WhatsApp</button>`;
+  }).join('') + `<button class="chat-pill" style="margin-top:6px;" onclick="addWaLine('${a}')">+ Conectar outro WhatsApp</button>${isAdminUser() ? ` <button class="chat-pill" style="margin-top:6px;" onclick="openCloudSetup('${a}')">+ API oficial</button>` : ''}`;
 }
 
 function refreshWaLinesFor(act) {
@@ -12388,7 +12778,7 @@ async function deleteWaLineFromQr() {
 async function removeWaLine(act, id) {
   if (waLines(act).length < 2) { showToast('Conecte outro WhatsApp antes de excluir este.', 'warning'); return; }
   const next = waLines(act).find(l => l.id !== id);
-  if (!await showConfirm(`O número "${waLineLabel(act, id)}" será desconectado e removido deste cliente. As conversas dele continuam no Chat. Os envios passam a sair por "${next.label}" quando nada for escolhido.`, 'Excluir WhatsApp', 'Excluir', true)) return;
+  if (!await showConfirm(`O número "${waLineLabel(act, id)}" será desconectado e removido deste cliente${waIsCloud(id) ? ' (as credenciais da API oficial são apagadas do CRM; na Meta nada muda)' : ''}. As conversas dele continuam no Chat. Os envios passam a sair por "${next.label}" quando nada for escolhido.`, 'Excluir WhatsApp', 'Excluir', true)) return;
   const s = WHATSAPP_SETTINGS[act] || {};
   try {
     await window._fb.whatsapp('/whatsapp/delete-line', act, { line: id });
