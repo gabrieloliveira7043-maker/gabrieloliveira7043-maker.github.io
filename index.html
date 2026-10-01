@@ -5971,20 +5971,20 @@ function getLeads() {
 
 function getLeadCrmSortTime(lead) {
   const candidates = [
-    lead && lead._crmArrivalSeenAt,
-    lead && lead.arrivalAt,
-    lead && lead.updatedAt,
-    lead && lead.updated_at,
+    lead && lead.createdAt,
     lead && lead.createdTime,
     lead && lead.created_time,
-    lead && lead.createdAt,
     lead && lead._createdAt,
+    lead && lead.arrivalAt,
+    lead && lead._crmArrivalSeenAt,
     lead && lead.timestamp,
     lead && lead.chegada,
     lead && lead.entrada,
     lead && lead.data,
     lead && lead.dataCriacao,
-    lead && lead.created_at
+    lead && lead.created_at,
+    lead && lead.updatedAt,
+    lead && lead.updated_at
   ];
 
   for (const value of candidates) {
@@ -6026,8 +6026,8 @@ function sortCrmLeadsForKanban(leads, boardAct) {
     const orderA = getLeadCrmOrder(a);
     const orderB = getLeadCrmOrder(b);
     if (orderA !== null && orderB !== null) return orderA - orderB;
-    if (orderA !== null) return -1;
-    if (orderB !== null) return 1;
+    if (orderA !== null) return 1;
+    if (orderB !== null) return -1;
     return 0;
   });
 }
