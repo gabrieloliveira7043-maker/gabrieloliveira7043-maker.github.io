@@ -2273,6 +2273,14 @@ td { font-family: var(--font); font-size: 13px; }
       await callAdminApi('/set-password', { login, password });
       await saveToVault(login, password);
     },
+    // Exclusão completa: o Worker apaga em rodadas (limite de pedidos do plano grátis) até terminar.
+    async deleteClientFull(login, act) {
+      for (let i = 0; i < 60; i++) {
+        const r = await callAdminApi('/admin/delete-client', { login, act });
+        if (r.done) return;
+      }
+      throw new Error('A exclusão ainda não terminou. Clique em Excluir de novo para continuar.');
+    },
     async deleteExtraClient(login) {
       const uid = await findUidByLogin(login);
       if (uid) {
@@ -3561,8 +3569,11 @@ applyDashboardMetricVisibility();
 }
 
 async function removeExtraClient(login, name) {
-  if (!await showConfirm('O cliente "' + name + '" e seu login serão removidos permanentemente.', 'Remover cliente', 'Remover')) return;
+  const act = (CREDENTIALS[login] && CREDENTIALS[login].act) || '';
+  if (!await showConfirm('O cliente "' + name + '" será excluído de vez: login, leads, funil, conversas e números de WhatsApp, campanhas, automações e páginas do Facebook ligadas. Não dá para desfazer.', 'Excluir cliente', 'Excluir', true)) return;
   try {
+    showToast('Excluindo "' + name + '"... pode levar alguns segundos.', 'info', 8000);
+    if (act) await window._fb.deleteClientFull(login, act);
     await window._fb.deleteExtraClient(login);
     delete CREDENTIALS[login];
     Object.keys(CLIENT_NAMES).forEach(act => {
@@ -3570,7 +3581,8 @@ async function removeExtraClient(login, name) {
     });
     renderSavedList();
     renderSidebar();
-  } catch(e) { alert('Erro ao remover: ' + e.message); }
+    showToast('Cliente excluído.', 'success');
+  } catch(e) { alert('Erro ao excluir: ' + e.message); }
 }
 
 function selectClient(name) {
@@ -3692,7 +3704,7 @@ async function renderSavedList() {
       extras.map(c => `
       <div class="saved-item">
         <div><div class="saved-name">${escapeHtml(c.name)}</div><div class="saved-id">${escapeHtml(getAdAccountFor(c.act) || 'sem conta de anúncios')} · login: ${escapeHtml(c.login)}</div></div>
-        <button class="btn-remove" onclick="removeExtraClient('${escapeJsString(c.login)}','${escapeJsString(c.name)}')">Remover</button>
+        <button class="btn-remove" onclick="removeExtraClient('${escapeJsString(c.login)}','${escapeJsString(c.name)}')">Excluir</button>
       </div>`).join('');
   } catch(e) { el.innerHTML = '<div style="font-size:12px;color:#f87171;margin:16px 0 8px;">Erro ao carregar.</div>'; }
 }
@@ -9450,6 +9462,16 @@ function prosApplyFilters() {
 function prosToggle(cnpj, on) { if (on) _prSelected.add(cnpj); else _prSelected.delete(cnpj); renderProsResult(); }
 function prosToggleAll(on) { _prFiltered.forEach(r => on ? _prSelected.add(r.cnpj) : _prSelected.delete(r.cnpj)); renderProsResult(); }
 
+// Marca só as N primeiras da lista (já com os filtros), no lugar de qualquer seleção anterior.
+function prosSelectFirst(n) {
+  n = Number(n) || 0;
+  if (!n) return;
+  _prSelected.clear();
+  _prFiltered.slice(0, n).forEach(r => _prSelected.add(r.cnpj));
+  if (_prShown < n) _prShown = n;
+  renderProsResult();
+}
+
 function prosFmtCnpj(c) { return String(c).replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5'); }
 
 function renderProsResult() {
@@ -9461,6 +9483,10 @@ function renderProsResult() {
   box.innerHTML = `
     <div class="pr-bar">
       <label class="integ-toggle"><input type="checkbox" ${allSel ? 'checked' : ''} onchange="prosToggleAll(this.checked)"> Selecionar todas</label>
+      <select class="field-input" style="width:auto;padding:4px 8px;font-size:12px;" onchange="prosSelectFirst(this.value)" aria-label="Selecionar as primeiras">
+        <option value="">Selecionar as primeiras...</option>
+        ${[100, 200, 300, 400, 500].map(n => `<option value="${n}">${n} primeiras</option>`).join('')}
+      </select>
       <span class="integ-muted">${list.length.toLocaleString('pt-BR')} empresas${_prRows.length !== list.length ? ` (de ${_prRows.length.toLocaleString('pt-BR')} na atividade)` : ''} · ${_prSelected.size} selecionada(s)</span>
       <span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;">
         <button class="huv-btn" onclick="prosApplyFilters()">Aplicar filtros</button>
@@ -9888,6 +9914,26 @@ function loadColumnAutomations(act) {
 function columnAutomation(act, stageId) {
   const list = (_colAutos[normalizeActValue(act)] || {}).list || [];
   return list.find(a => a.triggerStage === stageId && a.active) || list.find(a => a.triggerStage === stageId) || null;
+}
+
+// Põe na automação da coluna os leads que já estão lá (o Worker faz em páginas e devolve "next" até acabar).
+async function startColumnAutomation(stageId, stageLabel, autoName, count) {
+  const act = normalizeActValue(getActForStages());
+  if (!act) return;
+  const ok = await showConfirm('Os ' + count + ' lead(s) da coluna "' + stageLabel + '" começam agora o fluxo "' + (autoName || 'Automação') + '". As mensagens saem aos poucos (cerca de 10 por minuto), respeitando o horário configurado. Leads sem WhatsApp, que pediram para sair ou que já estão no fluxo são pulados.', 'Começar automação', 'Começar', false);
+  if (!ok) return;
+  showToast('Começando a automação...', 'info', 6000);
+  let started = 0, running = 0, noPhone = 0, optOut = 0, after = '';
+  try {
+    for (let i = 0; i < 40; i++) {
+      const r = await window._fb.whatsapp('/automation/start-column', act, { stage: stageId, after });
+      started += r.started; running += r.running; noPhone += r.noPhone; optOut += r.optOut;
+      after = r.next || '';
+      if (!after) break;
+    }
+    const skipped = [running && running + ' já no fluxo', noPhone && noPhone + ' sem WhatsApp', optOut && optOut + ' que pediram para sair'].filter(Boolean).join(', ');
+    showToast(started + ' lead(s) entraram na automação' + (skipped ? ' (pulados: ' + skipped + ')' : '') + '.', started ? 'success' : 'warning', 7000);
+  } catch (e) { showToast('Não consegui começar: ' + e.message, 'error', 7000); }
 }
 
 function openColumnAutomation(stageId) {
@@ -13810,6 +13856,14 @@ function renderKanban() {
       autoBtn.innerHTML = '⚡' + (colAuto ? `<span>${escapeHtml(limitText(colAuto.name || 'Fluxo', 12))}</span>` : '');
       autoBtn.addEventListener('click', e => { e.stopPropagation(); openColumnAutomation(stage.id); });
       headerLeft.appendChild(autoBtn);
+      if (colAuto && colAuto.active && stageLeads.length) {
+        const playBtn = document.createElement('button');
+        playBtn.className = 'col-auto-btn on';
+        playBtn.title = 'Começar a automação com os ' + stageLeads.length + ' lead(s) que já estão nesta coluna';
+        playBtn.innerHTML = '▶<span>Começar</span>';
+        playBtn.addEventListener('click', e => { e.stopPropagation(); startColumnAutomation(stage.id, stage.label, colAuto.name, stageLeads.length); });
+        headerLeft.appendChild(playBtn);
+      }
     }
     if (col._totalSpan) headerLeft.appendChild(col._totalSpan);
     header.appendChild(headerLeft);
