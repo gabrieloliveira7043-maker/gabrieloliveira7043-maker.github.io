@@ -9956,6 +9956,24 @@ function openColumnAutomation(stageId) {
     </div>`, 460);
 }
 
+// Proteção contra bloqueio do número, igual à das campanhas. O horário de envio é o de "Enviar só em horário comercial".
+function flowDispatchHtml() {
+  const d = { ...WHATSAPP_DISPATCH_DEFAULTS, ...(_flow.dispatch || {}) };
+  const num = (k, min, max) => `<input type="number" class="field-input" min="${min}" max="${max}" value="${d[k]}" style="width:62px;padding:5px;" onchange="setFlowDispatch('${k}', this.value)">`;
+  const row = 'display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:var(--muted2);flex-wrap:wrap;';
+  return `<div class="ci-label" style="margin-top:16px;">Proteção contra bloqueio</div>
+    <div class="integ-muted" style="margin-top:2px;">Já vem com o recomendado. Vale para os envios desta automação; o contador do número é compartilhado com campanhas.</div>
+    <div style="${row}">Máximo por dia ${num('dailyLimit', 1, 1000)} por hora ${num('hourlyLimit', 1, 60)}</div>
+    <div style="${row}">Intervalo entre envios ${num('minIntervalSec', 15, 3600)} a ${num('maxIntervalSec', 15, 3600)} s</div>
+    <div style="${row}">"Digitando..." ${num('typingMinSec', 1, 30)} a ${num('typingMaxSec', 1, 30)} s</div>
+    <label class="integ-toggle" style="margin-top:8px;align-items:flex-start;"><input type="checkbox" ${d.checkNumber !== false ? 'checked' : ''} onchange="setFlowDispatch('checkNumber', this.checked)"> Conferir se o número tem WhatsApp antes de enviar</label>
+    <button class="chat-pill" style="margin-top:8px;" onclick="_flow.dispatch = null; _flow._dirty = true; renderFlowEditor()">Voltar ao recomendado</button>`;
+}
+function setFlowDispatch(k, v) {
+  _flow.dispatch = { ...WHATSAPP_DISPATCH_DEFAULTS, ...(_flow.dispatch || {}), [k]: typeof v === 'boolean' ? v : Number(v) };
+  _flow._dirty = true;
+}
+
 function newColumnFlow(stageId, manual) {
   const act = normalizeActValue(getActForStages());
   const stage = getAllStages(act).find(s => s.id === stageId) || { label: stageId };
@@ -10005,6 +10023,7 @@ function renderFlowEditor() {
           ${_flow.stopOnReply !== false ? `<label class="auto-label" style="display:block;margin-top:6px;">e mover para<select class="field-input" style="margin-top:4px;" onchange="_flow.onReply = { moveTo: this.value }; _flow._dirty = true">${autoStageOptions(act, (_flow.onReply || {}).moveTo, 'Não mover')}</select></label>` : '<div class="integ-muted" style="margin-top:6px;">Use o bloco "Respondeu?" para decidir o caminho.</div>'}
           <label class="integ-toggle" style="margin-top:10px;align-items:flex-start;"><input type="checkbox" ${_flow.hours && _flow.hours.enabled ? 'checked' : ''} onchange="_flow.hours = { ..._flow.hours, enabled: this.checked }; _flow._dirty = true"> Enviar só em horário comercial</label>
           <div style="display:flex;align-items:center;gap:6px;margin-top:4px;font-size:12px;color:var(--muted2);">das <input type="number" class="field-input" min="0" max="23" value="${(_flow.hours || {}).start ?? 8}" style="width:58px;padding:5px;" onchange="_flow.hours = { ..._flow.hours, start: Number(this.value) }; _flow._dirty = true"> às <input type="number" class="field-input" min="1" max="24" value="${(_flow.hours || {}).end ?? 20}" style="width:58px;padding:5px;" onchange="_flow.hours = { ..._flow.hours, end: Number(this.value) }; _flow._dirty = true"> h</div>
+          ${flowDispatchHtml()}
           <div class="integ-muted" style="margin-top:14px;">Arraste os blocos para organizar. Para ligar, puxe a bolinha da direita de um bloco até outro. Clique na ✕ da linha para desligar.</div>
         </aside>
         <div class="flow-canvas" id="flow-canvas">
@@ -10351,6 +10370,7 @@ async function saveFlow() {
     if (n.type === 'move' && !d.stage) { _flowSel = n.id; renderFlowNodes(); renderFlowInspector(); return fail('Escolha a coluna do bloco "Mover card".'); }
   }
   if (f.hours && f.hours.enabled && Number(f.hours.end) <= Number(f.hours.start)) return fail('O horário final precisa ser depois do inicial.');
+  if (f.dispatch && (!(Number(f.dispatch.dailyLimit) > 0) || !(Number(f.dispatch.hourlyLimit) > 0) || Number(f.dispatch.maxIntervalSec) < Number(f.dispatch.minIntervalSec) || Number(f.dispatch.typingMaxSec) < Number(f.dispatch.typingMinSec))) return fail('Na proteção contra bloqueio, os limites precisam ser maiores que zero e o máximo maior que o mínimo.');
   const other = _flowList.find(a => a.id !== f.id && a.active && a.triggerStage === trigger.data.stage);
   if (other && f.active !== false) return fail(`A automação "${other.name}" já está ligada nessa coluna. Desligue uma delas.`);
   const data = {
@@ -10360,6 +10380,7 @@ async function saveFlow() {
     onReply: { moveTo: (f.onReply || {}).moveTo || '', moveToLabel: (f.onReply || {}).moveTo ? autoStageLabel(act, f.onReply.moveTo) : '' },
     hours: { enabled: !!(f.hours && f.hours.enabled), start: Number((f.hours || {}).start ?? 8), end: Number((f.hours || {}).end ?? 20) },
     lines: Array.isArray(f.lines) && f.lines.length ? f.lines : [waDefaultLine(act)],
+    dispatch: f.dispatch ? { dailyLimit: Number(f.dispatch.dailyLimit), hourlyLimit: Number(f.dispatch.hourlyLimit), minIntervalSec: Number(f.dispatch.minIntervalSec), maxIntervalSec: Number(f.dispatch.maxIntervalSec), typingMinSec: Number(f.dispatch.typingMinSec), typingMaxSec: Number(f.dispatch.typingMaxSec), checkNumber: f.dispatch.checkNumber !== false } : null,
     nodes: f.nodes.map(n => ({ id: n.id, type: n.type, x: n.x, y: n.y, data: JSON.parse(JSON.stringify(n.data || {})) })),
     edges: f.edges.map(e => ({ from: e.from, port: e.port || 'out', to: e.to })),
     steps: []
