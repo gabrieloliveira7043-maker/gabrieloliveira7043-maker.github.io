@@ -716,6 +716,10 @@ tr:hover td { background: var(--surface2); }
 .btn-manage-stages:hover { border-color: var(--accent); color: var(--accent2); background: var(--accent-glow2); }
 .stages-modal .modal-box { max-width: 400px; }
 #stages-modal.open { display: flex !important; }
+/* Caixa das janelas "stages-box" (notificações etc.): fundo sólido, sem o conteúdo de trás aparecer. */
+.stages-box { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 16px; padding: 20px; width: 100%; box-sizing: border-box; max-height: 88vh; overflow: auto; box-shadow: 0 20px 50px rgba(0,0,0,.35); }
+#notifications-modal .notification-item { background: var(--surface2); opacity: 1; }
+#notifications-modal .notification-item.unread { background: color-mix(in srgb, var(--surface2) 88%, #D4AF50); }
 .stage-item { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .stage-item input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; color: var(--fg); font-size: 13px; }
 .stage-item .btn-del-stage { background: none; border: none; color: var(--red); cursor: pointer; font-size: 16px; padding: 0 4px; }
