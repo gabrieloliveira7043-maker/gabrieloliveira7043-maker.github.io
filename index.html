@@ -11926,7 +11926,7 @@ function openAiFlowModal() {
     <div class="integ-muted" style="font-size:12.5px;margin-bottom:10px;">Descreva o fluxo do seu jeito, em ordem: quando começa, quanto tempo esperar, o que enviar e o que fazer se o lead responder ou não. A IA monta os blocos no editor para você conferir antes de ligar.</div>
     <textarea class="field-input" id="ai-flow-text" rows="7" maxlength="8000" style="width:100%;box-sizing:border-box;resize:vertical;margin-bottom:10px;" placeholder="Ex.: Quando o lead chegar em Novo lead, espera 5 minutos e manda boas-vindas perguntando qual serviço ele procura. Se não responder em 2 horas, manda de novo. Se depois de 1 dia continuar sem responder, manda o vídeo de depoimento e move para Sem resposta. Se responder, move para Em contato."></textarea>
     <label class="field-label">Ou anexe um PDF ou arquivo de texto com o fluxo (opcional)</label>
-    <input type="file" class="field-input" id="ai-flow-file" accept="application/pdf,.pdf,text/plain,.txt" onchange="readAiFlowFile(this)" style="margin-bottom:6px;">
+    <input type="file" class="field-input" id="ai-flow-file" accept="application/pdf,.pdf,text/plain,.txt,.md,text/markdown" onchange="readAiFlowFile(this)" style="margin-bottom:6px;">
     <div id="ai-flow-file-fb" class="integ-muted" style="font-size:12px;margin-bottom:12px;"></div>
     </div>
     <button class="btn-save" id="ai-flow-btn" style="width:auto;padding:9px 16px;" onclick="runAiFlow()">Criar automação</button> <span id="ai-flow-fb" class="integ-muted"></span>`, 560);
@@ -12567,9 +12567,61 @@ function renderFlowInspector() {
       <button class="ci-add" style="margin-left:6px;" onclick="aiFlowNodeCopy()">${uiIco('sparkles', 13)} Sugerir texto com IA</button>
       ${varChipsHtml('flow')}
       <div class="integ-muted" style="margin-top:6px;">Clique para inserir no texto. {atendente} vira o nome do atendente do WhatsApp que envia (defina em Conexões). Com várias versões, uma é sorteada a cada envio.</div>`;
+    if (flowCloudLine()) html += `<div id="flow-cloud-box" style="margin-top:14px;"></div>`;
   }
   if (n.type !== 'trigger') html += `<button class="huv-btn" style="margin-top:16px;color:var(--red);border-color:var(--red);" onclick="deleteFlowNode('${n.id}')">Excluir bloco</button>`;
   box.innerHTML = html;
+  if (n.type === 'message' && flowCloudLine()) renderFlowCloudBox(n);
+}
+
+// ----- API oficial nas automações: cada bloco de mensagem pode ter o seu modelo aprovado -----
+// Fora da janela de 24 h, o número oficial envia este modelo (e não o modelo padrão da linha).
+function flowCloudLine() {
+  return ((_flow && Array.isArray(_flow.lines)) ? _flow.lines : []).find(l => waIsCloud(l)) || '';
+}
+async function renderFlowCloudBox(n) {
+  const box = document.getElementById('flow-cloud-box');
+  const line = flowCloudLine();
+  if (!box || !line) return;
+  const d = n.data || {};
+  box.innerHTML = '<div class="integ-muted" style="font-size:12px;">Buscando os modelos aprovados da API oficial...</div>';
+  let list = [];
+  try { list = (await cloudTemplatesFor(_flow.act, line)).filter(t => t.status === 'APPROVED'); }
+  catch (e) { box.innerHTML = `<div class="integ-error">${escapeHtml(e.message)}</div>`; return; }
+  if (_flowSel !== n.id) return;
+  const cur = d.cloudTemplate;
+  const sel = cur ? list.find(t => t.name === cur.name && t.language === cur.language) : null;
+  box.innerHTML = `<div class="wa-line-picker">
+    <div class="wa-line-picker-title">Modelo aprovado · API oficial</div>
+    <div class="wa-line-picker-hint" style="margin-bottom:6px;">Pelo número da API oficial, fora da janela de 24 h só sai modelo aprovado pela Meta. Escolha o modelo desta mensagem. Os números por QR Code continuam enviando o texto acima.</div>
+    <select class="field-input" id="flow-cloud-tpl" onchange="onFlowCloudTpl()">
+      <option value="">Usar o modelo padrão do número</option>
+      ${list.map(t => `<option value="${escapeHtml(t.name + '|' + t.language)}" ${sel === t ? 'selected' : ''}>${escapeHtml(t.name)}${t.headerType ? ' · ' + escapeHtml((CLOUD_HEADER_TYPES[t.headerType] || {}).label || '') : ''}</option>`).join('')}
+    </select>
+    ${list.length ? '' : `<div class="integ-muted" style="font-size:12px;margin-top:6px;">Nenhum modelo aprovado ainda. Crie em Conexões → ${escapeHtml(waLineLabel(_flow.act, line))} → Modelos.</div>`}
+    <div id="flow-cloud-params" oninput="saveFlowCloudParams()" onchange="saveFlowCloudParams()"></div>
+  </div>`;
+  renderFlowCloudParams(sel ? cur.params : null);
+}
+function flowCloudSelected() {
+  return cloudSelectedTpl('flow-cloud-tpl', _cloudTplCache[_flow.act + '|' + flowCloudLine()]);
+}
+function renderFlowCloudParams(values) {
+  const box = document.getElementById('flow-cloud-params');
+  const tpl = flowCloudSelected();
+  if (!box) return;
+  if (!tpl) { box.innerHTML = ''; return; }
+  // Padrão: {{1}} = primeiro nome do lead, {{2}} = atendente (nome de quem envia).
+  const vals = values || Array.from({ length: tpl.vars || 0 }, (_, i) => i === 0 ? '{primeiro_nome}' : i === 1 ? '{atendente}' : '');
+  box.innerHTML = cloudParamsHtml('flow-cloud', tpl, vals, 'Maria', 'O que vai em cada variável: texto, {primeiro_nome}, {nome} ou {atendente}.');
+}
+function onFlowCloudTpl() {
+  renderFlowCloudParams(null);
+  saveFlowCloudParams();
+}
+function saveFlowCloudParams() {
+  const tpl = flowCloudSelected();
+  setFlowData('cloudTemplate', tpl ? cloudTplObject(tpl, readCloudParams('flow-cloud', tpl)) : null);
 }
 
 async function uploadFlowMedia(input, kind) {
@@ -12601,9 +12653,9 @@ async function saveFlow() {
     const label = flowNodeTitle(n);
     if (n.type === 'message') {
       const kind = d.kind || 'text';
-      const hasText = (d.templates || []).some(t => String(t || '').trim());
+      const hasText = (d.templates || []).some(t => String(t || '').trim()) || !!d.cloudTemplate;
       if (kind === 'text' && !hasText) { _flowSel = n.id; renderFlowNodes(); renderFlowInspector(); return fail(`O bloco "${label}" está sem mensagem.`); }
-      if (kind !== 'text' && !(d.media && d.media.url)) { _flowSel = n.id; renderFlowNodes(); renderFlowInspector(); return fail(`O bloco "${label}" está sem arquivo.`); }
+      if (kind !== 'text' && !(d.media && d.media.url) && !d.cloudTemplate) { _flowSel = n.id; renderFlowNodes(); renderFlowInspector(); return fail(`O bloco "${label}" está sem arquivo.`); }
     }
     if (n.type === 'move' && !d.stage) { _flowSel = n.id; renderFlowNodes(); renderFlowInspector(); return fail('Escolha a coluna do bloco "Mover card".'); }
   }
@@ -15262,7 +15314,7 @@ function renderCloudTemplates(list) {
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
       <div style="font-size:13px;font-weight:600;color:var(--text);">Modelos desta conta (${list.length})</div>
-      <div style="display:flex;gap:6px;"><button class="chat-pill" onclick="refreshCloudTemplates()">Atualizar</button><button class="chat-pill" onclick="toggleCloudNewTpl()">+ Novo modelo</button></div>
+      <div style="display:flex;gap:6px;"><button class="chat-pill" onclick="refreshCloudTemplates()">Atualizar</button><button class="chat-pill" onclick="openCloudBulkTemplates()">${uiIco('sparkles', 13)} Vários de um documento</button><button class="chat-pill" onclick="toggleCloudNewTpl()">+ Novo modelo</button></div>
     </div>
     <div id="cloud-new-tpl" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;">
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -15368,6 +15420,142 @@ async function createCloudTemplate() {
     showToast(`Modelo "${r.name}" enviado. Status: ${(CLOUD_STATUS[r.status] || [r.status])[0]}. Clique em Atualizar daqui a pouco para ver a aprovação.`, 'success', 8000);
     renderCloudTemplates(await cloudTemplatesFor(act, line, true));
   } catch (e) { fb.style.color = 'var(--red)'; fb.textContent = e.message; btn.disabled = false; }
+}
+
+// ----- Vários modelos de uma vez: a IA lê o roteiro (cadência) e monta um modelo por mensagem para revisar e enviar à Meta -----
+let _cloudBulk = null;
+async function fileToText(file) {
+  if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
+    if (!window.pdfjsLib) {
+      await new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'; s.onload = res; s.onerror = () => rej(new Error('Não consegui abrir o leitor de PDF.')); document.head.appendChild(s); });
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+    const pdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+    const parts = [];
+    for (let i = 1; i <= Math.min(pdf.numPages, 25); i++) parts.push((await (await pdf.getPage(i)).getTextContent()).items.map(it => it.str).join(' '));
+    return parts.join('\n').replace(/[ \t]+/g, ' ').trim();
+  }
+  return (await file.text()).trim();
+}
+function openCloudBulkTemplates() {
+  _cloudBulk = { text: '', items: [] };
+  document.getElementById('huven-modal-body').innerHTML = `
+    <button class="chat-pill" onclick="refreshCloudTemplates()" style="margin-bottom:10px;">← Voltar aos modelos</button>
+    <div class="integ-muted" style="font-size:12.5px;line-height:1.55;margin-bottom:10px;">Anexe o roteiro (cadência, sequência de follow-up) em PDF, .md ou .txt, ou cole o texto. A IA separa cada mensagem num modelo, você revisa e envia todos para a Meta aprovar de uma vez. <b>[NOME]</b> vira {{1}} e <b>[VENDEDOR]</b> vira {{2}}.</div>
+    <input type="file" class="field-input" accept="application/pdf,.pdf,text/plain,.txt,.md,text/markdown" onchange="readCloudBulkFile(this)" style="margin-bottom:6px;">
+    <textarea class="field-input" id="cbt-text" rows="5" style="width:100%;box-sizing:border-box;resize:vertical;margin-bottom:8px;" placeholder="Ou cole aqui o texto com as mensagens"></textarea>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;">
+      <div style="flex:1;min-width:150px;"><label class="field-label">Prefixo do nome (opcional)</label><input class="field-input" id="cbt-prefix" placeholder="mdv"></div>
+      <div style="flex:1;min-width:150px;"><label class="field-label">Categoria</label><select class="field-input" id="cbt-cat"><option value="MARKETING">Marketing</option><option value="UTILITY">Utilidade</option></select></div>
+      <button class="btn-save" id="cbt-read" style="width:auto;padding:9px 16px;" onclick="runCloudBulkAi()">${uiIco('sparkles', 13)} Ler mensagens com IA</button>
+    </div>
+    <div id="cbt-fb" class="integ-muted" style="font-size:12.5px;margin-bottom:8px;"></div>
+    <div id="cbt-list"></div>`;
+}
+async function readCloudBulkFile(input) {
+  const file = input.files && input.files[0];
+  const fb = document.getElementById('cbt-fb');
+  if (!file) return;
+  fb.style.color = 'var(--muted)'; fb.textContent = 'Lendo o arquivo...';
+  try {
+    const text = await fileToText(file);
+    document.getElementById('cbt-text').value = text;
+    fb.style.color = text.length > 30 ? 'var(--green)' : 'var(--amber)';
+    fb.textContent = text.length > 30 ? `✓ ${text.length.toLocaleString('pt-BR')} caracteres lidos. Clique em "Ler mensagens com IA".` : 'Não encontrei texto no arquivo.';
+  } catch (e) { fb.style.color = 'var(--red)'; fb.textContent = 'Erro ao ler: ' + e.message; }
+}
+async function runCloudBulkAi() {
+  const { act } = _cloudCtx;
+  const fb = document.getElementById('cbt-fb');
+  const btn = document.getElementById('cbt-read');
+  const text = document.getElementById('cbt-text').value.trim();
+  if (text.length < 30) { fb.style.color = 'var(--red)'; fb.textContent = 'Anexe o arquivo ou cole o texto com as mensagens.'; return; }
+  btn.disabled = true; fb.style.color = 'var(--muted)'; fb.textContent = 'A IA está lendo as mensagens (pode levar até 1 minuto)...';
+  try {
+    const r = await window._fb.whatsapp('/ai/cloud-templates', act, { text, prefix: document.getElementById('cbt-prefix').value });
+    _cloudBulk.items = (r.templates || []).map(t => ({ ...t, on: true, media: null, status: '' }));
+    fb.style.color = 'var(--green)';
+    fb.textContent = `${_cloudBulk.items.length} mensagens encontradas. Confira os textos, anexe os vídeos e envie para a Meta.`;
+    renderCloudBulkList();
+  } catch (e) { fb.style.color = 'var(--red)'; fb.textContent = e.message; }
+  btn.disabled = false;
+}
+function cloudBulkProblem(t) {
+  const body = String(t.body || '').trim();
+  if (!body) return 'Texto vazio.';
+  if (body.length > 1024) return 'Texto acima de 1024 caracteres.';
+  if (/^\{\{\d+\}\}|\{\{\d+\}\}[\s.!?]*$/.test(body)) return 'A Meta não aceita começar ou terminar com variável.';
+  const nums = [...new Set([...body.matchAll(/\{\{(\d+)\}\}/g)].map(m => Number(m[1])))].sort((a, b) => a - b);
+  if (nums.some((n, i) => n !== i + 1)) return 'Variáveis fora de ordem: use {{1}}, {{2}}...';
+  if (!/^[a-z0-9_]{1,60}$/.test(t.name || '')) return 'Nome inválido: só minúsculas, números e _.';
+  return '';
+}
+function renderCloudBulkList() {
+  const box = document.getElementById('cbt-list');
+  if (!box || !_cloudBulk) return;
+  const items = _cloudBulk.items;
+  if (!items.length) { box.innerHTML = ''; return; }
+  const kindLabel = { text: 'Texto', video: 'Vídeo', image: 'Imagem', audio: 'Áudio' };
+  box.innerHTML = items.map((t, i) => {
+    const prob = cloudBulkProblem(t);
+    const st = t.status === 'ok' ? `<span style="color:var(--green);font-weight:700;">✓ enviado</span>` : t.status ? `<span style="color:var(--red);">${escapeHtml(t.status)}</span>` : '';
+    const mediaRow = (t.kind === 'video' || t.kind === 'image') ? `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:12px;">
+        <span class="integ-muted">${t.kind === 'video' ? 'Vídeo (MP4, até 16 MB)' : 'Imagem (JPG/PNG)'} no topo:</span>
+        <input type="file" accept="${t.kind === 'video' ? 'video/mp4' : 'image/jpeg,image/png'}" onchange="uploadCloudBulkMedia(${i}, this)" style="font-size:12px;">
+        <span id="cbt-m${i}">${t.media ? `${uiIco('check', 12)} ${escapeHtml(t.media.fileName || 'arquivo')}` : '<span class="integ-muted">sem arquivo: vai só o texto</span>'}</span></div>` : '';
+    const audioNote = t.kind === 'audio' ? `<div style="font-size:12px;color:var(--amber);margin-top:6px;">Áudio não existe em modelo da Meta. Este modelo vai como <b>texto</b> (a fala escrita). Se preferir, desmarque e grave em vídeo.</div>` : '';
+    return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px;${t.on ? '' : 'opacity:.55;'}">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input type="checkbox" ${t.on ? 'checked' : ''} ${t.status === 'ok' ? 'disabled' : ''} onchange="_cloudBulk.items[${i}].on = this.checked; renderCloudBulkList()">
+        <input class="field-input" value="${escapeHtml(t.name)}" style="flex:1;min-width:140px;padding:5px 8px;font-size:12.5px;" oninput="_cloudBulk.items[${i}].name = this.value.toLowerCase().replace(/[^a-z0-9_]/g, '_')">
+        <span class="chat-tag">${kindLabel[t.kind] || 'Texto'}</span> ${st}
+      </div>
+      <textarea class="field-input" rows="${Math.min(8, Math.max(3, Math.ceil(String(t.body).length / 70)))}" style="width:100%;box-sizing:border-box;resize:vertical;margin-top:6px;font-size:12.5px;" oninput="_cloudBulk.items[${i}].body = this.value; const p = cloudBulkProblem(_cloudBulk.items[${i}]); document.getElementById('cbt-p${i}').textContent = p">${escapeHtml(t.body)}</textarea>
+      <div id="cbt-p${i}" style="font-size:12px;color:var(--red);">${escapeHtml(prob)}</div>
+      ${mediaRow}${audioNote}
+    </div>`;
+  }).join('') + `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;">
+      <button class="btn-save" id="cbt-send" style="width:auto;padding:9px 16px;" onclick="sendCloudBulk()">Enviar ${items.filter(t => t.on && t.status !== 'ok').length} para aprovação</button>
+      <span class="integ-muted" style="font-size:12px;">{{1}} = nome do lead · {{2}} = nome do vendedor. A Meta costuma responder em minutos; o status aparece em Modelos.</span>
+    </div>`;
+}
+async function uploadCloudBulkMedia(i, input) {
+  const file = input.files && input.files[0];
+  const el = document.getElementById('cbt-m' + i);
+  if (!file) return;
+  el.textContent = 'Enviando arquivo...';
+  try {
+    _cloudBulk.items[i].media = await window._fb.uploadCampaignMedia(_cloudCtx.act, file, true);
+    el.innerHTML = `${uiIco('check', 12)} ${escapeHtml(_cloudBulk.items[i].media.fileName || file.name)}`;
+  } catch (e) { el.style.color = 'var(--red)'; el.textContent = 'Erro: ' + e.message; }
+}
+async function sendCloudBulk() {
+  const { act, line } = _cloudCtx;
+  const btn = document.getElementById('cbt-send');
+  const todo = _cloudBulk.items.filter(t => t.on && t.status !== 'ok');
+  const bad = todo.find(t => cloudBulkProblem(t));
+  if (bad) return showToast(`Corrija o modelo "${bad.name}": ${cloudBulkProblem(bad)}`, 'warning', 6000);
+  if (!todo.length) return showToast('Nenhum modelo marcado.', 'warning');
+  if (!await showConfirm(`Enviar ${todo.length} modelo(s) para a Meta aprovar? Depois de aprovados, cada envio é cobrado pela Meta.`, 'Enviar para aprovação', 'Enviar', false)) return;
+  const category = document.getElementById('cbt-cat').value;
+  const example = { nome: 'Maria', atendente: 'Gustavo' };
+  let ok = 0;
+  for (const t of todo) {
+    if (btn) { btn.disabled = true; btn.textContent = `Enviando ${ok + 1} de ${todo.length}...`; }
+    try {
+      await window._fb.whatsapp('/whatsapp/cloud-template-create', act, {
+        line, name: t.name, category, body: t.body.trim(),
+        headerType: t.media ? t.kind : '', headerMediaId: t.media ? t.media.id : '',
+        examples: (t.vars || []).map(v => example[v] || 'Maria')
+      });
+      t.status = 'ok'; ok++;
+    } catch (e) { t.status = e.message.slice(0, 220); }
+    renderCloudBulkList();
+    await new Promise(r => setTimeout(r, 700));
+  }
+  _cloudTplCache[act + '|' + line] = null;
+  const fail = todo.length - ok;
+  showToast(fail ? `${ok} enviado(s) e ${fail} com erro. Corrija os marcados em vermelho e envie de novo.` : `${ok} modelo(s) enviados para a Meta aprovar.`, fail ? 'warning' : 'success', 8000);
 }
 
 async function deleteCloudTemplate(name) {
