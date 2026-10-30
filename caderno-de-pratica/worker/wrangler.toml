@@ -1,0 +1,7 @@
+name = "caderno-admin"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+PROJECT_ID = "caderno-de-pratica"
+ALLOWED_ORIGINS = "https://crm.huven.com.br,http://localhost:8766"
