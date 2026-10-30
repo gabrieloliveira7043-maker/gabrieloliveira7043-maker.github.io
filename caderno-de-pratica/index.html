@@ -169,7 +169,6 @@ p { margin: 0; }
 .who:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .whoname { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 480px) { .whoname { max-width: 90px; } }
-body.noapp .keys { display: none; }
 .auth { min-height: 60dvh; display: grid; place-items: center; padding: 24px 0; }
 .authcard { width: min(420px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 24px; display: grid; gap: 14px; box-shadow: var(--shadow-2); }
 .authcard .eic { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-text); }
@@ -179,19 +178,24 @@ input[type="password"] { background: var(--surface); border: 1px solid var(--lin
 input[type="password"]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 .role { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-text); }
 .role.stu { background: var(--warm-soft); color: var(--warm); }
+/* mini piano do cabeçalho: teclas montadas pelo script para preencher a largura; acende em onda e toca ao clicar */
 .keys {
-  height: 10px; margin: 12px auto 0; max-width: 1180px; border-radius: 3px 3px 6px 6px; border: 1px solid var(--line); opacity: 0.85;
-  background-color: var(--surface);
-  background-image:
-    linear-gradient(90deg, transparent 12px, var(--key) 12px, var(--key) 24px, transparent 24px),
-    linear-gradient(90deg, transparent 30px, var(--key) 30px, var(--key) 42px, transparent 42px),
-    linear-gradient(90deg, transparent 66px, var(--key) 66px, var(--key) 78px, transparent 78px),
-    linear-gradient(90deg, transparent 84px, var(--key) 84px, var(--key) 96px, transparent 96px),
-    linear-gradient(90deg, transparent 102px, var(--key) 102px, var(--key) 114px, transparent 114px),
-    repeating-linear-gradient(90deg, transparent 0 17px, var(--line) 17px 18px);
-  background-size: 126px 6px, 126px 6px, 126px 6px, 126px 6px, 126px 6px, auto;
-  background-repeat: repeat-x, repeat-x, repeat-x, repeat-x, repeat-x, repeat;
+  position: relative; display: flex; height: 38px; max-width: 1180px; margin: 12px auto 0; padding: 4px 4px 0;
+  border-radius: 10px 10px 12px 12px; background: linear-gradient(180deg, #2A3320 0%, #12170D 100%);
+  box-shadow: 0 6px 18px rgba(18, 23, 13, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.08); overflow: hidden; user-select: none; -webkit-user-select: none; touch-action: manipulation;
 }
+.keys::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: linear-gradient(90deg, var(--accent), var(--accent-2), var(--accent)); opacity: .9; }
+.wk { position: relative; flex: 1; margin: 0 1px; border-radius: 0 0 6px 6px; cursor: pointer;
+  background: linear-gradient(180deg, #F3F5EC 0%, #FFFFFF 55%, #E6EBD8 100%); box-shadow: inset 0 -4px 0 rgba(18, 23, 13, 0.10), inset 0 1px 0 rgba(0, 0, 0, 0.15);
+  transform-origin: top; transition: background 420ms var(--ease), transform 120ms var(--ease), box-shadow 420ms var(--ease); }
+.bk { position: absolute; top: 4px; height: 58%; border-radius: 0 0 4px 4px; z-index: 2; cursor: pointer;
+  background: linear-gradient(180deg, #3A4530 0%, #12170D 70%, #232B1A 100%); box-shadow: 0 2px 3px rgba(0, 0, 0, 0.45), inset 0 -2px 0 rgba(255, 255, 255, 0.10);
+  transition: background 420ms var(--ease), transform 120ms var(--ease); }
+.wk.on { background: linear-gradient(180deg, var(--accent-2) 0%, var(--accent) 100%); box-shadow: inset 0 -2px 0 rgba(18, 23, 13, 0.15), 0 0 14px color-mix(in srgb, var(--accent) 60%, transparent); transform: scaleY(0.97); transition-duration: 90ms; }
+.bk.on { background: linear-gradient(180deg, var(--accent-2) 0%, var(--accent) 100%); transform: scaleY(0.96); transition-duration: 90ms; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .wk { background: linear-gradient(180deg, #D9DECB 0%, #E9EDE0 55%, #C9D0B8 100%); } }
+:root[data-theme="dark"] .wk { background: linear-gradient(180deg, #D9DECB 0%, #E9EDE0 55%, #C9D0B8 100%); }
+@media (max-width: 720px) { .keys { height: 32px; } }
 .tabs { display: flex; gap: 6px; max-width: 1180px; margin: 12px auto 0; padding-bottom: 12px; overflow-x: auto; scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
 .tab { display: inline-flex; align-items: center; gap: 8px; background: none; border: 0; min-height: 44px; padding: 0 16px; border-radius: 999px; font-weight: 600; color: var(--ink-2); white-space: nowrap; transition: background 180ms var(--ease), color 180ms var(--ease); }
@@ -424,7 +428,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
       </div>
       <div class="headr"><div class="theme" id="theme" role="group" aria-label="Tema"></div><div id="me"></div></div>
     </div>
-    <div class="keys" aria-hidden="true"></div>
+    <div class="keys" id="piano" aria-hidden="true"></div>
     <nav class="tabs" id="tabs" aria-label="Seções"></nav>
   </header>
   <main id="main" tabindex="-1"></main>
@@ -1343,7 +1347,63 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   document.addEventListener("dragend", function () { drag = null; });
 
   /* ---------- início ---------- */
+  /* ---------- mini piano do cabeçalho ---------- */
+  var calm = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  var audio = null, pianoW = 0;
+  function buildPiano() {
+    var el = $("piano"); if (!el) return;
+    var w = el.clientWidth || 600;
+    if (w === pianoW) return; pianoW = w;
+    var n = Math.max(14, Math.round(w / 24));
+    var claras = [0, 2, 4, 5, 7, 9, 11], pretaDepois = { 0: 1, 1: 3, 3: 6, 4: 8, 5: 10 };
+    var h = "";
+    for (var i = 0; i < n; i++) h += '<span class="wk" data-i="' + i + '" data-midi="' + (48 + 12 * Math.floor(i / 7) + claras[i % 7]) + '"></span>';
+    for (var j = 0; j < n - 1; j++) {
+      if (!((j % 7) in pretaDepois)) continue;
+      h += '<span class="bk" data-midi="' + (48 + 12 * Math.floor(j / 7) + pretaDepois[j % 7]) + '" style="width:var(--bw);left:calc(4px + (100% - 8px) * ' + ((j + 1) / n).toFixed(5) + ' - var(--bw) / 2)"></span>';
+    }
+    el.style.setProperty("--bw", ((w - 8) / n * 0.58).toFixed(1) + "px");
+    el.innerHTML = h;
+  }
+  function light(k, ms) { if (!k) return; k.classList.add("on"); setTimeout(function () { k.classList.remove("on"); }, ms || 260); }
+  function whites() { return document.querySelectorAll("#piano .wk"); }
+  /* onda verde da esquerda para a direita */
+  function pianoWave() {
+    if (calm) return;
+    Array.prototype.forEach.call(whites(), function (k, i) { setTimeout(function () { light(k, 240); }, i * 28); });
+  }
+  /* de vez em quando um acorde (Dó, Fá ou Sol maior) acende em arpejo, numa oitava sorteada */
+  function pianoChord() {
+    if (calm || document.hidden) return;
+    var ws = whites(), oit = Math.floor(ws.length / 7); if (!oit) return;
+    var base = 7 * Math.floor(Math.random() * oit) + [0, 3, 4][Math.floor(Math.random() * 3)];
+    [0, 2, 4, 7].forEach(function (d, k) { setTimeout(function () { light(ws[base + d], 520); }, k * 130); });
+  }
+  /* tocar uma tecla: acende e faz um som curto, parecido com piano */
+  function tone(midi) {
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      var t = audio.currentTime, f = 440 * Math.pow(2, (midi - 69) / 12), g = audio.createGain();
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.18, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+      g.connect(audio.destination);
+      [[1, "triangle", 1], [2, "sine", 0.35]].forEach(function (p) {
+        var o = audio.createOscillator(), og = audio.createGain();
+        o.type = p[1]; o.frequency.value = f * p[0]; og.gain.value = p[2];
+        o.connect(og); og.connect(g); o.start(t); o.stop(t + 1.5);
+      });
+    } catch (e) {}
+  }
+  document.addEventListener("pointerdown", function (e) {
+    var k = e.target.closest && e.target.closest("#piano .wk, #piano .bk"); if (!k) return;
+    light(k, 300); tone(+k.dataset.midi);
+  });
+  var pianoT;
+  window.addEventListener("resize", function () { clearTimeout(pianoT); pianoT = setTimeout(buildPiano, 150); });
+
   $("logoMark").innerHTML = ic("music");
+  buildPiano();
+  setTimeout(pianoWave, 400);
+  setInterval(pianoChord, 6500);
   paintTheme();
   S.view = pref("view") === "lista" ? "lista" : "quadro";
   render();
