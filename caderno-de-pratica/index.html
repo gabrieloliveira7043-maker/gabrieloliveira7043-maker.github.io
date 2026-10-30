@@ -6,6 +6,10 @@
 <meta name="theme-color" content="#F3F7EC" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0D120B" media="(prefers-color-scheme: dark)">
 <title>Caderno de Prática</title>
+<script>
+  /* aplica o tema escolhido antes de desenhar a página, para não piscar */
+  try { var t = localStorage.getItem("cp_theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
@@ -49,8 +53,9 @@
   --nav-h: 0px;
   color-scheme: light;
 }
+/* Tema escuro: segue o sistema, a menos que a pessoa escolha "Claro" ou "Escuro" (data-theme no <html>) */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0D120B;
     --surface: #161D13;
     --surface-2: #1D2719;
@@ -81,6 +86,37 @@
     --shadow-3: 0 18px 50px rgba(0, 0, 0, 0.6);
     color-scheme: dark;
   }
+}
+:root[data-theme="dark"] {
+  --bg: #0D120B;
+  --surface: #161D13;
+  --surface-2: #1D2719;
+  --surface-3: #273322;
+  --ink: #EBF2E5;
+  --ink-2: #B2C2A8;
+  --ink-3: #93A589;
+  --line: #2D3A27;
+  --accent: #A9D67E;
+  --accent-2: #C8E6A0;
+  --accent-ink: #12200A;
+  --accent-soft: #283A1C;
+  --warm: #F5A94A;
+  --warm-soft: #3A2A14;
+  --key: #0D120B;
+  --s-todo: #BAC8B0;
+  --s-todo-bg: #26311F;
+  --s-doing: #F4BA63;
+  --s-doing-bg: #3B2C14;
+  --s-done: #72D6A4;
+  --s-done-bg: #14362A;
+  --s-rev: #66D2DD;
+  --s-rev-bg: #11363A;
+  --late: #FF968D;
+  --late-bg: #401C1B;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 6px 18px rgba(0, 0, 0, 0.35);
+  --shadow-3: 0 18px 50px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
 }
 
 /* Base */
@@ -114,7 +150,13 @@ p { margin: 0; }
 .brand { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; max-width: 1180px; margin: 0 auto; }
 .logo { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .logo-mark { width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%); box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 35%, transparent); flex: none; }
-@media (prefers-color-scheme: dark) { .logo-mark { color: var(--accent-ink); } }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .logo-mark { color: var(--accent-ink); } }
+:root[data-theme="dark"] .logo-mark { color: var(--accent-ink); }
+.headr { display: flex; align-items: center; gap: 8px; }
+.theme { display: inline-flex; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px; box-shadow: var(--shadow-1); }
+.theme button { width: 38px; height: 38px; display: grid; place-items: center; border: 0; background: none; border-radius: 999px; color: var(--ink-3); transition: background 160ms var(--ease), color 160ms var(--ease); }
+.theme button:hover { color: var(--ink); }
+.theme button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
 .logo h1 { font-size: 22px; font-weight: 800; line-height: 1.1; }
 .logo small { display: block; color: var(--ink-3); font-size: 13px; font-weight: 500; }
 .who { position: relative; display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px 6px 4px 4px; box-shadow: var(--shadow-1); min-height: 44px; }
@@ -205,7 +247,8 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
 .dot.reviewed { background: var(--s-rev-bg); color: var(--s-rev); }
 .dot.late { background: var(--late-bg); color: var(--late); }
 .hero { display: flex; align-items: center; gap: 18px; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%); color: #fff; border-radius: var(--r-lg); padding: 18px 20px; margin-bottom: 20px; box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 30%, transparent); }
-@media (prefers-color-scheme: dark) { .hero { color: var(--accent-ink); } }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hero { color: var(--accent-ink); } }
+:root[data-theme="dark"] .hero { color: var(--accent-ink); }
 .ring { --p: 0; width: 76px; height: 76px; border-radius: 50%; flex: none; display: grid; place-items: center; background: conic-gradient(currentColor calc(var(--p) * 1%), color-mix(in srgb, currentColor 25%, transparent) 0); }
 .ring span { width: 60px; height: 60px; border-radius: 50%; display: grid; place-items: center; font-family: var(--f-display); font-weight: 800; font-size: 18px; background: color-mix(in srgb, var(--accent) 85%, var(--accent-2)); }
 .hero h3 { font-size: 20px; font-weight: 800; }
@@ -359,7 +402,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
         <div class="logo-mark" aria-hidden="true" id="logoMark"></div>
         <div><h1>Caderno de Prática</h1><small>Teclado e canto</small></div>
       </div>
-      <div id="me"></div>
+      <div class="headr"><div class="theme" id="theme" role="group" aria-label="Tema"></div><div id="me"></div></div>
     </div>
     <div class="keys" aria-hidden="true"></div>
     <nav class="tabs" id="tabs" aria-label="Seções"></nav>
@@ -484,6 +527,9 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
     reset: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
     alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+    moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+    auto: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
     shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>'
   };
   function ic(n, cls) {
@@ -594,6 +640,21 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
       ? [{ k: "tarefas", n: "Tarefas", i: "tasks", b: pendingReview() }, { k: "alunos", n: "Alunos", i: "users" }, { k: "modulos", n: "Apostila", i: "book" }, { k: "backup", n: "Backup", i: "save" }]
       : [{ k: "tarefas", n: "Minhas tarefas", i: "tasks" }, { k: "materiais", n: "Materiais", i: "book" }];
   }
+  /* tema: "auto" segue o sistema; "light" e "dark" fixam */
+  var THEMES = [{ k: "light", n: "Claro", i: "sun" }, { k: "dark", n: "Escuro", i: "moon" }, { k: "auto", n: "Automático (segue o sistema)", i: "auto" }];
+  function curTheme() { var t = pref("theme"); return t === "light" || t === "dark" ? t : "auto"; }
+  function setTheme(k) {
+    pref("theme", k);
+    if (k === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = k;
+    paintTheme();
+  }
+  function paintTheme() {
+    var cur = curTheme();
+    $("theme").innerHTML = THEMES.map(function (t) {
+      return '<button data-act="theme" data-k="' + t.k + '" aria-pressed="' + (cur === t.k) + '" aria-label="Tema ' + t.n + '" title="' + t.n + '">' + ic(t.i, "sm") + "</button>";
+    }).join("");
+  }
+
   function render() {
     if (S.who !== "prof" && !stuById(S.who)) S.who = "prof";
     $("me").innerHTML = '<label class="who"><span class="role' + (isT() ? "" : " stu") + '">' + (isT() ? "Professor" : "Aluno") + "</span>" +
@@ -1016,6 +1077,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
         save(); closeSheet(); render(); toast("Tarefa excluída");
       } else { S.confirm = "t:" + tid; paintSheet(); }
     }
+    else if (a === "theme") setTheme(el.dataset.k);
     else if (a === "export") doExport();
     else if (a === "import") $("importFile").click();
     else if (a === "reset") {
@@ -1059,6 +1121,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
 
   /* ---------- início ---------- */
   $("logoMark").innerHTML = ic("music");
+  paintTheme();
   D = load();
   S.who = pref("who") || "prof";
   S.tab = pref("tab") || "";
