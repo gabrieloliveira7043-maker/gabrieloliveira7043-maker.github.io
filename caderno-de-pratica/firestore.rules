@@ -30,10 +30,16 @@ service cloud.firestore {
       allow read: if isProf() || (signed() && resource.data.uid == request.auth.uid);
       allow create, delete: if isProf();
       allow update: if isProf() || (
-        signed() && resource.data.uid == request.auth.uid
-        && resource.data.status != 'reviewed'
-        && request.resource.data.status in ['todo', 'doing', 'done']
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'doneAt'])
+        signed() && resource.data.uid == request.auth.uid && (
+          // andamento da tarefa (nunca para "revisada")
+          (resource.data.status != 'reviewed'
+            && request.resource.data.status in ['todo', 'doing', 'done']
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'doneAt']))
+          // mensagem do aluno para a professora
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['studentNote', 'studentNoteAt'])
+            && request.resource.data.studentNote is string
+            && request.resource.data.studentNote.size() <= 2000)
+        )
       );
     }
   }

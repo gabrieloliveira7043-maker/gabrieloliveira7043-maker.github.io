@@ -189,6 +189,9 @@ input[type="password"] { background: var(--surface); border: 1px solid var(--lin
 .attinfo span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .attach { cursor: pointer; border-style: dashed; }
 .upl { display: grid; gap: 6px; }
+.fbbox.stunote { background: var(--warm-soft); }
+.fbbox .lbl { display: inline-flex; align-items: center; gap: 6px; }
+.card .fb.stu .ic { color: var(--warm); }
 .previewbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 18px; padding: 12px 14px; border-radius: var(--r-md);
   background: var(--warm-soft); color: var(--ink); border: 1px solid color-mix(in srgb, var(--warm) 45%, transparent); }
 .previewbar > .ic { color: var(--warm); }
@@ -862,6 +865,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   }
   /* anexos das tarefas */
   var MBYTES = 1024 * 1024, fileUrls = {}, loadingUrls = {};
+  function fmtWhen(ms) { return new Date(ms).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).replace(",", " às"); }
   function fmtSize(b) { return b >= MBYTES ? (b / MBYTES).toFixed(1).replace(".", ",") + " MB" : Math.max(1, Math.round(b / 1024)) + " KB"; }
   async function loadUrls(t) {
     var falta = (t.attachments || []).some(function (a) { return !fileUrls[a.key]; });
@@ -1153,6 +1157,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
       ((t.moduleId || t.due) ? '<div class="meta">' + (t.moduleId ? '<span class="tag">' + esc(modName(t.moduleId)) + "</span>" : "") + dueTag(t) + "</div>" : "") +
       "<h4>" + esc(t.title) + "</h4>" +
       (isT() ? '<div class="stu">' + avImg(t.uid) + "<span>" + esc(nm(t.uid)) + "</span></div>" : "") +
+      (isT() && t.studentNote ? '<div class="fb stu">' + ic("user", "sm") + "<span>" + esc(t.studentNote) + "</span></div>" : "") +
       (t.feedback ? '<div class="fb">' + ic("message", "sm") + "<span>" + esc(t.feedback) + "</span></div>" : "") +
       ((t.attachments || []).length ? '<div class="fb">' + ic("clip", "sm") + "<span>" + t.attachments.length + (t.attachments.length > 1 ? " anexos" : " anexo") + "</span></div>" : "") +
       (n ? '<button class="btn sm block" data-act="adv" data-id="' + esc(t.id) + '">' + ic(n.i, "sm") + n.n + "</button>" : "") +
@@ -1359,10 +1364,14 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     }).join("") + "</div>" + (!isT() && t.status === "reviewed" ? '<span class="help">Esta tarefa já foi revisada pelo professor.</span>' : "") + "</div>";
     h += attachSection(t);
     if (isT()) {
+      if (t.studentNote) h += '<div class="fbbox stunote"><span class="lbl">' + ic("user", "sm") + "Mensagem do aluno" + (t.studentNoteAt ? " · " + fmtWhen(t.studentNoteAt) : "") + '</span><p class="desc">' + esc(t.studentNote) + "</p></div>";
       h += '<div class="field"><label for="fb">Retorno para o aluno</label><textarea id="fb" placeholder="Ex.: Ótimo! Na próxima, tente com o metrônomo em 70 BPM.">' + esc(t.feedback || "") + "</textarea></div>" +
         '<div class="btns" style="justify-content:space-between"><button class="btn danger' + (S.confirm === "t:" + t.id ? " on" : "") + '" data-act="delTask">' + ic("trash", "sm") + (S.confirm === "t:" + t.id ? "Confirmar exclusão" : "Excluir") + '</button><button class="btn pri" data-act="saveFb">' + ic("check", "sm") + "Salvar retorno</button></div>";
     } else {
       if (t.feedback) h += '<div class="fbbox"><span class="lbl">' + "Retorno do professor</span><p class=\"desc\">" + esc(t.feedback) + "</p></div>";
+      h += '<div class="field"><label for="sn">Mensagem para o professor</label><textarea id="sn" maxlength="2000" placeholder="Ex.: Tive dificuldade na troca de Fá para Sol. Pode me ajudar na próxima aula?">' + esc(t.studentNote || "") + "</textarea>" +
+        (t.studentNoteAt ? '<span class="help">Enviada em ' + fmtWhen(t.studentNoteAt) + ". Você pode editar e enviar de novo.</span>" : '<span class="help">O professor vê esta mensagem na tarefa.</span>') + "</div>" +
+        '<div class="btns"><button class="btn pri" data-act="saveNote">' + ic("message", "sm") + (t.studentNote ? "Atualizar mensagem" : "Enviar mensagem") + "</button></div>";
     }
     return h;
   }
@@ -1533,7 +1542,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     var el = e.target.closest("[data-act]");
     if (!el) { if (e.target.id === "sheet") closeSheet(); return; }
     var a = el.dataset.act, u = el.dataset.u, id = el.dataset.id, m = el.dataset.m;
-    if (S.preview && ["adv", "toggle", "setSt", "rmAtt", "attachPick", "account"].indexOf(a) > -1) { e.preventDefault(); e.stopPropagation(); toast(SO_LEITURA); return; }
+    if (S.preview && ["adv", "toggle", "setSt", "rmAtt", "attachPick", "account", "saveNote"].indexOf(a) > -1) { e.preventDefault(); e.stopPropagation(); toast(SO_LEITURA); return; }
     if (a === "preview") { startPreview(u); return; }
     if (a === "endPreview") { endPreview(); return; }
     if (a !== "delTask" && a !== "rmMat" && a !== "rmStu" && a !== "rmAtt" && a !== "peek" && a !== "copy" && S.confirm) S.confirm = "";
@@ -1573,6 +1582,10 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     else if (a === "createTask") createTasks();
     else if (a === "saveMat") saveMat();
     else if (a === "saveTopics") saveTopics();
+    else if (a === "saveNote") {
+      var snTxt = val("sn").slice(0, 2000), snId = S.sheet.id;
+      guard(function () { return FB.fs.updateDoc(dref("tasks/" + snId), { studentNote: snTxt, studentNoteAt: Date.now() }); }, snTxt ? "Mensagem enviada ao professor" : "Mensagem apagada");
+    }
     else if (a === "saveFb") { var fbTxt = val("fb"), fbId = S.sheet.id; guard(function () { return FB.fs.updateDoc(dref("tasks/" + fbId), { feedback: fbTxt }); }, "Retorno salvo"); }
     else if (a === "delTask") {
       var tid = S.sheet.id;
