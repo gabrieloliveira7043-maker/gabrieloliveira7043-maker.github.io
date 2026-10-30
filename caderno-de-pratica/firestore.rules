@@ -1,0 +1,40 @@
+rules_version = '2';
+
+// Regras do Caderno de Prática.
+// Professor: quem estiver em config/professor (definido no primeiro acesso, uma única vez).
+// Aluno: tem um documento em students/{uid}, criado pelo professor; só lê o próprio cadastro e as próprias tarefas,
+// e só pode mudar o andamento (status) das suas tarefas, nunca para "revisada".
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signed() { return request.auth != null; }
+    function profDoc() { return /databases/$(database)/documents/config/professor; }
+    function isProf() { return signed() && exists(profDoc()) && get(profDoc()).data.uid == request.auth.uid; }
+
+    match /config/professor {
+      allow read: if true;
+      allow create: if signed() && !exists(profDoc()) && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /modules/{id} {
+      allow read: if signed();
+      allow write: if isProf();
+    }
+
+    match /students/{uid} {
+      allow read: if isProf() || (signed() && request.auth.uid == uid);
+      allow write: if isProf();
+    }
+
+    match /tasks/{id} {
+      allow read: if isProf() || (signed() && resource.data.uid == request.auth.uid);
+      allow create, delete: if isProf();
+      allow update: if isProf() || (
+        signed() && resource.data.uid == request.auth.uid
+        && resource.data.status != 'reviewed'
+        && request.resource.data.status in ['todo', 'doing', 'done']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'doneAt'])
+      );
+    }
+  }
+}

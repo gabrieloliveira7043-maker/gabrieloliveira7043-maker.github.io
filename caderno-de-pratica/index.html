@@ -165,6 +165,18 @@ p { margin: 0; }
 .who { position: relative; display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px 6px 4px 4px; box-shadow: var(--shadow-1); min-height: 44px; }
 .who select { appearance: none; -webkit-appearance: none; border: 0; background-color: var(--surface); border-radius: 999px; padding: 6px 26px 6px 2px; font-weight: 600; font-size: 15px; max-width: 190px; min-height: 36px; cursor: pointer; }
 .who .chev { position: absolute; right: 10px; pointer-events: none; color: var(--ink-3); }
+.who { cursor: pointer; font-weight: 600; font-size: 15px; padding-right: 12px; color: var(--ink); }
+.who:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.whoname { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 480px) { .whoname { max-width: 90px; } }
+body.noapp .keys { display: none; }
+.auth { min-height: 60dvh; display: grid; place-items: center; padding: 24px 0; }
+.authcard { width: min(420px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 24px; display: grid; gap: 14px; box-shadow: var(--shadow-2); }
+.authcard .eic { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-text); }
+.authcard h2 { font-size: 26px; font-weight: 800; }
+.authcard input { width: 100%; }
+input[type="password"] { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; min-height: 44px; font-size: 16px; min-width: 0; max-width: 100%; }
+input[type="password"]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 .role { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-text); }
 .role.stu { background: var(--warm-soft); color: var(--warm); }
 .keys {
@@ -420,7 +432,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
 <nav class="bnav" id="bnav" aria-label="Seções"></nav>
 <div class="sheet" id="sheet" hidden></div>
 <div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
-<input type="file" id="importFile" accept=".json,application/json" hidden>
+<script src="firebase-config.js"></script>
 
 <script>
 (function () {
@@ -550,9 +562,9 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     { k: "done", n: "Feita", i: "check" },
     { k: "reviewed", n: "Revisada", i: "badge" }
   ];
-  var KEY = "cp_dados_v1";
-  var D;  // { modules, students: [{id, name, moduleIds}], tasks: [{id, uid, ...}] }
-  var S = { who: "prof", tab: "", view: "quadro", fStu: "", fMod: "", openMod: "", confirm: "", sheet: null };
+  var D = { modules: [], students: [], tasks: [] };  // espelho do Firestore, atualizado em tempo real
+  /* screen: loading | nocfg | login | first | noaccess | app;  me: { uid, name, login, role: "prof" | "aluno" } */
+  var S = { screen: "loading", me: null, profExists: null, busy: false, tab: "", view: "quadro", fStu: "", fMod: "", openMod: "", confirm: "", sheet: null };
 
   /* ---------- utilidades ---------- */
   function $(id) { return document.getElementById(id); }
@@ -595,30 +607,153 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   }
   SEED_MODULES.forEach(function (m) { m.materials = builtinMats(m.id); });
 
-  /* ---------- dados (salvos neste navegador) ---------- */
-  function fresh() { return { modules: JSON.parse(JSON.stringify(SEED_MODULES)), students: [], tasks: [], removedBuiltins: [] }; }
-  function valid(o) { return o && Array.isArray(o.modules) && Array.isArray(o.students) && Array.isArray(o.tasks); }
-  /* dados salvos antes de existir o material em PDF recebem os PDFs novos (menos os que o professor removeu) */
-  function addBuiltins(o) {
-    var gone = o.removedBuiltins || [];
-    o.modules.forEach(function (m) {
-      var have = {}; (m.materials || []).forEach(function (x) { have[x.id] = true; });
-      var add = builtinMats(m.id).filter(function (x) { return !have[x.id] && gone.indexOf(x.id) < 0; });
-      if (add.length) m.materials = add.concat(m.materials || []);
-    });
-    return o;
+  /* ---------- dados (Firebase: login + Firestore) ---------- */
+  var FBV = "10.12.2";
+  var FB = null;     // { a: app, au: auth, fs: firestore (módulos), app, auth, db }
+  var unsubs = [];
+  var LOGIN_DOMINIO = "@aluno.caderno";
+  function loginToEmail(l) { l = String(l || "").trim().toLowerCase(); return l.indexOf("@") > -1 ? l : l + LOGIN_DOMINIO; }
+  function validLogin(l) { return /^[a-z0-9._-]{3,30}$/.test(l); }
+  function dref(path) { return FB.fs.doc(FB.db, path); }
+  function cref(path) { return FB.fs.collection(FB.db, path); }
+  function errMsg(e) {
+    var c = (e && e.code) || "";
+    if (/invalid-credential|wrong-password|user-not-found|invalid-email/.test(c)) return "Usuário ou senha incorretos.";
+    if (/too-many-requests/.test(c)) return "Muitas tentativas. Espere alguns minutos e tente de novo.";
+    if (/email-already-in-use/.test(c)) return "Esse usuário já existe. Escolha outro.";
+    if (/weak-password/.test(c)) return "A senha precisa ter pelo menos 6 caracteres.";
+    if (/network|unavailable/.test(c)) return "Sem conexão. Verifique a internet e tente de novo.";
+    if (/permission-denied/.test(c)) return "Você não tem permissão para fazer isso.";
+    return "Algo deu errado. Tente de novo.";
   }
-  function load() {
-    try { var o = JSON.parse(localStorage.getItem(KEY)); if (valid(o)) return addBuiltins(o); } catch (e) {}
-    return fresh();
-  }
-  var warned = false;
-  function save() {
-    try { localStorage.setItem(KEY, JSON.stringify(D)); }
-    catch (e) { if (!warned) { warned = true; toast("Este navegador não está salvando. Use “Exportar” para não perder nada."); } }
+  async function guard(fn, okMsg) {
+    try { await fn(); if (okMsg) toast(okMsg); return true; }
+    catch (e) { console.error(e); toast(errMsg(e)); return false; }
   }
 
-  var isT = function () { return S.who === "prof"; };
+  async function fbInit() {
+    var cfg = window.CADERNO_FIREBASE;
+    if (!cfg) { S.screen = "nocfg"; render(); return; }
+    var base = "https://www.gstatic.com/firebasejs/" + FBV + "/firebase-";
+    var mods = await Promise.all([import(base + "app.js"), import(base + "auth.js"), import(base + "firestore.js")]);
+    var app = mods[0].initializeApp(cfg);
+    FB = { a: mods[0], au: mods[1], fs: mods[2], app: app, auth: mods[1].getAuth(app), db: mods[2].getFirestore(app) };
+    FB.au.onAuthStateChanged(FB.auth, onUser);
+  }
+  async function readProf() {
+    var d = await FB.fs.getDoc(dref("config/professor"));
+    S.profExists = d.exists();
+    return d.exists() ? d.data() : null;
+  }
+  async function onUser(user) {
+    stopData();
+    S.me = null; closeSheet();
+    try {
+      var prof = await readProf();
+      if (!user) { S.screen = S.profExists ? "login" : "first"; render(); return; }
+      if (prof && prof.uid === user.uid) {
+        S.me = { uid: user.uid, name: prof.name || "Professor", login: prof.login || "", role: "prof" };
+      } else {
+        var st = await FB.fs.getDoc(dref("students/" + user.uid));
+        if (!st.exists()) { S.screen = "noaccess"; render(); return; }
+        S.me = { uid: user.uid, name: st.data().name, login: st.data().login || "", role: "aluno" };
+      }
+      S.screen = "app"; S.tab = pref("tab") || "";
+      startData(); render();
+    } catch (e) { console.error(e); S.screen = "login"; render(); toast(errMsg(e)); }
+  }
+  function stopData() { unsubs.forEach(function (u) { u(); }); unsubs = []; D = { modules: [], students: [], tasks: [] }; }
+  function listen(q, fn) {
+    unsubs.push(FB.fs.onSnapshot(q, fn, function (e) { console.error(e); toast(errMsg(e)); }));
+  }
+  function docsOf(snap) { return snap.docs.map(function (d) { var o = d.data(); o.id = d.id; return o; }); }
+  function startData() {
+    var fs = FB.fs;
+    listen(cref("modules"), function (snap) {
+      D.modules = docsOf(snap);
+      if (isT()) syncModules();
+      if (!S.openMod && D.modules.length) S.openMod = modules()[0].id;
+      render(); refreshSheet();
+    });
+    if (isT()) {
+      listen(cref("students"), function (snap) { D.students = docsOf(snap); render(); refreshSheet(); });
+      listen(cref("tasks"), function (snap) { D.tasks = docsOf(snap); render(); refreshSheet(); });
+    } else {
+      listen(dref("students/" + S.me.uid), function (d) { D.students = d.exists() ? [Object.assign({ id: d.id }, d.data())] : []; render(); });
+      listen(fs.query(cref("tasks"), fs.where("uid", "==", S.me.uid)), function (snap) { D.tasks = docsOf(snap); render(); refreshSheet(); });
+    }
+  }
+  /* professor: cria os módulos da apostila na primeira vez e acrescenta PDFs novos que vierem com o caderno
+     (sem trazer de volta os que ele removeu) */
+  var syncing = false;
+  async function syncModules() {
+    if (syncing) return; syncing = true;
+    try {
+      var b = FB.fs.writeBatch(FB.db), n = 0;
+      SEED_MODULES.forEach(function (seed) {
+        var cur = modById(seed.id);
+        if (!cur) { b.set(dref("modules/" + seed.id), stripId(seed)); n++; return; }
+        var have = {}; (cur.materials || []).forEach(function (x) { have[x.id] = true; });
+        var gone = cur.removedBuiltins || [];
+        var add = builtinMats(seed.id).filter(function (x) { return !have[x.id] && gone.indexOf(x.id) < 0; });
+        if (add.length) { b.update(dref("modules/" + seed.id), { materials: add.concat(cur.materials || []) }); n++; }
+      });
+      if (n) await b.commit();
+    } catch (e) { console.error(e); } finally { syncing = false; }
+  }
+  function stripId(o) { var c = JSON.parse(JSON.stringify(o)); delete c.id; return c; }
+
+  /* login e contas */
+  async function doLogin() {
+    var l = val("lg-user"), pw = $("lg-pass") ? $("lg-pass").value : "";
+    if (!l || !pw) { toast("Preencha usuário e senha."); return; }
+    S.busy = true; render();
+    try { await FB.au.signInWithEmailAndPassword(FB.auth, loginToEmail(l), pw); S.busy = false; }
+    catch (e) {
+      S.busy = false; render(); toast(errMsg(e));
+      if ($("lg-user")) $("lg-user").value = l;
+      var f = $("lg-pass"); if (f) f.focus();
+    }
+  }
+  async function doFirst() {
+    var name = val("fp-name"), l = val("fp-user").toLowerCase(), pw = $("fp-pass").value, pw2 = $("fp-pass2").value;
+    if (!name) { need("fp-name", "Escreva o seu nome."); return; }
+    if (!validLogin(l)) { need("fp-user", "Usuário: de 3 a 30 letras minúsculas, números, ponto, hífen ou _ (sem espaços)."); return; }
+    if (pw.length < 6) { need("fp-pass", "A senha precisa ter pelo menos 6 caracteres."); return; }
+    if (pw !== pw2) { need("fp-pass2", "As senhas não são iguais."); return; }
+    S.busy = true; render();
+    try {
+      var cred = await FB.au.createUserWithEmailAndPassword(FB.auth, loginToEmail(l), pw);
+      await FB.fs.setDoc(dref("config/professor"), { uid: cred.user.uid, name: name, login: l, createdAt: Date.now() });
+      S.busy = false;
+      await onUser(cred.user);
+      toast("Conta do professor criada");
+    } catch (e) { console.error(e); S.busy = false; render(); toast(errMsg(e)); }
+  }
+  async function doLogout() { closeSheet(); await FB.au.signOut(FB.auth); }
+  async function changePw() {
+    var cur = $("pw-cur").value, nw = $("pw-new").value, nw2 = $("pw-new2").value;
+    if (nw.length < 6) { need("pw-new", "A nova senha precisa ter pelo menos 6 caracteres."); return; }
+    if (nw !== nw2) { need("pw-new2", "As senhas novas não são iguais."); return; }
+    var u = FB.auth.currentUser;
+    var ok = await guard(async function () {
+      await FB.au.reauthenticateWithCredential(u, FB.au.EmailAuthProvider.credential(u.email, cur));
+      await FB.au.updatePassword(u, nw);
+    }, "Senha alterada");
+    if (ok) closeSheet();
+  }
+  /* o professor cria a conta do aluno numa instância separada do Firebase, para não sair da própria conta */
+  async function createStudentAccount(login, pw) {
+    var sec = FB.a.initializeApp(window.CADERNO_FIREBASE, "cadastro-" + Date.now());
+    try {
+      var auth2 = FB.au.getAuth(sec);
+      var cred = await FB.au.createUserWithEmailAndPassword(auth2, loginToEmail(login), pw);
+      await FB.au.signOut(auth2);
+      return cred.user.uid;
+    } finally { FB.a.deleteApp(sec); }
+  }
+
+  var isT = function () { return !!S.me && S.me.role === "prof"; };
   function stuById(u) { for (var i = 0; i < D.students.length; i++) if (D.students[i].id === u) return D.students[i]; return null; }
   function nm(u) { var s = stuById(u); return s ? s.name : "Aluno removido"; }
   function initials(n) { return String(n).trim().split(/\s+/).slice(0, 2).map(function (w) { return w.charAt(0).toUpperCase(); }).join(""); }
@@ -635,7 +770,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   }
   function allTasks() {
     if (isT()) return D.tasks.filter(function (t) { return stuById(t.uid); });
-    return D.tasks.filter(function (t) { return t.uid === S.who; });
+    return D.tasks.filter(function (t) { return t.uid === S.me.uid; });
   }
   function sortT(a, b) {
     var da = a.due || "9999", db_ = b.due || "9999";
@@ -657,10 +792,9 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   function setStatus(id, k) {
     var t = findTask(id);
     if (!t || t.status === k || !canSet(t, k)) return;
-    t.status = k;
-    t.doneAt = (k === "done" || k === "reviewed") ? (t.doneAt || Date.now()) : null;
-    save(); render(); if (S.sheet && S.sheet.type === "task") paintSheet();
-    if (k === "done" && !isT()) toast("Boa! Tarefa marcada como feita");
+    var doneAt = (k === "done" || k === "reviewed") ? (t.doneAt || Date.now()) : null;
+    guard(function () { return FB.fs.updateDoc(dref("tasks/" + id), { status: k, doneAt: doneAt }); },
+      k === "done" && !isT() ? "Boa! Tarefa marcada como feita" : "");
   }
   function nextOf(t) {
     if (t.status === "todo") return { k: "doing", n: "Comecei a praticar", i: "play" };
@@ -691,11 +825,17 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   }
 
   function render() {
-    if (S.who !== "prof" && !stuById(S.who)) S.who = "prof";
-    $("me").innerHTML = '<label class="who"><span class="role' + (isT() ? "" : " stu") + '">' + (isT() ? "Professor" : "Aluno") + "</span>" +
-      '<span class="sr">Quem está usando</span><select data-chg="who"><option value="prof"' + (isT() ? " selected" : "") + ">Professor</option>" +
-      D.students.map(function (s) { return '<option value="' + esc(s.id) + '"' + (S.who === s.id ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") + "</select>" +
-      '<span class="chev">' + ic("chevron", "sm") + "</span></label>";
+    if (S.screen !== "app") {
+      $("me").innerHTML = ""; $("tabs").innerHTML = ""; $("bnav").innerHTML = "";
+      document.body.classList.add("noapp");
+      var keep = { u: val("lg-user") };
+      $("main").innerHTML = pageAuth();
+      if (keep.u && $("lg-user")) $("lg-user").value = keep.u;
+      return;
+    }
+    document.body.classList.remove("noapp");
+    $("me").innerHTML = '<button class="who" data-act="account" aria-label="Minha conta: ' + esc(S.me.name) + '"><span class="role' + (isT() ? "" : " stu") + '">' + (isT() ? "Professor" : "Aluno") + "</span>" +
+      '<span class="whoname">' + esc(S.me.name) + "</span>" + ic("user", "sm") + "</button>";
     var tabs = tabsFor();
     if (!tabs.some(function (t) { return t.k === S.tab; })) S.tab = tabs[0].k;
     $("tabs").innerHTML = tabs.map(function (t) {
@@ -744,7 +884,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
         stat("todo", "circle", "A fazer", cnt.todo) + "</div>";
     } else {
       var pct = total ? Math.round(fin / total * 100) : 0;
-      head = pageHead("Olá, " + esc(nm(S.who).split(" ")[0]) + "!", "Estas são as suas tarefas de prática.");
+      head = pageHead("Olá, " + esc(String(S.me.name).split(" ")[0]) + "!", "Estas são as suas tarefas de prática.");
       head += '<div class="hero"><div class="ring" style="--p:' + pct + '" role="img" aria-label="' + pct + '% concluído"><span>' + pct + '%</span></div><div>' +
         "<h3>" + fin + " de " + total + " tarefas feitas</h3><p>" + (total && fin === total ? "Tudo em dia. Continue praticando!" : "Um pouco por dia faz toda a diferença.") + "</p>" +
         (late ? '<span class="late-chip">' + ic("clock", "sm") + late + " atrasada" + (late > 1 ? "s" : "") + "</span>" : "") + "</div></div>";
@@ -888,7 +1028,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     return pageHead("Apostila", "Tópicos de cada módulo e os materiais de apoio.") + modules().map(function (m) { return accordion(m, true); }).join("");
   }
   function pageMaterials() {
-    var s = stuById(S.who), mine = (s && s.moduleIds) || [];
+    var s = stuById(S.me.uid), mine = (s && s.moduleIds) || [];
     var ms = modules().filter(function (m) { return mine.indexOf(m.id) > -1; });
     var h = pageHead("Materiais", "O conteúdo dos módulos que você está estudando.");
     if (!ms.length) return h + emptyBig("book", "Nenhum módulo liberado", "Quando o professor liberar o seu módulo, a apostila e os materiais aparecem aqui.");
@@ -897,16 +1037,10 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
 
   /* backup */
   function pageBackup() {
-    return pageHead("Backup", "Guarde uma cópia e leve os dados para outro aparelho.") +
-      '<div class="grid">' +
-      '<div class="panelbox"><div class="stu"><span class="mat" style="border:0;padding:0"><span class="mk">' + ic("shield") + '</span></span><h3>Seus dados ficam neste navegador</h3></div>' +
-      '<p class="note">Alunos, tarefas, tópicos e materiais são salvos só neste aparelho e neste navegador. Exporte de vez em quando para ter uma cópia de segurança.</p>' +
-      '<div class="btns" style="justify-content:flex-start"><button class="btn pri" data-act="export">' + ic("save", "sm") + 'Exportar dados</button><button class="btn" data-act="import">' + ic("upload", "sm") + "Importar arquivo</button></div>" +
-      '<p class="note">Importar substitui tudo o que está aqui pelo conteúdo do arquivo.</p></div>' +
-      '<div class="panelbox"><div class="stu"><span class="mat" style="border:0;padding:0"><span class="mk" style="background:var(--late-bg);color:var(--late)">' + ic("reset") + '</span></span><h3>Começar do zero</h3></div>' +
-      '<p class="note">Apaga alunos, tarefas e materiais e volta a apostila ao conteúdo original. Não dá para desfazer.</p>' +
-      '<div class="btns" style="justify-content:flex-start"><button class="btn danger' + (S.confirm === "reset" ? " on" : "") + '" data-act="reset">' + ic("trash", "sm") + (S.confirm === "reset" ? "Confirmar: apagar tudo" : "Apagar tudo") + "</button></div></div>" +
-      "</div>";
+    return pageHead("Backup", "Guarde uma cópia dos dados do caderno no seu computador.") +
+      '<div class="grid"><div class="panelbox"><div class="stu"><span class="mat" style="border:0;padding:0"><span class="mk">' + ic("shield") + '</span></span><h3>Seus dados ficam na nuvem</h3></div>' +
+      '<p class="note">Alunos, tarefas, tópicos e materiais ficam salvos no Firebase e aparecem em qualquer aparelho em que você entrar. Exporte de vez em quando para ter uma cópia extra.</p>' +
+      '<div class="btns" style="justify-content:flex-start"><button class="btn pri" data-act="export">' + ic("save", "sm") + "Exportar dados</button></div></div></div>";
   }
   function doExport() {
     var blob = new Blob([JSON.stringify(D, null, 2)], { type: "application/json" });
@@ -917,16 +1051,29 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
     toast("Arquivo exportado");
   }
-  function doImport(file) {
-    var r = new FileReader();
-    r.onload = function () {
-      try {
-        var o = JSON.parse(r.result);
-        if (!valid(o)) throw new Error("formato");
-        D = o; save(); S.fStu = ""; S.fMod = ""; render(); toast("Dados importados");
-      } catch (e) { toast("Esse arquivo não é um backup do caderno."); }
-    };
-    r.readAsText(file);
+
+  /* telas de acesso (antes do login) */
+  function pageAuth() {
+    var h = '<div class="auth">';
+    if (S.screen === "loading") return h + '<div class="authcard"><p class="note">Carregando…</p></div></div>';
+    if (S.screen === "nocfg") return h + '<div class="authcard"><div class="eic">' + ic("alert", "lg") + '</div><h2>Falta configurar o login</h2><p class="note">O caderno precisa do projeto Firebase para guardar os logins e os dados. Preencha o arquivo firebase-config.js.</p></div></div>';
+    if (S.screen === "noaccess") return h + '<div class="authcard"><div class="eic">' + ic("alert", "lg") + '</div><h2>Conta sem acesso</h2><p class="note">Esta conta não está cadastrada no caderno. Fale com o seu professor.</p><button class="btn pri block" data-act="logout">Sair</button></div></div>';
+    var dis = S.busy ? " disabled" : "";
+    if (S.screen === "first") {
+      return h + '<form class="authcard" data-form="first"><div class="eic">' + ic("music", "lg") + '</div><h2>Primeiro acesso</h2>' +
+        '<p class="note">Crie a conta do professor. Ela é única: depois disso, só você cadastra os alunos.</p>' +
+        '<div class="field"><label for="fp-name">Seu nome</label><input type="text" id="fp-name" autocomplete="name"></div>' +
+        '<div class="field"><label for="fp-user">Usuário</label><input type="text" id="fp-user" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="ex.: professor"><span class="help">Letras minúsculas, números, ponto ou hífen. Sem espaços.</span></div>' +
+        '<div class="field"><label for="fp-pass">Senha</label><input type="password" id="fp-pass" autocomplete="new-password"><span class="help">Pelo menos 6 caracteres.</span></div>' +
+        '<div class="field"><label for="fp-pass2">Repita a senha</label><input type="password" id="fp-pass2" autocomplete="new-password"></div>' +
+        '<button class="btn pri block" type="submit"' + dis + ">" + (S.busy ? "Criando…" : "Criar conta do professor") + "</button></form></div>";
+    }
+    return h + '<form class="authcard" data-form="login"><div class="eic">' + ic("music", "lg") + '</div><h2>Entrar</h2>' +
+      '<p class="note">Use o usuário e a senha que o seu professor passou.</p>' +
+      '<div class="field"><label for="lg-user">Usuário</label><input type="text" id="lg-user" autocomplete="username" autocapitalize="none" spellcheck="false"></div>' +
+      '<div class="field"><label for="lg-pass">Senha</label><input type="password" id="lg-pass" autocomplete="current-password"></div>' +
+      '<button class="btn pri block" type="submit"' + dis + ">" + (S.busy ? "Entrando…" : "Entrar") + "</button>" +
+      '<p class="help">Esqueceu a senha? Fale com o professor.</p></form></div>';
   }
 
   /* ---------- folhas ---------- */
@@ -935,6 +1082,13 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   function closeSheet() {
     S.sheet = null; var s = $("sheet"); s.hidden = true; s.innerHTML = "";
     if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
+  }
+  /* dados chegaram do servidor: só redesenha a tarefa aberta, e nunca enquanto a pessoa digita */
+  function refreshSheet() {
+    if (!S.sheet || S.sheet.type !== "task") return;
+    var a = document.activeElement;
+    if ($("sheet").contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
+    paintSheet();
   }
   function sheetHead(title, pre) {
     return '<div class="grab" aria-hidden="true"></div><div class="hd"><div style="display:grid;gap:8px;min-width:0">' + (pre || "") + '<h2 id="sheetTitle">' + title + '</h2></div><button class="iconbtn" data-act="close" aria-label="Fechar">' + ic("x") + "</button></div>";
@@ -948,11 +1102,12 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     else if (o.type === "addStu") h = sheetAddStu();
     else if (o.type === "topics") h = sheetTopics(o);
     else if (o.type === "mat") h = sheetMat(o);
+    else if (o.type === "account") h = sheetAccount();
     if (!h) { closeSheet(); return; }
     s.innerHTML = '<div class="panel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">' + h + "</div>";
     s.hidden = false;
     if (first) {
-      var f = s.querySelector("input[type=text], textarea") ;
+      var f = s.querySelector("input[type=text]:not([hidden]), input[type=password], textarea");
       if (f && o.type !== "task") f.focus(); else s.querySelector(".iconbtn").focus();
     }
   }
@@ -996,9 +1151,22 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   function sheetAddStu() {
     return sheetHead("Adicionar aluno") +
       '<div class="field"><label for="as-name">Nome do aluno *</label><input type="text" id="as-name" placeholder="Ex.: Ana Souza" autocomplete="off"></div>' +
+      '<div class="two"><div class="field"><label for="as-user">Usuário *</label><input type="text" id="as-user" placeholder="ex.: ana.souza" autocomplete="off" autocapitalize="none" spellcheck="false"><span class="help">Minúsculas, números, ponto ou hífen.</span></div>' +
+      '<div class="field"><label for="as-pass">Senha inicial *</label><input type="text" id="as-pass" placeholder="mín. 6 caracteres" autocomplete="off" spellcheck="false"><span class="help">Passe para o aluno. Ele pode trocar depois.</span></div></div>' +
       '<div class="field"><span class="lbl">Módulos que vai estudar</span><div class="checks">' +
       modules().map(function (m) { return '<label><input type="checkbox" name="as-mod" value="' + esc(m.id) + '"> ' + esc(m.title) + "</label>"; }).join("") + "</div></div>" +
       '<div class="btns"><button class="btn ghost" data-act="close">Cancelar</button><button class="btn pri" data-act="saveStudent">' + ic("plus", "sm") + "Adicionar</button></div>";
+  }
+  function sheetAccount() {
+    return sheetHead("Minha conta", '<span class="tag">' + (isT() ? "Professor" : "Aluno") + "</span>") +
+      '<div class="stu"><span class="av lg c' + hue(S.me.uid) + '" aria-hidden="true">' + esc(initials(S.me.name)) + '</span><div style="min-width:0"><h3>' + esc(S.me.name) + '</h3><span class="note">Usuário: ' + esc(S.me.login) + "</span></div></div>" +
+      '<form data-form="pw" style="display:grid;gap:12px"><h3 style="font-size:16px">Trocar senha</h3>' +
+      '<input type="text" autocomplete="username" value="' + esc(S.me.login) + '" hidden>' +
+      '<div class="field"><label for="pw-cur">Senha atual</label><input type="password" id="pw-cur" autocomplete="current-password"></div>' +
+      '<div class="two"><div class="field"><label for="pw-new">Nova senha</label><input type="password" id="pw-new" autocomplete="new-password"></div>' +
+      '<div class="field"><label for="pw-new2">Repita a nova senha</label><input type="password" id="pw-new2" autocomplete="new-password"></div></div>' +
+      '<div class="btns"><button class="btn" type="submit">' + ic("check", "sm") + "Salvar nova senha</button></div></form>" +
+      '<div class="btns" style="justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:14px"><span class="note">Saia sempre que usar um aparelho de outra pessoa.</span><button class="btn danger" data-act="logout">Sair</button></div>';
   }
   function sheetTopics(o) {
     var m = modById(o.m); if (!m) return "";
@@ -1020,37 +1188,46 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   function checked(name) { return Array.prototype.map.call(document.querySelectorAll('input[name="' + name + '"]:checked'), function (i) { return i.value; }); }
   function need(id, msg) { toast(msg); var e = $(id); if (e) e.focus(); }
 
-  function createTasks() {
+  async function createTasks() {
     var title = val("nt-title"), us = checked("nt-stu");
     if (!title) { need("nt-title", "Escreva o título da tarefa."); return; }
     if (!us.length) { toast("Escolha pelo menos um aluno."); return; }
-    var now = Date.now();
-    us.forEach(function (u) {
-      D.tasks.push({ id: rid(), uid: u, title: title, note: val("nt-note"), moduleId: val("nt-mod") || null, due: val("nt-due") || null, status: "todo", feedback: "", createdAt: now, doneAt: null });
-    });
-    save(); closeSheet(); render();
-    toast("Tarefa enviada para " + us.length + (us.length > 1 ? " alunos" : " aluno"));
+    var base = { title: title, note: val("nt-note"), moduleId: val("nt-mod") || null, due: val("nt-due") || null, status: "todo", feedback: "", createdAt: Date.now(), doneAt: null };
+    var btn = document.querySelector('[data-act="createTask"]'); if (btn) btn.disabled = true;
+    var ok = await guard(function () {
+      var b = FB.fs.writeBatch(FB.db);
+      us.forEach(function (u) { b.set(FB.fs.doc(cref("tasks")), Object.assign({ uid: u }, base)); });
+      return b.commit();
+    }, "Tarefa enviada para " + us.length + (us.length > 1 ? " alunos" : " aluno"));
+    if (ok) closeSheet(); else if (btn) btn.disabled = false;
   }
-  function saveStudent() {
-    var name = val("as-name");
+  async function saveStudent() {
+    var name = val("as-name"), login = val("as-user").toLowerCase(), pw = val("as-pass");
     if (!name) { need("as-name", "Escreva o nome do aluno."); return; }
-    D.students.push({ id: rid(), name: name, moduleIds: checked("as-mod"), createdAt: Date.now() });
-    save(); closeSheet(); render(); toast("Aluno adicionado");
+    if (!validLogin(login)) { need("as-user", "Usuário: de 3 a 30 letras minúsculas, números, ponto, hífen ou _ (sem espaços)."); return; }
+    if (pw.length < 6) { need("as-pass", "A senha precisa ter pelo menos 6 caracteres."); return; }
+    var btn = document.querySelector('[data-act="saveStudent"]'); if (btn) { btn.disabled = true; btn.textContent = "Criando…"; }
+    var mods = checked("as-mod");
+    var ok = await guard(async function () {
+      var uid = await createStudentAccount(login, pw);
+      await FB.fs.setDoc(dref("students/" + uid), { name: name, login: login, moduleIds: mods, createdAt: Date.now() });
+    }, "Aluno adicionado. Usuário: " + login);
+    if (ok) closeSheet(); else if (btn) { btn.disabled = false; btn.textContent = "Adicionar"; }
   }
-  function saveMat() {
+  async function saveMat() {
     var m = modById(S.sheet.m), title = val("mt-title"), url = val("mt-url");
     if (!title) { need("mt-title", "Dê um nome ao material."); return; }
     if (!/^https?:\/\//.test(url)) { need("mt-url", "Cole um link que comece com https://"); return; }
-    m.materials = (m.materials || []).concat([{ id: rid(), title: title, url: url, kind: kindOf(url) }]);
-    save(); closeSheet(); render(); toast("Material adicionado");
+    var mats = (m.materials || []).concat([{ id: rid(), title: title, url: url, kind: kindOf(url) }]);
+    if (await guard(function () { return FB.fs.updateDoc(dref("modules/" + m.id), { materials: mats }); }, "Material adicionado")) closeSheet();
   }
-  function saveTopics() {
+  async function saveTopics() {
     var m = modById(S.sheet.m);
-    m.topics = ($("tp-txt").value || "").split("\n").map(function (l) { return l.trim(); }).filter(Boolean).map(function (l) {
+    var topics = ($("tp-txt").value || "").split("\n").map(function (l) { return l.trim(); }).filter(Boolean).map(function (l) {
       var i = l.indexOf("|");
       return i > -1 ? { t: l.slice(0, i).trim(), d: l.slice(i + 1).trim() } : { t: l, d: "" };
     });
-    save(); closeSheet(); render(); toast("Tópicos salvos");
+    if (await guard(function () { return FB.fs.updateDoc(dref("modules/" + m.id), { topics: topics }); }, "Tópicos salvos")) closeSheet();
   }
   function onModChange() {
     var mid = $("nt-mod").value, m = modById(mid);
@@ -1070,7 +1247,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     var el = e.target.closest("[data-act]");
     if (!el) { if (e.target.id === "sheet") closeSheet(); return; }
     var a = el.dataset.act, u = el.dataset.u, id = el.dataset.id, m = el.dataset.m;
-    if (a !== "delTask" && a !== "rmMat" && a !== "rmStu" && a !== "reset" && S.confirm) S.confirm = "";
+    if (a !== "delTask" && a !== "rmMat" && a !== "rmStu" && S.confirm) S.confirm = "";
     if (a === "tab") { S.tab = el.dataset.k; pref("tab", S.tab); render(); window.scrollTo(0, 0); $("main").focus({ preventScroll: true }); }
     else if (a === "view") { S.view = el.dataset.k; pref("view", S.view); render(); }
     else if (a === "open") openSheet({ type: "task", id: id });
@@ -1084,15 +1261,18 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     else if (a === "togMod") {
       var s = stuById(u), cur = (s.moduleIds || []).slice(), i = cur.indexOf(m);
       if (i > -1) cur.splice(i, 1); else cur.push(m);
-      s.moduleIds = cur; save(); render();
+      guard(function () { return FB.fs.updateDoc(dref("students/" + u), { moduleIds: cur }); });
     }
     else if (a === "rmStu") {
       if (S.confirm === "s:" + u) {
         S.confirm = "";
-        D.students = D.students.filter(function (x) { return x.id !== u; });
-        D.tasks = D.tasks.filter(function (x) { return x.uid !== u; });
         if (S.fStu === u) S.fStu = "";
-        save(); render(); toast("Aluno removido");
+        guard(function () {
+          var b = FB.fs.writeBatch(FB.db);
+          b.delete(dref("students/" + u));
+          D.tasks.filter(function (x) { return x.uid === u; }).forEach(function (x) { b.delete(dref("tasks/" + x.id)); });
+          return b.commit();
+        }, "Aluno removido");
       } else { S.confirm = "s:" + u; render(); }
     }
     else if (a === "openMod") { S.openMod = S.openMod === m ? "" : m; render(); }
@@ -1101,40 +1281,39 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     else if (a === "rmMat") {
       var x = el.dataset.x;
       if (S.confirm === "x:" + x) {
-        S.confirm = ""; var mod = modById(m);
-        mod.materials = (mod.materials || []).filter(function (q) { return q.id !== x; });
-        if (/^pdf-/.test(x)) { D.removedBuiltins = (D.removedBuiltins || []).concat([x]); }
-        save(); render();
+        S.confirm = ""; var mod = modById(m), patch = { materials: (mod.materials || []).filter(function (q) { return q.id !== x; }) };
+        if (/^pdf-/.test(x)) patch.removedBuiltins = (mod.removedBuiltins || []).concat([x]);
+        guard(function () { return FB.fs.updateDoc(dref("modules/" + m), patch); }, "Material removido");
       } else { S.confirm = "x:" + x; render(); }
     }
     else if (a === "createTask") createTasks();
     else if (a === "saveMat") saveMat();
     else if (a === "saveTopics") saveTopics();
-    else if (a === "saveFb") { var t3 = findTask(S.sheet.id); if (t3) { t3.feedback = val("fb"); save(); render(); toast("Retorno salvo"); } }
+    else if (a === "saveFb") { var fbTxt = val("fb"), fbId = S.sheet.id; guard(function () { return FB.fs.updateDoc(dref("tasks/" + fbId), { feedback: fbTxt }); }, "Retorno salvo"); }
     else if (a === "delTask") {
       var tid = S.sheet.id;
       if (S.confirm === "t:" + tid) {
-        S.confirm = "";
-        D.tasks = D.tasks.filter(function (q) { return q.id !== tid; });
-        save(); closeSheet(); render(); toast("Tarefa excluída");
+        S.confirm = ""; closeSheet();
+        guard(function () { return FB.fs.deleteDoc(dref("tasks/" + tid)); }, "Tarefa excluída");
       } else { S.confirm = "t:" + tid; paintSheet(); }
     }
     else if (a === "theme") setTheme(el.dataset.k);
     else if (a === "export") doExport();
-    else if (a === "import") $("importFile").click();
-    else if (a === "reset") {
-      if (S.confirm === "reset") { S.confirm = ""; D = fresh(); save(); S.who = "prof"; render(); toast("Tudo apagado"); }
-      else { S.confirm = "reset"; render(); }
-    }
+    else if (a === "account") openSheet({ type: "account" });
+    else if (a === "logout") doLogout();
   });
   document.addEventListener("change", function (e) {
-    if (e.target.id === "importFile") { if (e.target.files[0]) doImport(e.target.files[0]); e.target.value = ""; return; }
     var k = e.target.dataset && e.target.dataset.chg;
-    if (k === "who") { S.who = e.target.value; pref("who", S.who); S.tab = ""; closeSheet(); render(); }
-    else if (k === "fStu") { S.fStu = e.target.value; render(); }
+    if (k === "fStu") { S.fStu = e.target.value; render(); }
     else if (k === "fMod") { S.fMod = e.target.value; render(); }
     else if (k === "ntMod") onModChange();
     else if (k === "ntTop") onTopChange();
+  });
+  document.addEventListener("submit", function (e) {
+    var f = e.target.dataset && e.target.dataset.form; if (!f) return;
+    e.preventDefault();
+    if (S.busy) return;
+    if (f === "login") doLogin(); else if (f === "first") doFirst(); else if (f === "pw") changePw();
   });
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && S.sheet) closeSheet();
@@ -1164,12 +1343,9 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   /* ---------- início ---------- */
   $("logoMark").innerHTML = ic("music");
   paintTheme();
-  D = load();
-  S.who = pref("who") || "prof";
-  S.tab = pref("tab") || "";
   S.view = pref("view") === "lista" ? "lista" : "quadro";
-  S.openMod = modules().length ? modules()[0].id : "";
   render();
+  fbInit().catch(function (e) { console.error(e); S.screen = "nocfg"; render(); toast("Não foi possível carregar o login. Verifique a internet."); });
 })();
 </script>
 </body>
