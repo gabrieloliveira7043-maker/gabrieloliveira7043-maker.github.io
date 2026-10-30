@@ -1,0 +1,833 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Caderno de Prática</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600&display=swap">
+<style>
+/* Layout: cabeçalho fixo com teclado decorativo e abas; conteúdo em quadro (kanban) ou lista; folhas de baixo para detalhes */
+:root {
+  --bg: #F1F3F8;
+  --surface: #FFFFFF;
+  --surface-2: #E8EBF3;
+  --ink: #12162B;
+  --ink-2: #4A5070;
+  --line: #D9DDEA;
+  --accent: #2B4FD8;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #E3E9FC;
+  --key: #12162B;
+  --s-todo: #5B6388;
+  --s-todo-bg: #E8EBF3;
+  --s-doing: #9A5B06;
+  --s-doing-bg: #FBEBD0;
+  --s-done: #1C7A4C;
+  --s-done-bg: #DDF3E6;
+  --s-rev: #0E727C;
+  --s-rev-bg: #D7F1F3;
+  --late: #B8312A;
+  --late-bg: #FBE0DD;
+  --f-display: "Bricolage Grotesque", "Figtree", system-ui, sans-serif;
+  --f-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0D1020;
+    --surface: #161A30;
+    --surface-2: #1F2440;
+    --ink: #E9EBF7;
+    --ink-2: #A0A7CC;
+    --line: #2A3050;
+    --accent: #8AA2FF;
+    --accent-ink: #0D1020;
+    --accent-soft: #222A55;
+    --key: #0D1020;
+    --s-todo: #AEB5DA;
+    --s-todo-bg: #262C4D;
+    --s-doing: #F2B65C;
+    --s-doing-bg: #3B2C14;
+    --s-done: #6FD3A1;
+    --s-done-bg: #15352A;
+    --s-rev: #62D0DB;
+    --s-rev-bg: #123539;
+    --late: #FF8D84;
+    --late-bg: #3F1B1A;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.45 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 56px;
+  -webkit-text-size-adjust: 100%;
+}
+[hidden] { display: none !important; }
+.wrap { max-width: 1180px; margin: 0 auto; min-width: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+h1, h2, h3, h4 { font-family: var(--f-display); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+p { margin: 0; }
+
+/* cabeçalho */
+.top { position: sticky; top: 0; z-index: 5; background: var(--bg); padding-top: max(14px, env(safe-area-inset-top, 0px)); }
+.brand { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.brand h1 { font-size: 26px; font-weight: 700; }
+.who-me { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); min-width: 0; }
+.who-me select { padding: 6px 10px; font-size: 13px; max-width: 220px; }
+.role { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; background: var(--accent-soft); color: var(--accent); padding: 3px 8px; border-radius: 6px; }
+.keys {
+  height: 12px; margin-top: 10px; border-radius: 3px 3px 6px 6px; border: 1px solid var(--line);
+  background-color: var(--surface);
+  background-image:
+    linear-gradient(90deg, transparent 12px, var(--key) 12px, var(--key) 24px, transparent 24px),
+    linear-gradient(90deg, transparent 30px, var(--key) 30px, var(--key) 42px, transparent 42px),
+    linear-gradient(90deg, transparent 66px, var(--key) 66px, var(--key) 78px, transparent 78px),
+    linear-gradient(90deg, transparent 84px, var(--key) 84px, var(--key) 96px, transparent 96px),
+    linear-gradient(90deg, transparent 102px, var(--key) 102px, var(--key) 114px, transparent 114px),
+    repeating-linear-gradient(90deg, transparent 0 17px, var(--line) 17px 18px);
+  background-size: 126px 7px, 126px 7px, 126px 7px, 126px 7px, 126px 7px, auto;
+  background-repeat: repeat-x, repeat-x, repeat-x, repeat-x, repeat-x, repeat;
+  background-position: 0 0;
+}
+.tabs { display: flex; gap: 4px; overflow-x: auto; padding: 10px 0 0; border-bottom: 1px solid var(--line); scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { background: none; border: 0; padding: 10px 14px; font-weight: 600; color: var(--ink-2); border-bottom: 3px solid transparent; white-space: nowrap; }
+.tab[aria-current="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+main { padding-top: 18px; min-width: 0; }
+
+/* barras de ferramentas */
+.bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.bar .grp { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-width: 0; }
+.seg { display: inline-flex; background: var(--surface-2); border-radius: 10px; padding: 3px; }
+.seg button { border: 0; background: none; padding: 6px 14px; border-radius: 8px; font-weight: 600; color: var(--ink-2); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(10, 14, 40, 0.15); }
+select, input[type="text"], input[type="url"], input[type="date"], textarea {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; min-width: 0; max-width: 100%;
+}
+textarea { width: 100%; resize: vertical; min-height: 84px; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 9px 14px; font-weight: 600; }
+.btn.pri { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.danger { color: var(--late); }
+.btn.sm { padding: 5px 10px; font-size: 13px; }
+.btn[disabled] { opacity: 0.5; cursor: default; }
+.note { color: var(--ink-2); font-size: 13px; }
+
+/* resumo */
+.sum { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 99px; background: var(--s-todo-bg); color: var(--s-todo); white-space: nowrap; }
+.pill.doing { background: var(--s-doing-bg); color: var(--s-doing); }
+.pill.done { background: var(--s-done-bg); color: var(--s-done); }
+.pill.reviewed { background: var(--s-rev-bg); color: var(--s-rev); }
+.pill.late { background: var(--late-bg); color: var(--late); }
+.prog { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; flex: 1; min-width: 120px; }
+.prog i { display: block; height: 100%; background: var(--s-done); }
+
+/* quadro */
+.board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(250px, 1fr); gap: 12px; overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: 8px; }
+.col { background: var(--surface-2); border-radius: 14px; padding: 10px; display: flex; flex-direction: column; gap: 10px; min-height: 160px; scroll-snap-align: start; min-width: 0; }
+.col.over { outline: 2px dashed var(--accent); }
+.col > header { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px; font-family: var(--f-display); font-weight: 700; }
+.col > header b { font-size: 12px; font-family: var(--f-body); color: var(--ink-2); font-weight: 600; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; min-width: 0; }
+.card:hover { border-color: var(--accent); }
+.card h4 { font-size: 16px; font-weight: 500; overflow-wrap: anywhere; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; color: var(--ink-2); }
+.tag { background: var(--accent-soft); color: var(--accent); font-weight: 600; font-size: 12px; padding: 2px 8px; border-radius: 6px; }
+.stu { display: flex; align-items: center; gap: 6px; font-size: 13px; min-width: 0; }
+.stu span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.av { width: 24px; height: 24px; border-radius: 50%; flex: none; background: var(--accent-soft); color: var(--accent); display: inline-grid; place-items: center; font-size: 11px; font-weight: 700; }
+.av.lg { width: 40px; height: 40px; font-size: 15px; }
+.empty { color: var(--ink-2); font-size: 13px; padding: 14px 6px; text-align: center; }
+.emptybig { background: var(--surface); border: 1px dashed var(--line); border-radius: 14px; padding: 28px 18px; text-align: center; display: grid; gap: 6px; justify-items: center; }
+.emptybig h3 { font-size: 20px; }
+
+/* lista */
+.lsec { margin-bottom: 20px; }
+.lsec h3 { font-size: 15px; color: var(--ink-2); margin-bottom: 8px; font-weight: 500; }
+.row { display: flex; gap: 12px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer; min-width: 0; }
+.row:hover { border-color: var(--accent); }
+.row .grow { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.row .grow b { font-weight: 600; overflow-wrap: anywhere; }
+.chk { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line); background: var(--surface); display: grid; place-items: center; flex: none; padding: 0; color: transparent; font-weight: 700; }
+.chk.on { background: var(--s-done); border-color: var(--s-done); color: #fff; }
+.chk.lock { background: var(--s-rev); border-color: var(--s-rev); color: #fff; cursor: default; }
+
+/* alunos e módulos */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
+.panelbox { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.panelbox h3 { font-size: 18px; }
+.sec-h { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); font-family: var(--f-body); font-weight: 600; margin: 22px 0 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 99px; padding: 4px 11px; font-size: 13px; font-weight: 500; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.acc { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 10px; min-width: 0; }
+.acc > button.h { width: 100%; text-align: left; background: none; border: 0; padding: 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.acc > button.h strong { font-family: var(--f-display); font-size: 18px; font-weight: 700; }
+.acc .body { padding: 0 14px 14px; display: grid; gap: 14px; }
+.topics { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.topics li { padding: 8px 10px; background: var(--surface-2); border-radius: 10px; }
+.topics li b { font-weight: 600; }
+.topics li small { display: block; color: var(--ink-2); font-size: 13px; margin-top: 2px; }
+.mats { display: grid; gap: 8px; }
+.mat { display: flex; gap: 10px; align-items: center; justify-content: space-between; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; min-width: 0; }
+.mat a { color: var(--accent); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; min-width: 0; }
+.mat a:hover { text-decoration: underline; }
+.kind { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); font-weight: 600; flex: none; }
+
+/* folha de detalhes */
+.sheet { position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-end; justify-content: center; background: rgba(10, 12, 30, 0.55); }
+.panel {
+  width: min(580px, 100%); max-height: 92%; overflow-y: auto; background: var(--surface); color: var(--ink);
+  border-radius: 18px 18px 0 0; padding: 18px max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  display: grid; gap: 14px; align-content: start;
+}
+@media (min-width: 700px) { .sheet { align-items: center; } .panel { border-radius: 18px; padding: 22px; } }
+.panel h2 { font-size: 22px; }
+.field { display: grid; gap: 5px; }
+.field > label, .lbl { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 460px) { .two { grid-template-columns: 1fr; } }
+.stseg { display: flex; flex-wrap: wrap; gap: 6px; }
+.stseg button { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 8px 12px; font-weight: 600; }
+.stseg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.checks { display: grid; gap: 6px; max-height: 190px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.checks label { display: flex; align-items: center; gap: 8px; }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; z-index: 30; font-weight: 500; max-width: calc(100% - 32px); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand">
+      <h1>Caderno de Prática</h1>
+      <div class="who-me" id="me"></div>
+    </div>
+    <div class="keys" aria-hidden="true"></div>
+    <nav class="tabs" id="tabs" aria-label="Seções"></nav>
+  </div>
+  <main id="main"></main>
+</div>
+<div class="sheet" id="sheet" hidden></div>
+<div class="toast" id="toast" hidden role="status"></div>
+<input type="file" id="importFile" accept=".json,application/json" hidden>
+
+<script>
+(function () {
+  "use strict";
+
+  /* Conteúdo inicial da apostila. Depois de editado no app, o que vale é o que está salvo no navegador. */
+  var SEED_MODULES = [
+    { id: "tec1", order: 1, title: "Teclado 1", summary: "Postura, dedos, acordes maiores e menores, melodia e harmonia", materials: [], topics: [
+      { t: "Uso correto dos dedos 1/3/5 com as duas mãos", d: "" },
+      { t: "Uso do pedal", d: "" },
+      { t: "Função de cada mão", d: "Mão direita faz o acorde cheio e dedilhados, enquanto a mão esquerda faz a base." },
+      { t: "Diferença entre teclado e piano", d: "" },
+      { t: "Percepção auditiva das notas", d: "" },
+      { t: "Formação de acorde maior e menor", d: "Tônica, terça menor ou maior, quinta justa." },
+      { t: "Troca de notas em determinado período de tempo", d: "" },
+      { t: "Postura e posicionamento das mãos", d: "" },
+      { t: "Exercícios de mobilidade", d: "" },
+      { t: "Letra que define cada acorde maior", d: "C, D, E, F, G, A, B" },
+      { t: "Letra que define cada acorde menor", d: "Cm, Dm, Em, Fm, Gm, Am, Bm" },
+      { t: "Diferença entre melodia e harmonia", d: "Melodia: sequência de notas tocadas uma após a outra. Harmonia: conjunto de notas tocadas ao mesmo tempo." }
+    ] },
+    { id: "tec2", order: 2, title: "Teclado 2", summary: "Escalas maiores, campo harmônico, tempo musical e leitura de partitura", materials: [], topics: [
+      { t: "Regra do T T ST T T T ST", d: "Tom, tom, semitom, tom, tom, tom, semitom." },
+      { t: "Escalas maiores", d: "" },
+      { t: "Campo harmônico", d: "C D E F G A B | D E F# G A B C# D | E F# G# A B C# D E | F G A Bb C D E F | G A B C D E F# | A B C# D E F# G# A | B C# D# E F# G# A# B" },
+      { t: "Tons musicais", d: "" },
+      { t: "Tempo musical", d: "4/4, 6/8 e 3/4." },
+      { t: "Regra das escalas", d: "Maior, menor, menor, maior, maior, menor, diminuto." },
+      { t: "Leitura da partitura", d: "" },
+      { t: "Uso do metrônomo com a música", d: "" },
+      { t: "Diferença entre bemol e sustenido", d: "Sustenido (#): eleva uma nota em meio-tom, na direção aguda. Bemol (b): abaixa uma nota em meio-tom, na direção grave. Existe apenas E bemol e B bemol; o resto dos acordes é chamado de sustenido." }
+    ] },
+    { id: "tec3", order: 3, title: "Teclado 3", summary: "Acordes sustenidos, figuras de tempo, transposição e repertório", materials: [], topics: [
+      { t: "Formação de acordes sustenidos", d: "" },
+      { t: "Formação de acordes sustenidos menores", d: "" },
+      { t: "Leitura da partitura com as figuras de tempo", d: "Semibreve 4 tempos, mínima 2 tempos, semínima 1 tempo, colcheia 1/2 tempo, semicolcheia 1/4 tempo, fusa 1/8 tempo, semifusa 1/16 tempo." },
+      { t: "Saber tocar 5 músicas inteiras", d: "" },
+      { t: "Transposição de tom", d: "Exemplo: uma música em C vira uma música em G." },
+      { t: "Inversão de acordes", d: "" },
+      { t: "Domínio do metrônomo", d: "Exercício do BPM em 70 e 140." },
+      { t: "Domínio de dinâmica musical", d: "Saber o momento de crescer ou abaixar a música em sua intensidade." },
+      { t: "Leitura de cifra", d: "" },
+      { t: "Escolha de timbres", d: "" },
+      { t: "Velocidade e agilidade", d: "" }
+    ] },
+    { id: "tec4", order: 4, title: "Teclado 4", summary: "Criatividade, improvisação, composição e ministração", materials: [], topics: [
+      { t: "Criatividade musical", d: "" },
+      { t: "Improvisação e composição", d: "" },
+      { t: "Domínio de todas as escalas", d: "" },
+      { t: "Domínio de notas e acordes tocados na música", d: "" },
+      { t: "Empréstimo modal", d: "" },
+      { t: "Domínio de notas diminutas dentro de cada escala", d: "" },
+      { t: "Tirar músicas de ouvido e introduções", d: "" },
+      { t: "Aumento de repertório musical", d: "" },
+      { t: "Ministração com o instrumento", d: "" },
+      { t: "Diferença entre escala e campo harmônico", d: "Saber introduzir na prática dentro de uma música." },
+      { t: "Precisão rítmica", d: "" },
+      { t: "Domínio de tocar em grupo", d: "" }
+    ] },
+    { id: "canto", order: 5, title: "Canto", summary: "A técnica vocal depende do equilíbrio entre mente, corpo, controle do fluxo de ar e ministração", materials: [], topics: [
+      { t: "Respiração diafragmática", d: "Ativação do diafragma e expansão das costelas flutuantes, evitando a respiração alta." },
+      { t: "Apoio e controle do ar", d: "Aprender a liberar o ar de forma controlada, sem sopros ou pressão excessiva." },
+      { t: "Não usar voz de garganta", d: "Não concentrar o esforço na laringe e na faringe. Use o suporte do diafragma e os espaços de ressonância da cabeça e do peito. A voz de garganta cansa rápido, causa rouquidão e, a longo prazo, pode gerar nódulos." },
+      { t: "Apoio vocal (suporte)", d: "Dinâmica de pressão usando a musculatura abdominal e intercostal para estabilizar o fluxo de ar." },
+      { t: "Voz de peito", d: "Registro de mecanismo 1, ideal para notas graves e médias firmes. É mais potente." },
+      { t: "Voz de cabeça", d: "Ideal para notas agudas e texturas leves." },
+      { t: "Voz mista (mix voice)", d: "Coordenação e equilíbrio muscular entre as duas vozes, para cantar notas agudas com potência e sem falhas bruscas na passagem." },
+      { t: "Aquecimento vocal", d: "" },
+      { t: "Dinâmica vocal", d: "" },
+      { t: "Procura de tons adequados para a sua voz e timbre", d: "" },
+      { t: "Controle de intensidade", d: "Domínio do crescendo (aumento gradual do volume) e do decrescendo (redução gradual), mantendo o apoio." },
+      { t: "Ornamentos", d: "Vibrato espontâneo e precisão em melismas." },
+      { t: "Afinação e percepção auditiva", d: "Treino de ouvido para intervalos musicais e correção de desvios. Reconhecer alturas da música e manter a nota." },
+      { t: "Psicodinâmica da voz", d: "Uso do timbre para transmitir emoções de forma intencional." },
+      { t: "Postura corporal", d: "Alinhamento da coluna, relaxamento cervical e ombros soltos, ajudando na solta da laringe." },
+      { t: "Uso do microfone", d: "Distância correta, angulação e controle do efeito de proximidade, em estúdio e no palco." },
+      { t: "Cuidados básicos com a voz", d: "Hidratação, evitar gritos, descanso vocal após ministração, hábitos saudáveis e evitar alimentos que deixam pigarro." },
+      { t: "Ministração e composição", d: "Juntar a técnica vocal com o ato de levar as pessoas a adorarem. Cantar não é só técnica, é expressão do reino de Deus." },
+      { t: "Como compor", d: "Busque primeiro o coração do Senhor. Busque versos na Bíblia, escreva a última coisa que o Senhor lhe falou, escolha uma melodia ou gênero que goste. A composição precisa de começo, meio, fim e uma ponte." }
+    ] }
+  ];
+
+  var ST = [
+    { k: "todo", n: "A fazer" },
+    { k: "doing", n: "Praticando" },
+    { k: "done", n: "Feita" },
+    { k: "reviewed", n: "Revisada" }
+  ];
+  var KEY = "cp_dados_v1";
+  var D;  // { modules, students: [{id, name, moduleIds}], tasks: [{id, uid, ...}] }
+  var S = { who: "prof", tab: "", view: "quadro", fStu: "", fMod: "", openMod: "", confirm: "", sheet: null };
+
+  /* ---------- utilidades ---------- */
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function pref(k, v) {
+    try { if (v === undefined) return localStorage.getItem("cp_" + k); localStorage.setItem("cp_" + k, v); } catch (e) { return null; }
+  }
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function todayStr() { var n = new Date(); return n.getFullYear() + "-" + pad(n.getMonth() + 1) + "-" + pad(n.getDate()); }
+  function fmtD(s) {
+    var p = String(s).split("-").map(Number);
+    return new Date(p[0], p[1] - 1, p[2]).toLocaleDateString("pt-BR", { day: "numeric", month: "short" }).replace(".", "");
+  }
+  function rid() { return Math.random().toString(36).slice(2, 10); }
+  function safeUrl(u) { return /^https?:\/\//.test(u || "") ? u : "#"; }
+  var toastT;
+  function toast(m) {
+    var t = $("toast"); t.textContent = m; t.hidden = false;
+    clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 3200);
+  }
+
+  /* ---------- dados (salvos neste navegador) ---------- */
+  function fresh() { return { modules: JSON.parse(JSON.stringify(SEED_MODULES)), students: [], tasks: [] }; }
+  function valid(o) { return o && Array.isArray(o.modules) && Array.isArray(o.students) && Array.isArray(o.tasks); }
+  function load() {
+    try { var o = JSON.parse(localStorage.getItem(KEY)); if (valid(o)) return o; } catch (e) {}
+    return fresh();
+  }
+  var warned = false;
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(D)); }
+    catch (e) { if (!warned) { warned = true; toast("Este navegador não está salvando. Use “Exportar” para não perder nada."); } }
+  }
+
+  var isT = function () { return S.who === "prof"; };
+  function stuById(u) { for (var i = 0; i < D.students.length; i++) if (D.students[i].id === u) return D.students[i]; return null; }
+  function nm(u) { var s = stuById(u); return s ? s.name : "Aluno removido"; }
+  function initials(n) { return String(n).trim().split(/\s+/).slice(0, 2).map(function (w) { return w.charAt(0).toUpperCase(); }).join(""); }
+  function avImg(u, cls) { return '<span class="av ' + (cls || "") + '" aria-hidden="true">' + esc(initials(nm(u))) + "</span>"; }
+  function modules() { return D.modules.slice().sort(function (a, b) { return (a.order || 0) - (b.order || 0); }); }
+  function modById(id) { for (var i = 0; i < D.modules.length; i++) if (D.modules[i].id === id) return D.modules[i]; return null; }
+  function modName(id) { var m = modById(id); return m ? m.title : ""; }
+  function stName(k) { for (var i = 0; i < ST.length; i++) if (ST[i].k === k) return ST[i].n; return k; }
+  function canSet(t, k) {
+    if (isT()) return true;
+    return t.status !== "reviewed" && k !== "reviewed";
+  }
+  function allTasks() {
+    if (isT()) return D.tasks.filter(function (t) { return stuById(t.uid); });
+    return D.tasks.filter(function (t) { return t.uid === S.who; });
+  }
+  function sortT(a, b) {
+    var da = a.due || "9999", db_ = b.due || "9999";
+    return da < db_ ? -1 : da > db_ ? 1 : (a.createdAt || 0) - (b.createdAt || 0);
+  }
+  function isLate(t) { return t.due && t.due < todayStr() && (t.status === "todo" || t.status === "doing"); }
+  function findTask(id) { for (var i = 0; i < D.tasks.length; i++) if (D.tasks[i].id === id) return D.tasks[i]; return null; }
+  function kindOf(url) {
+    var s = (url || "").toLowerCase();
+    if (/youtu\.?be|vimeo/.test(s)) return "Vídeo";
+    if (/\.pdf($|\?)/.test(s)) return "PDF";
+    if (/\.(mp3|m4a|wav|ogg)($|\?)/.test(s)) return "Áudio";
+    if (/\.(png|jpe?g|gif|webp)($|\?)/.test(s)) return "Imagem";
+    return "Link";
+  }
+
+  function setStatus(id, k) {
+    var t = findTask(id);
+    if (!t || t.status === k || !canSet(t, k)) return;
+    t.status = k;
+    t.doneAt = (k === "done" || k === "reviewed") ? (t.doneAt || Date.now()) : null;
+    save(); render(); if (S.sheet && S.sheet.type === "task") paintSheet();
+  }
+  function nextOf(t) {
+    if (t.status === "todo") return { k: "doing", n: "Comecei a praticar" };
+    if (t.status === "doing") return { k: "done", n: "Marcar como feita" };
+    if (t.status === "done" && isT()) return { k: "reviewed", n: "Marcar como revisada" };
+    return null;
+  }
+
+  /* ---------- telas ---------- */
+  function tabsFor() {
+    return isT()
+      ? [{ k: "tarefas", n: "Tarefas" }, { k: "alunos", n: "Alunos" }, { k: "modulos", n: "Módulos e materiais" }, { k: "backup", n: "Backup" }]
+      : [{ k: "tarefas", n: "Minhas tarefas" }, { k: "materiais", n: "Materiais" }];
+  }
+  function render() {
+    if (S.who !== "prof" && !stuById(S.who)) S.who = "prof";
+    $("me").innerHTML = '<span class="role">' + (isT() ? "Professor" : "Aluno") + "</span>" +
+      '<select data-chg="who" aria-label="Quem está usando"><option value="prof"' + (isT() ? " selected" : "") + ">Professor</option>" +
+      D.students.map(function (s) { return '<option value="' + esc(s.id) + '"' + (S.who === s.id ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") + "</select>";
+    var tabs = tabsFor();
+    if (!tabs.some(function (t) { return t.k === S.tab; })) S.tab = tabs[0].k;
+    $("tabs").innerHTML = tabs.map(function (t) {
+      return '<button class="tab" data-act="tab" data-k="' + t.k + '" aria-current="' + (S.tab === t.k) + '">' + t.n + "</button>";
+    }).join("");
+    var h;
+    if (S.tab === "tarefas") h = pageTasks();
+    else if (S.tab === "alunos") h = pageStudents();
+    else if (S.tab === "modulos") h = pageModules();
+    else if (S.tab === "backup") h = pageBackup();
+    else h = pageMaterials();
+    $("main").innerHTML = h;
+  }
+
+  /* tarefas */
+  function pageTasks() {
+    var list = allTasks();
+    if (isT()) {
+      if (S.fStu) list = list.filter(function (t) { return t.uid === S.fStu; });
+      if (S.fMod) list = list.filter(function (t) { return t.moduleId === S.fMod; });
+    }
+    list.sort(sortT);
+    var cnt = {}; ST.forEach(function (s) { cnt[s.k] = 0; });
+    list.forEach(function (t) { cnt[t.status] = (cnt[t.status] || 0) + 1; });
+    var late = list.filter(isLate).length;
+    var total = list.length, fin = cnt.done + cnt.reviewed;
+
+    var bar = '<div class="bar"><div class="grp">' +
+      '<div class="seg" role="group" aria-label="Modo de exibição">' +
+      '<button data-act="view" data-k="quadro" aria-pressed="' + (S.view === "quadro") + '">Quadro</button>' +
+      '<button data-act="view" data-k="lista" aria-pressed="' + (S.view === "lista") + '">Lista</button></div>';
+    if (isT()) {
+      bar += '<select data-chg="fStu" aria-label="Filtrar por aluno"><option value="">Todos os alunos</option>' +
+        D.students.map(function (s) { return '<option value="' + esc(s.id) + '"' + (S.fStu === s.id ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") + "</select>" +
+        '<select data-chg="fMod" aria-label="Filtrar por módulo"><option value="">Todos os módulos</option>' +
+        modules().map(function (m) { return '<option value="' + esc(m.id) + '"' + (S.fMod === m.id ? " selected" : "") + ">" + esc(m.title) + "</option>"; }).join("") + "</select>";
+    }
+    bar += "</div>";
+    if (isT()) bar += '<button class="btn pri" data-act="newTask">+ Nova tarefa</button>';
+    bar += "</div>";
+
+    var sum = '<div class="sum">';
+    if (isT()) {
+      sum += '<span class="pill done">' + cnt.done + " para revisar</span>";
+      if (late) sum += '<span class="pill late">' + late + " atrasada" + (late > 1 ? "s" : "") + "</span>";
+      sum += '<span class="pill">' + cnt.todo + " a fazer</span>";
+    } else {
+      sum += '<div style="display:flex;gap:10px;align-items:center;width:100%;max-width:480px"><div class="prog"><i style="width:' + (total ? Math.round(fin / total * 100) : 0) + '%"></i></div>' +
+        '<span class="note">' + fin + " de " + total + " feitas</span></div>";
+      if (late) sum += '<span class="pill late">' + late + " atrasada" + (late > 1 ? "s" : "") + "</span>";
+    }
+    sum += "</div>";
+
+    if (!total) {
+      return bar + sum + '<div class="emptybig"><h3>Nenhuma tarefa por aqui</h3><p class="note">' +
+        (isT() ? (D.students.length ? "Toque em “Nova tarefa” para enviar a primeira depois da aula." : "Cadastre os alunos na aba Alunos e depois envie a primeira tarefa.") : "Depois da aula, as tarefas do professor aparecem aqui.") + "</p></div>";
+    }
+    return bar + sum + (S.view === "quadro" ? board(list) : listView(list));
+  }
+  function dueTag(t) {
+    if (!t.due) return "";
+    return '<span class="pill ' + (isLate(t) ? "late" : "") + '">' + (isLate(t) ? "Atrasada · " : "Até ") + fmtD(t.due) + "</span>";
+  }
+  function card(t) {
+    var n = nextOf(t);
+    return '<article class="card" tabindex="0" draggable="true" data-act="open" data-id="' + esc(t.id) + '">' +
+      '<div class="meta">' + (t.moduleId ? '<span class="tag">' + esc(modName(t.moduleId)) + "</span>" : "") + dueTag(t) + "</div>" +
+      "<h4>" + esc(t.title) + "</h4>" +
+      (isT() ? '<div class="stu">' + avImg(t.uid) + "<span>" + esc(nm(t.uid)) + "</span></div>" : "") +
+      (n ? '<button class="btn sm" data-act="adv" data-id="' + esc(t.id) + '">' + n.n + "</button>" : "") +
+      "</article>";
+  }
+  function board(list) {
+    return '<div class="board">' + ST.map(function (s) {
+      var items = list.filter(function (t) { return t.status === s.k; });
+      return '<section class="col" data-drop="' + s.k + '"><header>' + s.n + "<b>" + items.length + "</b></header>" +
+        (items.length ? items.map(card).join("") : '<div class="empty">Nada aqui</div>') + "</section>";
+    }).join("") + "</div>";
+  }
+  function listView(list) {
+    var groups = [
+      { n: "Para fazer", f: function (t) { return t.status === "todo" || t.status === "doing"; } },
+      { n: "Feitas, aguardando revisão", f: function (t) { return t.status === "done"; } },
+      { n: "Revisadas", f: function (t) { return t.status === "reviewed"; } }
+    ];
+    return groups.map(function (g) {
+      var items = list.filter(g.f);
+      if (!items.length) return "";
+      return '<div class="lsec"><h3>' + g.n + " · " + items.length + "</h3>" + items.map(row).join("") + "</div>";
+    }).join("");
+  }
+  function row(t) {
+    var lead;
+    if (isT()) lead = avImg(t.uid, "lg");
+    else if (t.status === "reviewed") lead = '<button class="chk lock" aria-label="Revisada" tabindex="-1">✓</button>';
+    else lead = '<button class="chk' + (t.status === "done" ? " on" : "") + '" data-act="toggle" data-id="' + esc(t.id) + '" aria-label="Marcar como feita">✓</button>';
+    return '<div class="row" tabindex="0" data-act="open" data-id="' + esc(t.id) + '">' + lead +
+      '<div class="grow"><b>' + esc(t.title) + '</b><div class="meta">' +
+      (isT() ? "<span>" + esc(nm(t.uid)) + "</span>" : "") +
+      (t.moduleId ? '<span class="tag">' + esc(modName(t.moduleId)) + "</span>" : "") + dueTag(t) +
+      '<span class="pill ' + t.status + '">' + stName(t.status) + "</span></div></div></div>";
+  }
+
+  /* alunos */
+  function pageStudents() {
+    var h = '<div class="bar"><div class="grp"><span class="note">' + D.students.length + " aluno(s)</span></div>" +
+      '<button class="btn pri" data-act="addStudent">+ Adicionar aluno</button></div>';
+    if (!D.students.length) return h + '<div class="emptybig"><h3>Ainda sem alunos</h3><p class="note">Toque em “Adicionar aluno”, escreva o nome e escolha os módulos dele.</p></div>';
+    h += '<div class="grid">' + D.students.map(function (s) {
+      var u = s.id, mine = s.moduleIds || [];
+      var ts = D.tasks.filter(function (t) { return t.uid === u; });
+      var fin = ts.filter(function (t) { return t.status === "done" || t.status === "reviewed"; }).length;
+      var rev = ts.filter(function (t) { return t.status === "done"; }).length;
+      return '<div class="panelbox"><div class="stu">' + avImg(u, "lg") + "<h3>" + esc(s.name) + "</h3></div>" +
+        '<div><div class="lbl" style="margin-bottom:6px">Módulos</div><div class="chips">' +
+        modules().map(function (m) {
+          return '<button class="chip" data-act="togMod" data-u="' + esc(u) + '" data-m="' + esc(m.id) + '" aria-pressed="' + (mine.indexOf(m.id) > -1) + '">' + esc(m.title) + "</button>";
+        }).join("") + "</div></div>" +
+        '<div class="meta"><span>' + fin + " de " + ts.length + " tarefas feitas</span>" + (rev ? '<span class="pill done">' + rev + " para revisar</span>" : "") + "</div>" +
+        '<div class="btns"><button class="btn sm danger" data-act="rmStu" data-u="' + esc(u) + '">' + (S.confirm === "s:" + u ? "Confirmar remoção" : "Remover") + "</button>" +
+        '<button class="btn sm pri" data-act="newTask" data-u="' + esc(u) + '">Nova tarefa</button></div></div>';
+    }).join("") + "</div>";
+    return h;
+  }
+
+  /* módulos e materiais (professor) / materiais (aluno) */
+  function topicsHtml(m) {
+    var tp = m.topics || [];
+    if (!tp.length) return '<p class="note">Nenhum tópico cadastrado.</p>';
+    return '<ul class="topics">' + tp.map(function (t) {
+      return "<li><b>" + esc(t.t) + "</b>" + (t.d ? "<small>" + esc(t.d) + "</small>" : "") + "</li>";
+    }).join("") + "</ul>";
+  }
+  function matsHtml(m, edit) {
+    var ms = m.materials || [];
+    if (!ms.length) return '<p class="note">' + (edit ? "Nenhum material ainda." : "O professor ainda não colocou materiais neste módulo.") + "</p>";
+    return '<div class="mats">' + ms.map(function (x) {
+      return '<div class="mat"><div style="display:grid;gap:2px;min-width:0"><span class="kind">' + esc(x.kind || "Link") + '</span><a href="' + esc(safeUrl(x.url)) + '" target="_blank" rel="noopener noreferrer">' + esc(x.title) + "</a></div>" +
+        (edit ? '<button class="btn sm danger" data-act="rmMat" data-m="' + esc(m.id) + '" data-x="' + esc(x.id) + '">' + (S.confirm === "x:" + x.id ? "Confirmar" : "Remover") + "</button>" : "") + "</div>";
+    }).join("") + "</div>";
+  }
+  function accordion(m, edit) {
+    var open = S.openMod === m.id;
+    var h = '<div class="acc"><button class="h" data-act="openMod" data-m="' + esc(m.id) + '" aria-expanded="' + open + '"><span><strong>' + esc(m.title) + '</strong><div class="note">' + esc(m.summary || "") + '</div></span><span aria-hidden="true">' + (open ? "−" : "+") + "</span></button>";
+    if (open) {
+      h += '<div class="body"><div><div class="lbl" style="margin-bottom:8px">Conteúdo da apostila</div>' + topicsHtml(m) + "</div>" +
+        '<div><div class="lbl" style="margin-bottom:8px">Materiais</div>' + matsHtml(m, edit) + "</div>";
+      if (edit) h += '<div class="btns"><button class="btn sm" data-act="editTopics" data-m="' + esc(m.id) + '">Editar tópicos</button><button class="btn sm pri" data-act="addMat" data-m="' + esc(m.id) + '">+ Material</button></div>';
+      h += "</div>";
+    }
+    return h + "</div>";
+  }
+  function pageModules() { return modules().map(function (m) { return accordion(m, true); }).join(""); }
+  function pageMaterials() {
+    var s = stuById(S.who), mine = (s && s.moduleIds) || [];
+    var ms = modules().filter(function (m) { return mine.indexOf(m.id) > -1; });
+    if (!ms.length) return '<div class="emptybig"><h3>Nenhum módulo liberado</h3><p class="note">Quando o professor liberar o seu módulo, a apostila e os materiais aparecem aqui.</p></div>';
+    return ms.map(function (m) { return accordion(m, false); }).join("");
+  }
+
+  /* backup */
+  function pageBackup() {
+    return '<div class="panelbox" style="max-width:640px"><h3>Seus dados ficam neste navegador</h3>' +
+      '<p class="note">Tudo o que você cadastra (alunos, tarefas, tópicos e materiais) é salvo só neste aparelho e neste navegador. Exporte de vez em quando para ter uma cópia e para levar os dados para outro aparelho.</p>' +
+      '<div class="btns" style="justify-content:flex-start"><button class="btn pri" data-act="export">Exportar dados</button><button class="btn" data-act="import">Importar arquivo</button></div>' +
+      '<p class="note">Importar substitui tudo o que está aqui pelo conteúdo do arquivo.</p></div>' +
+      '<div class="panelbox" style="max-width:640px;margin-top:12px"><h3>Começar do zero</h3>' +
+      '<p class="note">Apaga alunos, tarefas e materiais e volta a apostila ao conteúdo original.</p>' +
+      '<div class="btns" style="justify-content:flex-start"><button class="btn danger" data-act="reset">' + (S.confirm === "reset" ? "Confirmar: apagar tudo" : "Apagar tudo") + "</button></div></div>";
+  }
+  function doExport() {
+    var blob = new Blob([JSON.stringify(D, null, 2)], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "caderno-de-pratica-" + todayStr() + ".json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    toast("Arquivo exportado");
+  }
+  function doImport(file) {
+    var r = new FileReader();
+    r.onload = function () {
+      try {
+        var o = JSON.parse(r.result);
+        if (!valid(o)) throw new Error("formato");
+        D = o; save(); S.fStu = ""; S.fMod = ""; render(); toast("Dados importados");
+      } catch (e) { toast("Esse arquivo não é um backup do caderno."); }
+    };
+    r.readAsText(file);
+  }
+
+  /* ---------- folhas ---------- */
+  function openSheet(o) { S.sheet = o; paintSheet(); }
+  function closeSheet() { S.sheet = null; var s = $("sheet"); s.hidden = true; s.innerHTML = ""; }
+  function paintSheet() {
+    var o = S.sheet, s = $("sheet");
+    if (!o) return;
+    var h = "";
+    if (o.type === "task") h = sheetTask(o);
+    else if (o.type === "new") h = sheetNew(o);
+    else if (o.type === "addStu") h = sheetAddStu();
+    else if (o.type === "topics") h = sheetTopics(o);
+    else if (o.type === "mat") h = sheetMat(o);
+    if (!h) { closeSheet(); return; }
+    s.innerHTML = '<div class="panel" role="dialog" aria-modal="true">' + h + "</div>";
+    s.hidden = false;
+    var f = s.querySelector("input[type=text]"); if (f && o.type !== "task") f.focus();
+  }
+  function sheetTask(o) {
+    var t = findTask(o.id);
+    if (!t) return "";
+    var h = '<div class="meta">' + (t.moduleId ? '<span class="tag">' + esc(modName(t.moduleId)) + "</span>" : "") + dueTag(t) + "</div><h2>" + esc(t.title) + "</h2>";
+    if (isT()) h += '<div class="stu">' + avImg(t.uid) + "<span>" + esc(nm(t.uid)) + "</span></div>";
+    if (t.note) h += '<p style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(t.note) + "</p>";
+    h += '<div class="field"><span class="lbl">Andamento</span><div class="stseg">' + ST.map(function (s) {
+      var ok = canSet(t, s.k);
+      return '<button data-act="setSt" data-k="' + s.k + '" aria-pressed="' + (t.status === s.k) + '"' + (ok ? "" : " disabled") + ">" + s.n + "</button>";
+    }).join("") + "</div>" + (!isT() && t.status === "reviewed" ? '<span class="note">Esta tarefa já foi revisada pelo professor.</span>' : "") + "</div>";
+    if (isT()) {
+      h += '<div class="field"><label for="fb">Retorno para o aluno</label><textarea id="fb" placeholder="Ex.: Ótimo! Na próxima, tente com o metrônomo em 70 BPM.">' + esc(t.feedback || "") + "</textarea></div>" +
+        '<div class="btns"><button class="btn danger" data-act="delTask">' + (S.confirm === "t:" + t.id ? "Confirmar exclusão" : "Excluir tarefa") + '</button><button class="btn" data-act="close">Fechar</button><button class="btn pri" data-act="saveFb">Salvar retorno</button></div>';
+    } else {
+      if (t.feedback) h += '<div class="field"><span class="lbl">Retorno do professor</span><p style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(t.feedback) + "</p></div>";
+      h += '<div class="btns"><button class="btn pri" data-act="close">Fechar</button></div>';
+    }
+    return h;
+  }
+  function stuChecks(modId, pre) {
+    if (!D.students.length) return '<p class="note">Nenhum aluno cadastrado ainda.</p>';
+    return D.students.map(function (s) {
+      var on = pre ? pre === s.id : (modId && (s.moduleIds || []).indexOf(modId) > -1);
+      return '<label><input type="checkbox" name="nt-stu" value="' + esc(s.id) + '"' + (on ? " checked" : "") + "> " + esc(s.name) + "</label>";
+    }).join("");
+  }
+  function sheetNew(o) {
+    return "<h2>Nova tarefa</h2>" +
+      '<div class="two"><div class="field"><label for="nt-mod">Módulo</label><select id="nt-mod" data-chg="ntMod"><option value="">Sem módulo</option>' +
+      modules().map(function (m) { return '<option value="' + esc(m.id) + '">' + esc(m.title) + "</option>"; }).join("") + "</select></div>" +
+      '<div class="field"><label for="nt-top">Tópico da apostila</label><select id="nt-top" data-chg="ntTop"><option value="">Escolha o módulo</option></select></div></div>' +
+      '<div class="field"><label for="nt-title">Título da tarefa</label><input type="text" id="nt-title" placeholder="Ex.: Praticar escala de Ré maior"></div>' +
+      '<div class="field"><label for="nt-note">Orientação</label><textarea id="nt-note" placeholder="Quanto tempo, quantas vezes, com ou sem metrônomo…"></textarea></div>' +
+      '<div class="field"><label for="nt-due">Prazo</label><input type="date" id="nt-due"></div>' +
+      '<div class="field"><span class="lbl">Alunos</span><div class="checks" id="nt-stus">' + stuChecks("", o.u) + "</div></div>" +
+      '<div class="btns"><button class="btn" data-act="close">Cancelar</button><button class="btn pri" data-act="createTask">Enviar tarefa</button></div>';
+  }
+  function sheetAddStu() {
+    return "<h2>Adicionar aluno</h2>" +
+      '<div class="field"><label for="as-name">Nome do aluno</label><input type="text" id="as-name" placeholder="Ex.: Ana Souza" autocomplete="off"></div>' +
+      '<div class="field"><span class="lbl">Módulos</span><div class="checks">' +
+      modules().map(function (m) { return '<label><input type="checkbox" name="as-mod" value="' + esc(m.id) + '"> ' + esc(m.title) + "</label>"; }).join("") + "</div></div>" +
+      '<div class="btns"><button class="btn" data-act="close">Cancelar</button><button class="btn pri" data-act="saveStudent">Adicionar</button></div>';
+  }
+  function sheetTopics(o) {
+    var m = modById(o.m); if (!m) return "";
+    var txt = (m.topics || []).map(function (t) { return t.t + (t.d ? " | " + t.d : ""); }).join("\n");
+    return "<h2>Tópicos de " + esc(m.title) + "</h2>" +
+      '<p class="note">Um tópico por linha. Para incluir uma explicação, escreva “Título | explicação”.</p>' +
+      '<div class="field"><label for="tp-txt">Tópicos</label><textarea id="tp-txt" style="min-height:260px">' + esc(txt) + "</textarea></div>" +
+      '<div class="btns"><button class="btn" data-act="close">Cancelar</button><button class="btn pri" data-act="saveTopics">Salvar</button></div>';
+  }
+  function sheetMat(o) {
+    var m = modById(o.m); if (!m) return "";
+    return "<h2>Novo material em " + esc(m.title) + "</h2>" +
+      '<div class="field"><label for="mt-title">Nome do material</label><input type="text" id="mt-title" placeholder="Ex.: Escalas maiores (PDF)"></div>' +
+      '<div class="field"><label for="mt-url">Link (YouTube, Google Drive, site…)</label><input type="url" id="mt-url" placeholder="https://"></div>' +
+      '<p class="note">Para PDFs e áudios, suba o arquivo no Google Drive ou similar e cole aqui o link de compartilhamento.</p>' +
+      '<div class="btns"><button class="btn" data-act="close">Cancelar</button><button class="btn pri" data-act="saveMat">Adicionar</button></div>';
+  }
+
+  /* ---------- ações ---------- */
+  function val(id) { var e = $(id); return e ? e.value.trim() : ""; }
+  function checked(name) { return Array.prototype.map.call(document.querySelectorAll('input[name="' + name + '"]:checked'), function (i) { return i.value; }); }
+
+  function createTasks() {
+    var title = val("nt-title"), us = checked("nt-stu");
+    if (!title) { toast("Escreva o título da tarefa."); return; }
+    if (!us.length) { toast("Escolha pelo menos um aluno."); return; }
+    var now = Date.now();
+    us.forEach(function (u) {
+      D.tasks.push({ id: rid(), uid: u, title: title, note: val("nt-note"), moduleId: val("nt-mod") || null, due: val("nt-due") || null, status: "todo", feedback: "", createdAt: now, doneAt: null });
+    });
+    save(); closeSheet(); render();
+    toast("Tarefa enviada para " + us.length + (us.length > 1 ? " alunos" : " aluno"));
+  }
+  function saveStudent() {
+    var name = val("as-name");
+    if (!name) { toast("Escreva o nome do aluno."); return; }
+    D.students.push({ id: rid(), name: name, moduleIds: checked("as-mod"), createdAt: Date.now() });
+    save(); closeSheet(); render(); toast("Aluno adicionado");
+  }
+  function saveMat() {
+    var m = modById(S.sheet.m), title = val("mt-title"), url = val("mt-url");
+    if (!title) { toast("Dê um nome ao material."); return; }
+    if (!/^https?:\/\//.test(url)) { toast("Cole um link que comece com https://"); return; }
+    m.materials = (m.materials || []).concat([{ id: rid(), title: title, url: url, kind: kindOf(url) }]);
+    save(); closeSheet(); render(); toast("Material adicionado");
+  }
+  function saveTopics() {
+    var m = modById(S.sheet.m);
+    m.topics = ($("tp-txt").value || "").split("\n").map(function (l) { return l.trim(); }).filter(Boolean).map(function (l) {
+      var i = l.indexOf("|");
+      return i > -1 ? { t: l.slice(0, i).trim(), d: l.slice(i + 1).trim() } : { t: l, d: "" };
+    });
+    save(); closeSheet(); render(); toast("Tópicos salvos");
+  }
+  function onModChange() {
+    var mid = $("nt-mod").value, m = modById(mid);
+    $("nt-top").innerHTML = m && (m.topics || []).length
+      ? '<option value="">Escolha um tópico</option>' + m.topics.map(function (t, i) { return '<option value="' + i + '">' + esc(t.t) + "</option>"; }).join("")
+      : '<option value="">Escolha o módulo</option>';
+    $("nt-stus").innerHTML = stuChecks(mid, null);
+  }
+  function onTopChange() {
+    var m = modById($("nt-mod").value), i = $("nt-top").value;
+    if (!m || i === "") return;
+    $("nt-title").value = "Praticar: " + m.topics[+i].t;
+  }
+
+  /* ---------- eventos ---------- */
+  document.addEventListener("click", function (e) {
+    var el = e.target.closest("[data-act]");
+    if (!el) { if (e.target.id === "sheet") closeSheet(); return; }
+    var a = el.dataset.act, u = el.dataset.u, id = el.dataset.id, m = el.dataset.m;
+    if (a !== "delTask" && a !== "rmMat" && a !== "rmStu" && a !== "reset" && S.confirm) S.confirm = "";
+    if (a === "tab") { S.tab = el.dataset.k; pref("tab", S.tab); render(); }
+    else if (a === "view") { S.view = el.dataset.k; pref("view", S.view); render(); }
+    else if (a === "open") openSheet({ type: "task", id: id });
+    else if (a === "adv") { e.stopPropagation(); var t = findTask(id), n = t && nextOf(t); if (n) setStatus(id, n.k); }
+    else if (a === "toggle") { e.stopPropagation(); var t2 = findTask(id); if (t2) setStatus(id, t2.status === "done" ? "todo" : "done"); }
+    else if (a === "setSt") setStatus(S.sheet.id, el.dataset.k);
+    else if (a === "close") closeSheet();
+    else if (a === "newTask") openSheet({ type: "new", u: u || null });
+    else if (a === "addStudent") openSheet({ type: "addStu" });
+    else if (a === "saveStudent") saveStudent();
+    else if (a === "togMod") {
+      var s = stuById(u), cur = (s.moduleIds || []).slice(), i = cur.indexOf(m);
+      if (i > -1) cur.splice(i, 1); else cur.push(m);
+      s.moduleIds = cur; save(); render();
+    }
+    else if (a === "rmStu") {
+      if (S.confirm === "s:" + u) {
+        S.confirm = "";
+        D.students = D.students.filter(function (x) { return x.id !== u; });
+        D.tasks = D.tasks.filter(function (x) { return x.uid !== u; });
+        if (S.fStu === u) S.fStu = "";
+        save(); render(); toast("Aluno removido");
+      } else { S.confirm = "s:" + u; render(); }
+    }
+    else if (a === "openMod") { S.openMod = S.openMod === m ? "" : m; render(); }
+    else if (a === "editTopics") openSheet({ type: "topics", m: m });
+    else if (a === "addMat") openSheet({ type: "mat", m: m });
+    else if (a === "rmMat") {
+      var x = el.dataset.x;
+      if (S.confirm === "x:" + x) {
+        S.confirm = ""; var mod = modById(m);
+        mod.materials = (mod.materials || []).filter(function (q) { return q.id !== x; });
+        save(); render();
+      } else { S.confirm = "x:" + x; render(); }
+    }
+    else if (a === "createTask") createTasks();
+    else if (a === "saveMat") saveMat();
+    else if (a === "saveTopics") saveTopics();
+    else if (a === "saveFb") { var t3 = findTask(S.sheet.id); if (t3) { t3.feedback = val("fb"); save(); toast("Retorno salvo"); } }
+    else if (a === "delTask") {
+      var tid = S.sheet.id;
+      if (S.confirm === "t:" + tid) {
+        S.confirm = "";
+        D.tasks = D.tasks.filter(function (q) { return q.id !== tid; });
+        save(); closeSheet(); render(); toast("Tarefa excluída");
+      } else { S.confirm = "t:" + tid; paintSheet(); }
+    }
+    else if (a === "export") doExport();
+    else if (a === "import") $("importFile").click();
+    else if (a === "reset") {
+      if (S.confirm === "reset") { S.confirm = ""; D = fresh(); save(); S.who = "prof"; render(); toast("Tudo apagado"); }
+      else { S.confirm = "reset"; render(); }
+    }
+  });
+  document.addEventListener("change", function (e) {
+    if (e.target.id === "importFile") { if (e.target.files[0]) doImport(e.target.files[0]); e.target.value = ""; return; }
+    var k = e.target.dataset && e.target.dataset.chg;
+    if (k === "who") { S.who = e.target.value; pref("who", S.who); S.tab = ""; closeSheet(); render(); }
+    else if (k === "fStu") { S.fStu = e.target.value; render(); }
+    else if (k === "fMod") { S.fMod = e.target.value; render(); }
+    else if (k === "ntMod") onModChange();
+    else if (k === "ntTop") onTopChange();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && S.sheet) closeSheet();
+    if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches('[data-act="open"]')) { e.preventDefault(); e.target.click(); }
+  });
+  /* arrastar e soltar (computador e iPad) */
+  var drag = null;
+  document.addEventListener("dragstart", function (e) {
+    var c = e.target.closest && e.target.closest(".card"); if (!c) return;
+    drag = c.dataset.id;
+    try { e.dataTransfer.setData("text/plain", drag); e.dataTransfer.effectAllowed = "move"; } catch (er) {}
+  });
+  document.addEventListener("dragover", function (e) {
+    var c = e.target.closest && e.target.closest(".col"); if (!c || !drag) return;
+    e.preventDefault(); c.classList.add("over");
+  });
+  document.addEventListener("dragleave", function (e) {
+    var c = e.target.closest && e.target.closest(".col"); if (c) c.classList.remove("over");
+  });
+  document.addEventListener("drop", function (e) {
+    var c = e.target.closest && e.target.closest(".col"); if (!c || !drag) return;
+    e.preventDefault(); c.classList.remove("over");
+    var d = drag; drag = null; setStatus(d, c.dataset.drop);
+  });
+  document.addEventListener("dragend", function () { drag = null; });
+
+  /* ---------- início ---------- */
+  D = load();
+  S.who = pref("who") || "prof";
+  S.tab = pref("tab") || "";
+  S.view = pref("view") === "lista" ? "lista" : "quadro";
+  S.openMod = modules().length ? modules()[0].id : "";
+  render();
+})();
+</script>
+</body>
+</html>
