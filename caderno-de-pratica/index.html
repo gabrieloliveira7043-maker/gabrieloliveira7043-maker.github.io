@@ -3,91 +3,127 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F4F5FA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0C0F1E" media="(prefers-color-scheme: dark)">
 <title>Caderno de Prática</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
 <style>
-/* Layout: cabeçalho fixo com teclado decorativo e abas; conteúdo em quadro (kanban) ou lista; folhas de baixo para detalhes */
+/* Tokens */
 :root {
-  --bg: #F1F3F8;
+  --bg: #F4F5FA;
   --surface: #FFFFFF;
-  --surface-2: #E8EBF3;
-  --ink: #12162B;
-  --ink-2: #4A5070;
-  --line: #D9DDEA;
-  --accent: #2B4FD8;
+  --surface-2: #EEF0F7;
+  --surface-3: #E4E7F2;
+  --ink: #11152A;
+  --ink-2: #4B5170;
+  --ink-3: #6B7190;
+  --line: #DFE2EE;
+  --accent: #3048D6;
+  --accent-2: #5B3FD0;
   --accent-ink: #FFFFFF;
-  --accent-soft: #E3E9FC;
-  --key: #12162B;
-  --s-todo: #5B6388;
-  --s-todo-bg: #E8EBF3;
-  --s-doing: #9A5B06;
-  --s-doing-bg: #FBEBD0;
-  --s-done: #1C7A4C;
-  --s-done-bg: #DDF3E6;
-  --s-rev: #0E727C;
-  --s-rev-bg: #D7F1F3;
-  --late: #B8312A;
-  --late-bg: #FBE0DD;
+  --accent-soft: #E6EAFD;
+  --warm: #E8891B;
+  --warm-soft: #FDF0DF;
+  --key: #11152A;
+  --s-todo: #4F5880;
+  --s-todo-bg: #E9ECF5;
+  --s-doing: #8F5304;
+  --s-doing-bg: #FCEBCF;
+  --s-done: #17704A;
+  --s-done-bg: #DCF3E6;
+  --s-rev: #0B6873;
+  --s-rev-bg: #D6F0F2;
+  --late: #B42B23;
+  --late-bg: #FCE3E0;
+  --shadow-1: 0 1px 2px rgba(17, 21, 42, 0.06), 0 1px 3px rgba(17, 21, 42, 0.05);
+  --shadow-2: 0 4px 14px rgba(17, 21, 42, 0.08), 0 1px 3px rgba(17, 21, 42, 0.06);
+  --shadow-3: 0 18px 50px rgba(17, 21, 42, 0.22);
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --f-display: "Bricolage Grotesque", "Figtree", system-ui, sans-serif;
   --f-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --nav-h: 0px;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0D1020;
-    --surface: #161A30;
-    --surface-2: #1F2440;
-    --ink: #E9EBF7;
-    --ink-2: #A0A7CC;
-    --line: #2A3050;
-    --accent: #8AA2FF;
-    --accent-ink: #0D1020;
-    --accent-soft: #222A55;
-    --key: #0D1020;
-    --s-todo: #AEB5DA;
-    --s-todo-bg: #262C4D;
-    --s-doing: #F2B65C;
+    --bg: #0C0F1E;
+    --surface: #151931;
+    --surface-2: #1C2140;
+    --surface-3: #252B50;
+    --ink: #ECEEFA;
+    --ink-2: #AEB4D6;
+    --ink-3: #8C93BA;
+    --line: #2A3056;
+    --accent: #8EA2FF;
+    --accent-2: #B39CFF;
+    --accent-ink: #0C0F1E;
+    --accent-soft: #232B5C;
+    --warm: #F5A94A;
+    --warm-soft: #3A2A14;
+    --key: #0C0F1E;
+    --s-todo: #B4BBE0;
+    --s-todo-bg: #262C50;
+    --s-doing: #F4BA63;
     --s-doing-bg: #3B2C14;
-    --s-done: #6FD3A1;
-    --s-done-bg: #15352A;
-    --s-rev: #62D0DB;
-    --s-rev-bg: #123539;
-    --late: #FF8D84;
-    --late-bg: #3F1B1A;
+    --s-done: #72D6A4;
+    --s-done-bg: #14362A;
+    --s-rev: #66D2DD;
+    --s-rev-bg: #11363A;
+    --late: #FF968D;
+    --late-bg: #401C1B;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+    --shadow-2: 0 6px 18px rgba(0, 0, 0, 0.35);
+    --shadow-3: 0 18px 50px rgba(0, 0, 0, 0.6);
     color-scheme: dark;
   }
 }
 
+/* Base */
 * { box-sizing: border-box; }
 html, body { margin: 0; }
+html { -webkit-text-size-adjust: 100%; }
 body {
+  min-height: 100dvh;
   background: var(--bg);
   color: var(--ink);
-  font: 15px/1.45 var(--f-body);
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 0 56px;
-  -webkit-text-size-adjust: 100%;
+  font: 16px/1.5 var(--f-body);
+  padding: 0 max(16px, env(safe-area-inset-right, 0px)) calc(48px + var(--nav-h)) max(16px, env(safe-area-inset-left, 0px));
+  -webkit-font-smoothing: antialiased;
 }
 [hidden] { display: none !important; }
 .wrap { max-width: 1180px; margin: 0 auto; min-width: 0; }
 button, input, select, textarea { font: inherit; color: inherit; }
-button { cursor: pointer; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-h1, h2, h3, h4 { font-family: var(--f-display); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+button { cursor: pointer; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+h1, h2, h3, h4 { font-family: var(--f-display); margin: 0; text-wrap: balance; letter-spacing: -0.015em; }
 p { margin: 0; }
+.ic { width: 20px; height: 20px; flex: none; }
+.ic.sm { width: 16px; height: 16px; }
+.ic.lg { width: 28px; height: 28px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.skip { position: absolute; left: 16px; top: -60px; z-index: 50; background: var(--accent); color: var(--accent-ink); padding: 10px 14px; border-radius: var(--r-sm); font-weight: 600; }
+.skip:focus { top: 12px; }
 
-/* cabeçalho */
-.top { position: sticky; top: 0; z-index: 5; background: var(--bg); padding-top: max(14px, env(safe-area-inset-top, 0px)); }
-.brand { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.brand h1 { font-size: 26px; font-weight: 700; }
-.who-me { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); min-width: 0; }
-.who-me select { padding: 6px 10px; font-size: 13px; max-width: 220px; }
-.role { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; background: var(--accent-soft); color: var(--accent); padding: 3px 8px; border-radius: 6px; }
+/* Cabeçalho */
+.top { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: saturate(1.4) blur(12px); -webkit-backdrop-filter: saturate(1.4) blur(12px); padding-top: max(14px, env(safe-area-inset-top, 0px)); margin: 0 -16px; padding-left: 16px; padding-right: 16px; }
+.brand { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; max-width: 1180px; margin: 0 auto; }
+.logo { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.logo-mark { width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%); box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 35%, transparent); flex: none; }
+@media (prefers-color-scheme: dark) { .logo-mark { color: #0C0F1E; } }
+.logo h1 { font-size: 22px; font-weight: 800; line-height: 1.1; }
+.logo small { display: block; color: var(--ink-3); font-size: 13px; font-weight: 500; }
+.who { position: relative; display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px 6px 4px 4px; box-shadow: var(--shadow-1); min-height: 44px; }
+.who select { appearance: none; -webkit-appearance: none; border: 0; background: transparent; padding: 6px 26px 6px 2px; font-weight: 600; font-size: 15px; max-width: 190px; min-height: 36px; cursor: pointer; }
+.who .chev { position: absolute; right: 10px; pointer-events: none; color: var(--ink-3); }
+.role { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); }
+.role.stu { background: var(--warm-soft); color: var(--warm); }
 .keys {
-  height: 12px; margin-top: 10px; border-radius: 3px 3px 6px 6px; border: 1px solid var(--line);
+  height: 10px; margin: 12px auto 0; max-width: 1180px; border-radius: 3px 3px 6px 6px; border: 1px solid var(--line); opacity: 0.85;
   background-color: var(--surface);
   background-image:
     linear-gradient(90deg, transparent 12px, var(--key) 12px, var(--key) 24px, transparent 24px),
@@ -96,131 +132,241 @@ p { margin: 0; }
     linear-gradient(90deg, transparent 84px, var(--key) 84px, var(--key) 96px, transparent 96px),
     linear-gradient(90deg, transparent 102px, var(--key) 102px, var(--key) 114px, transparent 114px),
     repeating-linear-gradient(90deg, transparent 0 17px, var(--line) 17px 18px);
-  background-size: 126px 7px, 126px 7px, 126px 7px, 126px 7px, 126px 7px, auto;
+  background-size: 126px 6px, 126px 6px, 126px 6px, 126px 6px, 126px 6px, auto;
   background-repeat: repeat-x, repeat-x, repeat-x, repeat-x, repeat-x, repeat;
-  background-position: 0 0;
 }
-.tabs { display: flex; gap: 4px; overflow-x: auto; padding: 10px 0 0; border-bottom: 1px solid var(--line); scrollbar-width: none; }
+.tabs { display: flex; gap: 6px; max-width: 1180px; margin: 12px auto 0; padding-bottom: 12px; overflow-x: auto; scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
-.tab { background: none; border: 0; padding: 10px 14px; font-weight: 600; color: var(--ink-2); border-bottom: 3px solid transparent; white-space: nowrap; }
-.tab[aria-current="true"] { color: var(--ink); border-bottom-color: var(--accent); }
-main { padding-top: 18px; min-width: 0; }
+.tab { display: inline-flex; align-items: center; gap: 8px; background: none; border: 0; min-height: 44px; padding: 0 16px; border-radius: 999px; font-weight: 600; color: var(--ink-2); white-space: nowrap; transition: background 180ms var(--ease), color 180ms var(--ease); }
+.tab:hover { background: var(--surface-2); color: var(--ink); }
+.tab[aria-current="true"] { background: var(--ink); color: var(--bg); }
+.tab .badge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--warm); color: #fff; font-size: 12px; display: inline-grid; place-items: center; }
 
-/* barras de ferramentas */
+/* Navegação inferior no celular */
+.bnav { display: none; }
+@media (max-width: 720px) {
+  :root { --nav-h: calc(66px + env(safe-area-inset-bottom, 0px)); }
+  .tabs { display: none; }
+  .bnav { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--line); padding: 6px max(8px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)); }
+  .bnav button { flex: 1; display: grid; justify-items: center; gap: 2px; background: none; border: 0; min-height: 54px; padding: 4px 2px; border-radius: 12px; font-size: 12px; font-weight: 600; color: var(--ink-3); position: relative; }
+  .bnav button[aria-current="true"] { color: var(--accent); }
+  .bnav button[aria-current="true"] .pillbg { background: var(--accent-soft); }
+  .bnav .pillbg { width: 56px; height: 30px; border-radius: 999px; display: grid; place-items: center; transition: background 180ms var(--ease); }
+  .bnav .badge { position: absolute; top: 2px; left: calc(50% + 10px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--warm); color: #fff; font-size: 11px; display: grid; place-items: center; }
+  .logo small { display: none; }
+}
+
+main { padding-top: 22px; min-width: 0; }
+.ph { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.ph h2 { font-size: 28px; font-weight: 800; }
+.ph p { color: var(--ink-2); margin-top: 2px; }
+
+/* Botões e campos */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border: 1px solid var(--line); background: var(--surface); border-radius: var(--r-sm); padding: 0 16px; font-weight: 600; box-shadow: var(--shadow-1); transition: transform 120ms var(--ease), background 180ms var(--ease), border-color 180ms var(--ease), box-shadow 180ms var(--ease); }
+.btn:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.btn:active { transform: scale(0.97); }
+.btn.pri { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 30%, transparent); }
+.btn.pri:hover { background: color-mix(in srgb, var(--accent) 88%, var(--ink)); }
+.btn.ghost { background: transparent; box-shadow: none; }
+.btn.danger { color: var(--late); }
+.btn.danger.on { background: var(--late); color: #fff; border-color: var(--late); }
+.btn.sm { min-height: 36px; padding: 0 12px; font-size: 14px; }
+.btn.block { width: 100%; }
+.btn[disabled] { opacity: 0.45; cursor: not-allowed; transform: none; }
+.iconbtn { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 12px; border: 0; background: var(--surface-2); color: var(--ink-2); transition: background 160ms var(--ease); }
+.iconbtn:hover { background: var(--surface-3); color: var(--ink); }
+select, input[type="text"], input[type="url"], input[type="date"], textarea {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; min-height: 44px; min-width: 0; max-width: 100%; font-size: 16px;
+  transition: border-color 160ms var(--ease), box-shadow 160ms var(--ease);
+}
+select:focus, input:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
+.note { color: var(--ink-2); font-size: 14px; }
+
+/* Barra de ferramentas */
 .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .bar .grp { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-width: 0; }
-.seg { display: inline-flex; background: var(--surface-2); border-radius: 10px; padding: 3px; }
-.seg button { border: 0; background: none; padding: 6px 14px; border-radius: 8px; font-weight: 600; color: var(--ink-2); }
-.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(10, 14, 40, 0.15); }
-select, input[type="text"], input[type="url"], input[type="date"], textarea {
-  background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; min-width: 0; max-width: 100%;
-}
-textarea { width: 100%; resize: vertical; min-height: 84px; }
-.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 9px 14px; font-weight: 600; }
-.btn.pri { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.btn.danger { color: var(--late); }
-.btn.sm { padding: 5px 10px; font-size: 13px; }
-.btn[disabled] { opacity: 0.5; cursor: default; }
-.note { color: var(--ink-2); font-size: 13px; }
+.seg { display: inline-flex; background: var(--surface-2); border-radius: 12px; padding: 4px; }
+.seg button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; min-height: 36px; padding: 0 14px; border-radius: 9px; font-weight: 600; color: var(--ink-2); transition: background 160ms var(--ease), color 160ms var(--ease); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-1); }
 
-/* resumo */
-.sum { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 99px; background: var(--s-todo-bg); color: var(--s-todo); white-space: nowrap; }
+/* Resumo */
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
+@media (max-width: 720px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px; display: grid; gap: 6px; box-shadow: var(--shadow-1); min-width: 0; }
+.stat .k { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 14px; font-weight: 600; }
+.stat .k .dot { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; }
+.stat .v { font-family: var(--f-display); font-size: 30px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.dot.todo { background: var(--s-todo-bg); color: var(--s-todo); }
+.dot.doing { background: var(--s-doing-bg); color: var(--s-doing); }
+.dot.done { background: var(--s-done-bg); color: var(--s-done); }
+.dot.reviewed { background: var(--s-rev-bg); color: var(--s-rev); }
+.dot.late { background: var(--late-bg); color: var(--late); }
+.hero { display: flex; align-items: center; gap: 18px; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%); color: #fff; border-radius: var(--r-lg); padding: 18px 20px; margin-bottom: 20px; box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 30%, transparent); }
+@media (prefers-color-scheme: dark) { .hero { color: #0C0F1E; } }
+.ring { --p: 0; width: 76px; height: 76px; border-radius: 50%; flex: none; display: grid; place-items: center; background: conic-gradient(currentColor calc(var(--p) * 1%), color-mix(in srgb, currentColor 25%, transparent) 0); }
+.ring span { width: 60px; height: 60px; border-radius: 50%; display: grid; place-items: center; font-family: var(--f-display); font-weight: 800; font-size: 18px; background: color-mix(in srgb, var(--accent) 85%, var(--accent-2)); }
+.hero h3 { font-size: 20px; font-weight: 800; }
+.hero p { opacity: 0.9; font-size: 15px; }
+.hero .late-chip { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; background: rgba(255, 255, 255, 0.2); padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+
+/* Etiquetas */
+.pill { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--s-todo-bg); color: var(--s-todo); white-space: nowrap; }
 .pill.doing { background: var(--s-doing-bg); color: var(--s-doing); }
 .pill.done { background: var(--s-done-bg); color: var(--s-done); }
 .pill.reviewed { background: var(--s-rev-bg); color: var(--s-rev); }
 .pill.late { background: var(--late-bg); color: var(--late); }
-.prog { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; flex: 1; min-width: 120px; }
-.prog i { display: block; height: 100%; background: var(--s-done); }
+.tag { display: inline-flex; align-items: center; gap: 5px; background: var(--accent-soft); color: var(--accent); font-weight: 600; font-size: 13px; padding: 3px 9px; border-radius: 7px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; color: var(--ink-2); }
 
-/* quadro */
-.board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(250px, 1fr); gap: 12px; overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: 8px; }
-.col { background: var(--surface-2); border-radius: 14px; padding: 10px; display: flex; flex-direction: column; gap: 10px; min-height: 160px; scroll-snap-align: start; min-width: 0; }
-.col.over { outline: 2px dashed var(--accent); }
-.col > header { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px; font-family: var(--f-display); font-weight: 700; }
-.col > header b { font-size: 12px; font-family: var(--f-body); color: var(--ink-2); font-weight: 600; }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; min-width: 0; }
-.card:hover { border-color: var(--accent); }
-.card h4 { font-size: 16px; font-weight: 500; overflow-wrap: anywhere; }
-.meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; color: var(--ink-2); }
-.tag { background: var(--accent-soft); color: var(--accent); font-weight: 600; font-size: 12px; padding: 2px 8px; border-radius: 6px; }
-.stu { display: flex; align-items: center; gap: 6px; font-size: 13px; min-width: 0; }
+/* Quadro */
+.board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(260px, 1fr); gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 10px; }
+@media (max-width: 720px) { .board { grid-auto-columns: 84%; margin: 0 -16px; padding: 0 16px 10px; scroll-padding: 0 16px; } }
+.col { background: var(--surface-2); border-radius: var(--r-lg); padding: 12px; display: flex; flex-direction: column; gap: 10px; min-height: 180px; scroll-snap-align: start; min-width: 0; transition: outline-color 160ms var(--ease); outline: 2px dashed transparent; outline-offset: -2px; }
+.col.over { outline-color: var(--accent); }
+.col > header { display: flex; align-items: center; gap: 8px; padding: 2px 4px 4px; font-family: var(--f-display); font-weight: 700; font-size: 16px; }
+.col > header .sd { width: 10px; height: 10px; border-radius: 50%; }
+.col > header b { margin-left: auto; font: 600 13px var(--f-body); color: var(--ink-2); background: var(--surface); padding: 2px 9px; border-radius: 999px; }
+.sd.todo { background: var(--s-todo); } .sd.doing { background: var(--s-doing); } .sd.done { background: var(--s-done); } .sd.reviewed { background: var(--s-rev); }
+.card { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px 14px 14px 18px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; min-width: 0; box-shadow: var(--shadow-1); transition: transform 160ms var(--ease), box-shadow 160ms var(--ease), border-color 160ms var(--ease); overflow: hidden; }
+.card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--s-todo); }
+.card.doing::before { background: var(--s-doing); } .card.done::before { background: var(--s-done); } .card.reviewed::before { background: var(--s-rev); }
+.card.late::before { background: var(--late); }
+.card:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+.card:active { transform: scale(0.99); }
+.card h4 { font: 600 16px/1.35 var(--f-body); letter-spacing: 0; overflow-wrap: anywhere; }
+.card .fb { display: flex; gap: 6px; align-items: flex-start; color: var(--ink-2); font-size: 13px; }
+.card .fb span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.stu { display: flex; align-items: center; gap: 8px; font-size: 14px; min-width: 0; font-weight: 500; }
 .stu span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.av { width: 24px; height: 24px; border-radius: 50%; flex: none; background: var(--accent-soft); color: var(--accent); display: inline-grid; place-items: center; font-size: 11px; font-weight: 700; }
-.av.lg { width: 40px; height: 40px; font-size: 15px; }
-.empty { color: var(--ink-2); font-size: 13px; padding: 14px 6px; text-align: center; }
-.emptybig { background: var(--surface); border: 1px dashed var(--line); border-radius: 14px; padding: 28px 18px; text-align: center; display: grid; gap: 6px; justify-items: center; }
+.av { width: 26px; height: 26px; border-radius: 50%; flex: none; display: inline-grid; place-items: center; font-size: 11px; font-weight: 700; color: #fff; }
+.av.lg { width: 44px; height: 44px; font-size: 16px; }
+.av.c0 { background: #3048D6; } .av.c1 { background: #C2410C; } .av.c2 { background: #0F766E; } .av.c3 { background: #7C3AED; } .av.c4 { background: #BE185D; } .av.c5 { background: #4D7C0F; }
+.empty { color: var(--ink-3); font-size: 14px; padding: 18px 8px; text-align: center; border: 1px dashed var(--line); border-radius: var(--r-md); }
+.emptybig { background: var(--surface); border: 1px dashed var(--line); border-radius: var(--r-lg); padding: 36px 20px; text-align: center; display: grid; gap: 8px; justify-items: center; }
+.emptybig .eic { width: 64px; height: 64px; border-radius: 20px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); margin-bottom: 4px; }
 .emptybig h3 { font-size: 20px; }
+.emptybig p { max-width: 420px; }
 
-/* lista */
-.lsec { margin-bottom: 20px; }
-.lsec h3 { font-size: 15px; color: var(--ink-2); margin-bottom: 8px; font-weight: 500; }
-.row { display: flex; gap: 12px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer; min-width: 0; }
-.row:hover { border-color: var(--accent); }
-.row .grow { flex: 1; min-width: 0; display: grid; gap: 3px; }
+/* Lista */
+.lsec { margin-bottom: 22px; }
+.lsec h3 { display: flex; align-items: center; gap: 8px; font: 600 14px var(--f-body); color: var(--ink-2); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
+.row { display: flex; gap: 12px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px 14px 10px 10px; margin-bottom: 8px; cursor: pointer; min-width: 0; box-shadow: var(--shadow-1); transition: border-color 160ms var(--ease), box-shadow 160ms var(--ease); }
+.row:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); box-shadow: var(--shadow-2); }
+.row .grow { flex: 1; min-width: 0; display: grid; gap: 4px; }
 .row .grow b { font-weight: 600; overflow-wrap: anywhere; }
-.chk { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line); background: var(--surface); display: grid; place-items: center; flex: none; padding: 0; color: transparent; font-weight: 700; }
-.chk.on { background: var(--s-done); border-color: var(--s-done); color: #fff; }
-.chk.lock { background: var(--s-rev); border-color: var(--s-rev); color: #fff; cursor: default; }
+.row .go { color: var(--ink-3); }
+.chk { width: 44px; height: 44px; border-radius: 50%; border: 0; background: none; display: grid; place-items: center; flex: none; padding: 0; }
+.chk i { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line); background: var(--surface); display: grid; place-items: center; color: transparent; transition: background 160ms var(--ease), border-color 160ms var(--ease), color 160ms var(--ease); }
+.chk:hover i { border-color: var(--s-done); }
+.chk.on i { background: var(--s-done); border-color: var(--s-done); color: #fff; }
+.chk.lock i { background: var(--s-rev); border-color: var(--s-rev); color: #fff; }
+.chk.lock { cursor: default; }
 
-/* alunos e módulos */
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
-.panelbox { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+/* Alunos */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.panelbox { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 16px; display: grid; gap: 14px; min-width: 0; box-shadow: var(--shadow-1); }
 .panelbox h3 { font-size: 18px; }
-.sec-h { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); font-family: var(--f-body); font-weight: 600; margin: 22px 0 10px; }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 99px; padding: 4px 11px; font-size: 13px; font-weight: 500; }
+.prog { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.prog i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--s-done), color-mix(in srgb, var(--s-done) 70%, var(--s-rev))); transition: width 300ms var(--ease); }
+.lbl { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 0 12px; font-size: 14px; font-weight: 500; transition: background 160ms var(--ease), border-color 160ms var(--ease), color 160ms var(--ease); }
+.chip:hover { border-color: var(--accent); }
 .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.acc { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 10px; min-width: 0; }
-.acc > button.h { width: 100%; text-align: left; background: none; border: 0; padding: 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.acc > button.h strong { font-family: var(--f-display); font-size: 18px; font-weight: 700; }
-.acc .body { padding: 0 14px 14px; display: grid; gap: 14px; }
-.topics { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
-.topics li { padding: 8px 10px; background: var(--surface-2); border-radius: 10px; }
-.topics li b { font-weight: 600; }
-.topics li small { display: block; color: var(--ink-2); font-size: 13px; margin-top: 2px; }
-.mats { display: grid; gap: 8px; }
-.mat { display: flex; gap: 10px; align-items: center; justify-content: space-between; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; min-width: 0; }
-.mat a { color: var(--accent); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; min-width: 0; }
-.mat a:hover { text-decoration: underline; }
-.kind { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); font-weight: 600; flex: none; }
-
-/* folha de detalhes */
-.sheet { position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-end; justify-content: center; background: rgba(10, 12, 30, 0.55); }
-.panel {
-  width: min(580px, 100%); max-height: 92%; overflow-y: auto; background: var(--surface); color: var(--ink);
-  border-radius: 18px 18px 0 0; padding: 18px max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
-  display: grid; gap: 14px; align-content: start;
-}
-@media (min-width: 700px) { .sheet { align-items: center; } .panel { border-radius: 18px; padding: 22px; } }
-.panel h2 { font-size: 22px; }
-.field { display: grid; gap: 5px; }
-.field > label, .lbl { font-size: 13px; font-weight: 600; color: var(--ink-2); }
-.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-@media (max-width: 460px) { .two { grid-template-columns: 1fr; } }
-.stseg { display: flex; flex-wrap: wrap; gap: 6px; }
-.stseg button { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 8px 12px; font-weight: 600; }
-.stseg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.checks { display: grid; gap: 6px; max-height: 190px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
-.checks label { display: flex; align-items: center; gap: 8px; }
 .btns { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
-.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; z-index: 30; font-weight: 500; max-width: calc(100% - 32px); }
+
+/* Módulos */
+.acc { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); margin-bottom: 12px; min-width: 0; box-shadow: var(--shadow-1); overflow: hidden; }
+.acc > button.h { width: 100%; text-align: left; background: none; border: 0; padding: 16px; display: flex; align-items: center; gap: 14px; }
+.acc > button.h:hover { background: color-mix(in srgb, var(--surface-2) 50%, transparent); }
+.acc .mi { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; flex: none; background: var(--accent-soft); color: var(--accent); }
+.acc .mi.canto { background: var(--warm-soft); color: var(--warm); }
+.acc .ht { flex: 1; min-width: 0; }
+.acc .ht strong { display: block; font-family: var(--f-display); font-size: 19px; font-weight: 700; }
+.acc .ht .note { display: block; }
+.acc .cnt { font-size: 13px; color: var(--ink-3); font-weight: 600; white-space: nowrap; }
+.acc .chev { color: var(--ink-3); transition: transform 220ms var(--ease); }
+.acc .h[aria-expanded="true"] .chev { transform: rotate(180deg); }
+.acc .body { padding: 0 16px 16px; display: grid; gap: 18px; border-top: 1px solid var(--line); padding-top: 16px; }
+.topics { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; counter-reset: tp; }
+.topics li { counter-increment: tp; display: grid; grid-template-columns: 30px 1fr; gap: 10px; padding: 10px 12px; background: var(--surface-2); border-radius: 12px; }
+.topics li::before { content: counter(tp); width: 26px; height: 26px; border-radius: 8px; background: var(--surface); color: var(--accent); font-weight: 700; font-size: 13px; display: grid; place-items: center; font-variant-numeric: tabular-nums; }
+.topics li b { font-weight: 600; }
+.topics li small { display: block; color: var(--ink-2); font-size: 14px; margin-top: 2px; }
+.mats { display: grid; gap: 8px; }
+.mat { display: flex; gap: 12px; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; transition: border-color 160ms var(--ease); }
+.mat:hover { border-color: var(--accent); }
+.mat .mk { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); flex: none; }
+.mat a { color: var(--ink); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; min-width: 0; flex: 1; }
+.mat a:hover { color: var(--accent); text-decoration: underline; }
+.mat a::after { content: ""; }
+.kind { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); font-weight: 600; }
+
+/* Folha (modal) */
+.sheet { position: fixed; inset: 0; z-index: 40; display: flex; align-items: flex-end; justify-content: center; background: rgba(8, 10, 24, 0.55); animation: fade 200ms var(--ease); }
+.panel {
+  position: relative; width: min(600px, 100%); max-height: 92dvh; overflow-y: auto; background: var(--surface); color: var(--ink);
+  border-radius: 24px 24px 0 0; padding: 10px max(18px, env(safe-area-inset-right, 0px)) calc(22px + env(safe-area-inset-bottom, 0px)) max(18px, env(safe-area-inset-left, 0px));
+  display: grid; gap: 16px; align-content: start; box-shadow: var(--shadow-3); animation: up 260ms var(--ease);
+}
+.panel .grab { width: 40px; height: 5px; border-radius: 99px; background: var(--line); margin: 0 auto; }
+.panel .hd { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+@media (min-width: 720px) {
+  .sheet { align-items: center; }
+  .panel { border-radius: 24px; padding: 24px; animation: pop 220ms var(--ease); }
+  .panel .grab { display: none; }
+}
+.panel h2 { font-size: 24px; font-weight: 800; }
+.field { display: grid; gap: 6px; }
+.field > label, .field > .lbl { font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.field .help { font-size: 13px; color: var(--ink-3); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 480px) { .two { grid-template-columns: 1fr; } }
+.stseg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; background: var(--surface-2); padding: 4px; border-radius: 14px; }
+@media (max-width: 480px) { .stseg { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.stseg button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; background: none; min-height: 42px; border-radius: 10px; font-weight: 600; color: var(--ink-2); font-size: 14px; transition: background 160ms var(--ease), color 160ms var(--ease); }
+.stseg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-1); }
+.stseg button[disabled] { opacity: 0.4; cursor: not-allowed; }
+.checks { display: grid; gap: 2px; max-height: 220px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 4px; }
+.checks label { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border-radius: 8px; cursor: pointer; }
+.checks label:hover { background: var(--surface-2); }
+.checks input { width: 20px; height: 20px; accent-color: var(--accent); }
+.fbbox { background: var(--surface-2); border-radius: var(--r-md); padding: 12px 14px; display: grid; gap: 4px; }
+.desc { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); }
+
+/* Aviso */
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + var(--nav-h)); display: flex; align-items: center; gap: 10px; background: var(--ink); color: var(--bg); padding: 12px 18px; border-radius: 14px; z-index: 60; font-weight: 600; max-width: calc(100% - 32px); box-shadow: var(--shadow-3); animation: up 220ms var(--ease); }
+
+@keyframes fade { from { opacity: 0; } }
+@keyframes up { from { transform: translateY(24px); opacity: 0; } }
+@keyframes pop { from { transform: scale(0.96); opacity: 0; } }
+.toast { animation-name: toastup; }
+@keyframes toastup { from { transform: translate(-50%, 16px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
 </style>
 </head>
 <body>
+<a class="skip" href="#main">Pular para o conteúdo</a>
 <div class="wrap">
-  <div class="top">
+  <header class="top">
     <div class="brand">
-      <h1>Caderno de Prática</h1>
-      <div class="who-me" id="me"></div>
+      <div class="logo">
+        <div class="logo-mark" aria-hidden="true" id="logoMark"></div>
+        <div><h1>Caderno de Prática</h1><small>Teclado e canto</small></div>
+      </div>
+      <div id="me"></div>
     </div>
     <div class="keys" aria-hidden="true"></div>
     <nav class="tabs" id="tabs" aria-label="Seções"></nav>
-  </div>
-  <main id="main"></main>
+  </header>
+  <main id="main" tabindex="-1"></main>
 </div>
+<nav class="bnav" id="bnav" aria-label="Seções"></nav>
 <div class="sheet" id="sheet" hidden></div>
-<div class="toast" id="toast" hidden role="status"></div>
+<div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
 <input type="file" id="importFile" accept=".json,application/json" hidden>
 
 <script>
@@ -304,11 +450,49 @@ textarea { width: 100%; resize: vertical; min-height: 84px; }
     ] }
   ];
 
+  /* Ícones (traço único, estilo Lucide) */
+  var ICONS = {
+    check: '<path d="M20 6 9 17l-5-5"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    x: '<path d="M18 6 6 18M6 6l12 12"/>',
+    chevron: '<path d="m6 9 6 6 6-6"/>',
+    right: '<path d="m9 18 6-6-6-6"/>',
+    tasks: '<path d="M3 5h2M3 12h2M3 19h2M9 5h12M9 12h12M9 19h12"/>',
+    users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+    book: '<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>',
+    save: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
+    upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>',
+    calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+    clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+    play: '<path d="M7 4v16l13-8z"/>',
+    circle: '<circle cx="12" cy="12" r="9"/>',
+    badge: '<path d="M12 2 15 5h4v4l3 3-3 3v4h-4l-3 3-3-3H5v-4l-3-3 3-3V5h4z"/><path d="m9 12 2 2 4-4"/>',
+    link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+    video: '<path d="m22 8-6 4 6 4V8z"/><rect x="2" y="6" width="14" height="12" rx="2"/>',
+    file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/>',
+    music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+    image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/>',
+    trash: '<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+    pencil: '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>',
+    message: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+    board: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/>',
+    list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+    piano: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 14h20M7 4v10M12 4v10M17 4v10M7 14v6M12 14v6M17 14v6"/>',
+    mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/>',
+    inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+    reset: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+    alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/>',
+    shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>'
+  };
+  function ic(n, cls) {
+    return '<svg class="ic ' + (cls || "") + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[n] || "") + "</svg>";
+  }
+
   var ST = [
-    { k: "todo", n: "A fazer" },
-    { k: "doing", n: "Praticando" },
-    { k: "done", n: "Feita" },
-    { k: "reviewed", n: "Revisada" }
+    { k: "todo", n: "A fazer", i: "circle" },
+    { k: "doing", n: "Praticando", i: "play" },
+    { k: "done", n: "Feita", i: "check" },
+    { k: "reviewed", n: "Revisada", i: "badge" }
   ];
   var KEY = "cp_dados_v1";
   var D;  // { modules, students: [{id, name, moduleIds}], tasks: [{id, uid, ...}] }
@@ -334,7 +518,7 @@ textarea { width: 100%; resize: vertical; min-height: 84px; }
   function safeUrl(u) { return /^https?:\/\//.test(u || "") ? u : "#"; }
   var toastT;
   function toast(m) {
-    var t = $("toast"); t.textContent = m; t.hidden = false;
+    var t = $("toast"); t.innerHTML = ic("check", "sm") + "<span>" + esc(m) + "</span>"; t.hidden = false;
     clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 3200);
   }
 
@@ -355,11 +539,13 @@ textarea { width: 100%; resize: vertical; min-height: 84px; }
   function stuById(u) { for (var i = 0; i < D.students.length; i++) if (D.students[i].id === u) return D.students[i]; return null; }
   function nm(u) { var s = stuById(u); return s ? s.name : "Aluno removido"; }
   function initials(n) { return String(n).trim().split(/\s+/).slice(0, 2).map(function (w) { return w.charAt(0).toUpperCase(); }).join(""); }
-  function avImg(u, cls) { return '<span class="av ' + (cls || "") + '" aria-hidden="true">' + esc(initials(nm(u))) + "</span>"; }
+  function hue(u) { var h = 0, s = String(u); for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h % 6; }
+  function avImg(u, cls) { return '<span class="av c' + hue(u) + " " + (cls || "") + '" aria-hidden="true">' + esc(initials(nm(u))) + "</span>"; }
   function modules() { return D.modules.slice().sort(function (a, b) { return (a.order || 0) - (b.order || 0); }); }
   function modById(id) { for (var i = 0; i < D.modules.length; i++) if (D.modules[i].id === id) return D.modules[i]; return null; }
   function modName(id) { var m = modById(id); return m ? m.title : ""; }
-  function stName(k) { for (var i = 0; i < ST.length; i++) if (ST[i].k === k) return ST[i].n; return k; }
+  function modIcon(m) { return /canto/i.test(m.id + " " + m.title) ? "mic" : "piano"; }
+  function stOf(k) { for (var i = 0; i < ST.length; i++) if (ST[i].k === k) return ST[i]; return ST[0]; }
   function canSet(t, k) {
     if (isT()) return true;
     return t.status !== "reviewed" && k !== "reviewed";
@@ -382,6 +568,8 @@ textarea { width: 100%; resize: vertical; min-height: 84px; }
     if (/\.(png|jpe?g|gif|webp)($|\?)/.test(s)) return "Imagem";
     return "Link";
   }
+  var KIND_IC = { "Vídeo": "video", "PDF": "file", "Áudio": "music", "Imagem": "image", "Link": "link" };
+  function pendingReview() { return D.tasks.filter(function (t) { return t.status === "done" && stuById(t.uid); }).length; }
 
   function setStatus(id, k) {
     var t = findTask(id);
@@ -389,29 +577,36 @@ textarea { width: 100%; resize: vertical; min-height: 84px; }
     t.status = k;
     t.doneAt = (k === "done" || k === "reviewed") ? (t.doneAt || Date.now()) : null;
     save(); render(); if (S.sheet && S.sheet.type === "task") paintSheet();
+    if (k === "done" && !isT()) toast("Boa! Tarefa marcada como feita");
   }
   function nextOf(t) {
-    if (t.status === "todo") return { k: "doing", n: "Comecei a praticar" };
-    if (t.status === "doing") return { k: "done", n: "Marcar como feita" };
-    if (t.status === "done" && isT()) return { k: "reviewed", n: "Marcar como revisada" };
+    if (t.status === "todo") return { k: "doing", n: "Comecei a praticar", i: "play" };
+    if (t.status === "doing") return { k: "done", n: "Marcar como feita", i: "check" };
+    if (t.status === "done" && isT()) return { k: "reviewed", n: "Marcar como revisada", i: "badge" };
     return null;
   }
 
   /* ---------- telas ---------- */
   function tabsFor() {
     return isT()
-      ? [{ k: "tarefas", n: "Tarefas" }, { k: "alunos", n: "Alunos" }, { k: "modulos", n: "Módulos e materiais" }, { k: "backup", n: "Backup" }]
-      : [{ k: "tarefas", n: "Minhas tarefas" }, { k: "materiais", n: "Materiais" }];
+      ? [{ k: "tarefas", n: "Tarefas", i: "tasks", b: pendingReview() }, { k: "alunos", n: "Alunos", i: "users" }, { k: "modulos", n: "Apostila", i: "book" }, { k: "backup", n: "Backup", i: "save" }]
+      : [{ k: "tarefas", n: "Minhas tarefas", i: "tasks" }, { k: "materiais", n: "Materiais", i: "book" }];
   }
   function render() {
     if (S.who !== "prof" && !stuById(S.who)) S.who = "prof";
-    $("me").innerHTML = '<span class="role">' + (isT() ? "Professor" : "Aluno") + "</span>" +
-      '<select data-chg="who" aria-label="Quem está usando"><option value="prof"' + (isT() ? " selected" : "") + ">Professor</option>" +
-      D.students.map(function (s) { return '<option value="' + esc(s.id) + '"' + (S.who === s.id ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") + "</select>";
+    $("me").innerHTML = '<label class="who"><span class="role' + (isT() ? "" : " stu") + '">' + (isT() ? "Professor" : "Aluno") + "</span>" +
+      '<span class="sr">Quem está usando</span><select data-chg="who"><option value="prof"' + (isT() ? " selected" : "") + ">Professor</option>" +
+      D.students.map(function (s) { return '<option value="' + esc(s.id) + '"' + (S.who === s.id ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") + "</select>" +
+      '<span class="chev">' + ic("chevron", "sm") + "</span></label>";
     var tabs = tabsFor();
     if (!tabs.some(function (t) { return t.k === S.tab; })) S.tab = tabs[0].k;
     $("tabs").innerHTML = tabs.map(function (t) {
-      return '<button class="tab" data-act="tab" data-k="' + t.k + '" aria-current="' + (S.tab === t.k) + '">' + t.n + "</button>";
+      return '<button class="tab" data-act="tab" data-k="' + t.k + '" aria-current="' + (S.tab === t.k) + '">' + ic(t.i) + t.n +
+        (t.b ? '<span class="badge" aria-label="' + t.b + ' para revisar">' + t.b + "</span>" : "") + "</button>";
+    }).join("");
+    $("bnav").innerHTML = tabs.map(function (t) {
+      return '<button data-act="tab" data-k="' + t.k + '" aria-current="' + (S.tab === t.k) + '"><span class="pillbg">' + ic(t.i) + "</span>" + t.n +
+        (t.b ? '<span class="badge" aria-label="' + t.b + ' para revisar">' + t.b + "</span>" : "") + "</button>";
     }).join("");
     var h;
     if (S.tab === "tarefas") h = pageTasks();
@@ -420,6 +615,12 @@ textarea { width: 100%; resize: vertical; min-height: 84px; }
     else if (S.tab === "backup") h = pageBackup();
     else h = pageMaterials();
     $("main").innerHTML = h;
+  }
+  function pageHead(title, sub, action) {
+    return '<div class="ph"><div><h2>' + title + "</h2>" + (sub ? "<p>" + sub + "</p>" : "") + "</div>" + (action || "") + "</div>";
+  }
+  function emptyBig(icon, title, text, action) {
+    return '<div class="emptybig"><div class="eic">' + ic(icon, "lg") + "</div><h3>" + title + '</h3><p class="note">' + text + "</p>" + (action || "") + "</div>";
   }
 
   /* tarefas */
@@ -435,55 +636,64 @@ textarea { width: 100%; resize: vertical; min-height: 84px; }
     var late = list.filter(isLate).length;
     var total = list.length, fin = cnt.done + cnt.reviewed;
 
+    var head;
+    if (isT()) {
+      head = pageHead("Tarefas", "Acompanhe a prática de cada aluno depois da aula.", '<button class="btn pri" data-act="newTask">' + ic("plus") + "Nova tarefa</button>");
+      head += '<div class="stats">' +
+        stat("done", "check", "Para revisar", cnt.done) +
+        stat("late", "clock", "Atrasadas", late) +
+        stat("doing", "play", "Praticando", cnt.doing) +
+        stat("todo", "circle", "A fazer", cnt.todo) + "</div>";
+    } else {
+      var pct = total ? Math.round(fin / total * 100) : 0;
+      head = pageHead("Olá, " + esc(nm(S.who).split(" ")[0]) + "!", "Estas são as suas tarefas de prática.");
+      head += '<div class="hero"><div class="ring" style="--p:' + pct + '" role="img" aria-label="' + pct + '% concluído"><span>' + pct + '%</span></div><div>' +
+        "<h3>" + fin + " de " + total + " tarefas feitas</h3><p>" + (total && fin === total ? "Tudo em dia. Continue praticando!" : "Um pouco por dia faz toda a diferença.") + "</p>" +
+        (late ? '<span class="late-chip">' + ic("clock", "sm") + late + " atrasada" + (late > 1 ? "s" : "") + "</span>" : "") + "</div></div>";
+    }
+
     var bar = '<div class="bar"><div class="grp">' +
       '<div class="seg" role="group" aria-label="Modo de exibição">' +
-      '<button data-act="view" data-k="quadro" aria-pressed="' + (S.view === "quadro") + '">Quadro</button>' +
-      '<button data-act="view" data-k="lista" aria-pressed="' + (S.view === "lista") + '">Lista</button></div>';
+      '<button data-act="view" data-k="quadro" aria-pressed="' + (S.view === "quadro") + '">' + ic("board", "sm") + "Quadro</button>" +
+      '<button data-act="view" data-k="lista" aria-pressed="' + (S.view === "lista") + '">' + ic("list", "sm") + "Lista</button></div>";
     if (isT()) {
       bar += '<select data-chg="fStu" aria-label="Filtrar por aluno"><option value="">Todos os alunos</option>' +
         D.students.map(function (s) { return '<option value="' + esc(s.id) + '"' + (S.fStu === s.id ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") + "</select>" +
         '<select data-chg="fMod" aria-label="Filtrar por módulo"><option value="">Todos os módulos</option>' +
         modules().map(function (m) { return '<option value="' + esc(m.id) + '"' + (S.fMod === m.id ? " selected" : "") + ">" + esc(m.title) + "</option>"; }).join("") + "</select>";
     }
-    bar += "</div>";
-    if (isT()) bar += '<button class="btn pri" data-act="newTask">+ Nova tarefa</button>';
-    bar += "</div>";
-
-    var sum = '<div class="sum">';
-    if (isT()) {
-      sum += '<span class="pill done">' + cnt.done + " para revisar</span>";
-      if (late) sum += '<span class="pill late">' + late + " atrasada" + (late > 1 ? "s" : "") + "</span>";
-      sum += '<span class="pill">' + cnt.todo + " a fazer</span>";
-    } else {
-      sum += '<div style="display:flex;gap:10px;align-items:center;width:100%;max-width:480px"><div class="prog"><i style="width:' + (total ? Math.round(fin / total * 100) : 0) + '%"></i></div>' +
-        '<span class="note">' + fin + " de " + total + " feitas</span></div>";
-      if (late) sum += '<span class="pill late">' + late + " atrasada" + (late > 1 ? "s" : "") + "</span>";
-    }
-    sum += "</div>";
+    bar += "</div></div>";
 
     if (!total) {
-      return bar + sum + '<div class="emptybig"><h3>Nenhuma tarefa por aqui</h3><p class="note">' +
-        (isT() ? (D.students.length ? "Toque em “Nova tarefa” para enviar a primeira depois da aula." : "Cadastre os alunos na aba Alunos e depois envie a primeira tarefa.") : "Depois da aula, as tarefas do professor aparecem aqui.") + "</p></div>";
+      var msg = isT()
+        ? (D.students.length ? "Envie a primeira tarefa depois da aula. Você pode partir de um tópico da apostila." : "Comece cadastrando seus alunos e escolhendo os módulos de cada um.")
+        : "Depois da aula, as tarefas do professor aparecem aqui.";
+      var act = isT() ? (D.students.length ? '<button class="btn pri" data-act="newTask">' + ic("plus") + "Nova tarefa</button>" : '<button class="btn pri" data-act="addStudent">' + ic("plus") + "Adicionar aluno</button>") : "";
+      return head + emptyBig("inbox", "Nenhuma tarefa por aqui", msg, act);
     }
-    return bar + sum + (S.view === "quadro" ? board(list) : listView(list));
+    return head + bar + (S.view === "quadro" ? board(list) : listView(list));
+  }
+  function stat(cls, icon, label, v) {
+    return '<div class="stat"><div class="k"><span class="dot ' + cls + '">' + ic(icon, "sm") + "</span>" + label + '</div><div class="v">' + v + "</div></div>";
   }
   function dueTag(t) {
     if (!t.due) return "";
-    return '<span class="pill ' + (isLate(t) ? "late" : "") + '">' + (isLate(t) ? "Atrasada · " : "Até ") + fmtD(t.due) + "</span>";
+    return '<span class="pill ' + (isLate(t) ? "late" : "") + '">' + ic(isLate(t) ? "clock" : "calendar", "sm") + (isLate(t) ? "Atrasada · " : "Até ") + fmtD(t.due) + "</span>";
   }
   function card(t) {
     var n = nextOf(t);
-    return '<article class="card" tabindex="0" draggable="true" data-act="open" data-id="' + esc(t.id) + '">' +
-      '<div class="meta">' + (t.moduleId ? '<span class="tag">' + esc(modName(t.moduleId)) + "</span>" : "") + dueTag(t) + "</div>" +
+    return '<article class="card ' + t.status + (isLate(t) ? " late" : "") + '" tabindex="0" draggable="true" data-act="open" data-id="' + esc(t.id) + '" aria-label="' + esc(t.title) + ", " + stOf(t.status).n + '">' +
+      ((t.moduleId || t.due) ? '<div class="meta">' + (t.moduleId ? '<span class="tag">' + esc(modName(t.moduleId)) + "</span>" : "") + dueTag(t) + "</div>" : "") +
       "<h4>" + esc(t.title) + "</h4>" +
       (isT() ? '<div class="stu">' + avImg(t.uid) + "<span>" + esc(nm(t.uid)) + "</span></div>" : "") +
-      (n ? '<button class="btn sm" data-act="adv" data-id="' + esc(t.id) + '">' + n.n + "</button>" : "") +
+      (t.feedback ? '<div class="fb">' + ic("message", "sm") + "<span>" + esc(t.feedback) + "</span></div>" : "") +
+      (n ? '<button class="btn sm block" data-act="adv" data-id="' + esc(t.id) + '">' + ic(n.i, "sm") + n.n + "</button>" : "") +
       "</article>";
   }
   function board(list) {
     return '<div class="board">' + ST.map(function (s) {
       var items = list.filter(function (t) { return t.status === s.k; });
-      return '<section class="col" data-drop="' + s.k + '"><header>' + s.n + "<b>" + items.length + "</b></header>" +
+      return '<section class="col" data-drop="' + s.k + '" aria-label="' + s.n + '"><header><span class="sd ' + s.k + '"></span>' + s.n + "<b>" + items.length + "</b></header>" +
         (items.length ? items.map(card).join("") : '<div class="empty">Nada aqui</div>') + "</section>";
     }).join("") + "</div>";
   }
@@ -500,35 +710,40 @@ textarea { width: 100%; resize: vertical; min-height: 84px; }
     }).join("");
   }
   function row(t) {
-    var lead;
+    var lead, st = stOf(t.status);
     if (isT()) lead = avImg(t.uid, "lg");
-    else if (t.status === "reviewed") lead = '<button class="chk lock" aria-label="Revisada" tabindex="-1">✓</button>';
-    else lead = '<button class="chk' + (t.status === "done" ? " on" : "") + '" data-act="toggle" data-id="' + esc(t.id) + '" aria-label="Marcar como feita">✓</button>';
+    else if (t.status === "reviewed") lead = '<span class="chk lock" aria-hidden="true"><i>' + ic("check", "sm") + "</i></span>";
+    else lead = '<button class="chk' + (t.status === "done" ? " on" : "") + '" data-act="toggle" data-id="' + esc(t.id) + '" aria-label="' + (t.status === "done" ? "Desmarcar" : "Marcar como feita") + '" aria-pressed="' + (t.status === "done") + '"><i>' + ic("check", "sm") + "</i></button>";
     return '<div class="row" tabindex="0" data-act="open" data-id="' + esc(t.id) + '">' + lead +
       '<div class="grow"><b>' + esc(t.title) + '</b><div class="meta">' +
       (isT() ? "<span>" + esc(nm(t.uid)) + "</span>" : "") +
       (t.moduleId ? '<span class="tag">' + esc(modName(t.moduleId)) + "</span>" : "") + dueTag(t) +
-      '<span class="pill ' + t.status + '">' + stName(t.status) + "</span></div></div></div>";
+      '<span class="pill ' + t.status + '">' + ic(st.i, "sm") + st.n + "</span></div></div>" +
+      '<span class="go">' + ic("right") + "</span></div>";
   }
 
   /* alunos */
   function pageStudents() {
-    var h = '<div class="bar"><div class="grp"><span class="note">' + D.students.length + " aluno(s)</span></div>" +
-      '<button class="btn pri" data-act="addStudent">+ Adicionar aluno</button></div>';
-    if (!D.students.length) return h + '<div class="emptybig"><h3>Ainda sem alunos</h3><p class="note">Toque em “Adicionar aluno”, escreva o nome e escolha os módulos dele.</p></div>';
+    var h = pageHead("Alunos", D.students.length ? D.students.length + (D.students.length > 1 ? " alunos cadastrados" : " aluno cadastrado") : "Cadastre quem faz aula com você.",
+      '<button class="btn pri" data-act="addStudent">' + ic("plus") + "Adicionar aluno</button>");
+    if (!D.students.length) return h + emptyBig("users", "Ainda sem alunos", "Adicione cada aluno pelo nome e escolha os módulos da apostila que ele está estudando.");
     h += '<div class="grid">' + D.students.map(function (s) {
       var u = s.id, mine = s.moduleIds || [];
       var ts = D.tasks.filter(function (t) { return t.uid === u; });
       var fin = ts.filter(function (t) { return t.status === "done" || t.status === "reviewed"; }).length;
       var rev = ts.filter(function (t) { return t.status === "done"; }).length;
-      return '<div class="panelbox"><div class="stu">' + avImg(u, "lg") + "<h3>" + esc(s.name) + "</h3></div>" +
-        '<div><div class="lbl" style="margin-bottom:6px">Módulos</div><div class="chips">' +
+      var late = ts.filter(isLate).length;
+      var pct = ts.length ? Math.round(fin / ts.length * 100) : 0;
+      return '<div class="panelbox"><div class="stu">' + avImg(u, "lg") + '<div style="min-width:0"><h3>' + esc(s.name) + '</h3><span class="note">' + fin + " de " + ts.length + " tarefas feitas</span></div></div>" +
+        '<div class="prog" role="progressbar" aria-valuenow="' + pct + '" aria-valuemin="0" aria-valuemax="100" aria-label="Progresso de ' + esc(s.name) + '"><i style="width:' + pct + '%"></i></div>' +
+        ((rev || late) ? '<div class="meta">' + (rev ? '<span class="pill done">' + ic("check", "sm") + rev + " para revisar</span>" : "") + (late ? '<span class="pill late">' + ic("clock", "sm") + late + " atrasada" + (late > 1 ? "s" : "") + "</span>" : "") + "</div>" : "") +
+        '<div><div class="lbl" style="margin-bottom:8px">Módulos</div><div class="chips">' +
         modules().map(function (m) {
-          return '<button class="chip" data-act="togMod" data-u="' + esc(u) + '" data-m="' + esc(m.id) + '" aria-pressed="' + (mine.indexOf(m.id) > -1) + '">' + esc(m.title) + "</button>";
+          var on = mine.indexOf(m.id) > -1;
+          return '<button class="chip" data-act="togMod" data-u="' + esc(u) + '" data-m="' + esc(m.id) + '" aria-pressed="' + on + '">' + (on ? ic("check", "sm") : "") + esc(m.title) + "</button>";
         }).join("") + "</div></div>" +
-        '<div class="meta"><span>' + fin + " de " + ts.length + " tarefas feitas</span>" + (rev ? '<span class="pill done">' + rev + " para revisar</span>" : "") + "</div>" +
-        '<div class="btns"><button class="btn sm danger" data-act="rmStu" data-u="' + esc(u) + '">' + (S.confirm === "s:" + u ? "Confirmar remoção" : "Remover") + "</button>" +
-        '<button class="btn sm pri" data-act="newTask" data-u="' + esc(u) + '">Nova tarefa</button></div></div>';
+        '<div class="btns"><button class="btn sm danger' + (S.confirm === "s:" + u ? " on" : "") + '" data-act="rmStu" data-u="' + esc(u) + '">' + ic("trash", "sm") + (S.confirm === "s:" + u ? "Confirmar remoção" : "Remover") + "</button>" +
+        '<button class="btn sm pri" data-act="newTask" data-u="' + esc(u) + '">' + ic("plus", "sm") + "Nova tarefa</button></div></div>";
     }).join("") + "</div>";
     return h;
   }
@@ -537,46 +752,57 @@ textarea { width: 100%; resize: vertical; min-height: 84px; }
   function topicsHtml(m) {
     var tp = m.topics || [];
     if (!tp.length) return '<p class="note">Nenhum tópico cadastrado.</p>';
-    return '<ul class="topics">' + tp.map(function (t) {
-      return "<li><b>" + esc(t.t) + "</b>" + (t.d ? "<small>" + esc(t.d) + "</small>" : "") + "</li>";
-    }).join("") + "</ul>";
+    return '<ol class="topics">' + tp.map(function (t) {
+      return "<li><div><b>" + esc(t.t) + "</b>" + (t.d ? "<small>" + esc(t.d) + "</small>" : "") + "</div></li>";
+    }).join("") + "</ol>";
   }
   function matsHtml(m, edit) {
     var ms = m.materials || [];
-    if (!ms.length) return '<p class="note">' + (edit ? "Nenhum material ainda." : "O professor ainda não colocou materiais neste módulo.") + "</p>";
+    if (!ms.length) return '<p class="note">' + (edit ? "Nenhum material ainda. Adicione vídeos, PDFs ou links de apoio." : "O professor ainda não colocou materiais neste módulo.") + "</p>";
     return '<div class="mats">' + ms.map(function (x) {
-      return '<div class="mat"><div style="display:grid;gap:2px;min-width:0"><span class="kind">' + esc(x.kind || "Link") + '</span><a href="' + esc(safeUrl(x.url)) + '" target="_blank" rel="noopener noreferrer">' + esc(x.title) + "</a></div>" +
-        (edit ? '<button class="btn sm danger" data-act="rmMat" data-m="' + esc(m.id) + '" data-x="' + esc(x.id) + '">' + (S.confirm === "x:" + x.id ? "Confirmar" : "Remover") + "</button>" : "") + "</div>";
+      var k = x.kind || "Link";
+      return '<div class="mat"><span class="mk">' + ic(KIND_IC[k] || "link") + '</span><a href="' + esc(safeUrl(x.url)) + '" target="_blank" rel="noopener noreferrer"><span class="kind">' + esc(k) + "</span>" + esc(x.title) + "</a>" +
+        (edit ? '<button class="btn sm danger' + (S.confirm === "x:" + x.id ? " on" : "") + '" data-act="rmMat" data-m="' + esc(m.id) + '" data-x="' + esc(x.id) + '" aria-label="Remover ' + esc(x.title) + '">' + (S.confirm === "x:" + x.id ? "Confirmar" : ic("trash", "sm")) + "</button>" : "") + "</div>";
     }).join("") + "</div>";
   }
   function accordion(m, edit) {
-    var open = S.openMod === m.id;
-    var h = '<div class="acc"><button class="h" data-act="openMod" data-m="' + esc(m.id) + '" aria-expanded="' + open + '"><span><strong>' + esc(m.title) + '</strong><div class="note">' + esc(m.summary || "") + '</div></span><span aria-hidden="true">' + (open ? "−" : "+") + "</span></button>";
+    var open = S.openMod === m.id, mi = modIcon(m);
+    var h = '<div class="acc"><button class="h" data-act="openMod" data-m="' + esc(m.id) + '" aria-expanded="' + open + '">' +
+      '<span class="mi ' + (mi === "mic" ? "canto" : "") + '">' + ic(mi) + "</span>" +
+      '<span class="ht"><strong>' + esc(m.title) + '</strong><span class="note">' + esc(m.summary || "") + "</span></span>" +
+      '<span class="cnt">' + (m.topics || []).length + " tópicos</span>" +
+      '<span class="chev">' + ic("chevron") + "</span></button>";
     if (open) {
-      h += '<div class="body"><div><div class="lbl" style="margin-bottom:8px">Conteúdo da apostila</div>' + topicsHtml(m) + "</div>" +
-        '<div><div class="lbl" style="margin-bottom:8px">Materiais</div>' + matsHtml(m, edit) + "</div>";
-      if (edit) h += '<div class="btns"><button class="btn sm" data-act="editTopics" data-m="' + esc(m.id) + '">Editar tópicos</button><button class="btn sm pri" data-act="addMat" data-m="' + esc(m.id) + '">+ Material</button></div>';
+      h += '<div class="body"><div><div class="lbl" style="margin-bottom:10px">Conteúdo da apostila</div>' + topicsHtml(m) + "</div>" +
+        '<div><div class="lbl" style="margin-bottom:10px">Materiais</div>' + matsHtml(m, edit) + "</div>";
+      if (edit) h += '<div class="btns"><button class="btn sm" data-act="editTopics" data-m="' + esc(m.id) + '">' + ic("pencil", "sm") + 'Editar tópicos</button><button class="btn sm pri" data-act="addMat" data-m="' + esc(m.id) + '">' + ic("plus", "sm") + "Material</button></div>";
       h += "</div>";
     }
     return h + "</div>";
   }
-  function pageModules() { return modules().map(function (m) { return accordion(m, true); }).join(""); }
+  function pageModules() {
+    return pageHead("Apostila", "Tópicos de cada módulo e os materiais de apoio.") + modules().map(function (m) { return accordion(m, true); }).join("");
+  }
   function pageMaterials() {
     var s = stuById(S.who), mine = (s && s.moduleIds) || [];
     var ms = modules().filter(function (m) { return mine.indexOf(m.id) > -1; });
-    if (!ms.length) return '<div class="emptybig"><h3>Nenhum módulo liberado</h3><p class="note">Quando o professor liberar o seu módulo, a apostila e os materiais aparecem aqui.</p></div>';
-    return ms.map(function (m) { return accordion(m, false); }).join("");
+    var h = pageHead("Materiais", "O conteúdo dos módulos que você está estudando.");
+    if (!ms.length) return h + emptyBig("book", "Nenhum módulo liberado", "Quando o professor liberar o seu módulo, a apostila e os materiais aparecem aqui.");
+    return h + ms.map(function (m) { return accordion(m, false); }).join("");
   }
 
   /* backup */
   function pageBackup() {
-    return '<div class="panelbox" style="max-width:640px"><h3>Seus dados ficam neste navegador</h3>' +
-      '<p class="note">Tudo o que você cadastra (alunos, tarefas, tópicos e materiais) é salvo só neste aparelho e neste navegador. Exporte de vez em quando para ter uma cópia e para levar os dados para outro aparelho.</p>' +
-      '<div class="btns" style="justify-content:flex-start"><button class="btn pri" data-act="export">Exportar dados</button><button class="btn" data-act="import">Importar arquivo</button></div>' +
+    return pageHead("Backup", "Guarde uma cópia e leve os dados para outro aparelho.") +
+      '<div class="grid">' +
+      '<div class="panelbox"><div class="stu"><span class="mat" style="border:0;padding:0"><span class="mk">' + ic("shield") + '</span></span><h3>Seus dados ficam neste navegador</h3></div>' +
+      '<p class="note">Alunos, tarefas, tópicos e materiais são salvos só neste aparelho e neste navegador. Exporte de vez em quando para ter uma cópia de segurança.</p>' +
+      '<div class="btns" style="justify-content:flex-start"><button class="btn pri" data-act="export">' + ic("save", "sm") + 'Exportar dados</button><button class="btn" data-act="import">' + ic("upload", "sm") + "Importar arquivo</button></div>" +
       '<p class="note">Importar substitui tudo o que está aqui pelo conteúdo do arquivo.</p></div>' +
-      '<div class="panelbox" style="max-width:640px;margin-top:12px"><h3>Começar do zero</h3>' +
-      '<p class="note">Apaga alunos, tarefas e materiais e volta a apostila ao conteúdo original.</p>' +
-      '<div class="btns" style="justify-content:flex-start"><button class="btn danger" data-act="reset">' + (S.confirm === "reset" ? "Confirmar: apagar tudo" : "Apagar tudo") + "</button></div></div>";
+      '<div class="panelbox"><div class="stu"><span class="mat" style="border:0;padding:0"><span class="mk" style="background:var(--late-bg);color:var(--late)">' + ic("reset") + '</span></span><h3>Começar do zero</h3></div>' +
+      '<p class="note">Apaga alunos, tarefas e materiais e volta a apostila ao conteúdo original. Não dá para desfazer.</p>' +
+      '<div class="btns" style="justify-content:flex-start"><button class="btn danger' + (S.confirm === "reset" ? " on" : "") + '" data-act="reset">' + ic("trash", "sm") + (S.confirm === "reset" ? "Confirmar: apagar tudo" : "Apagar tudo") + "</button></div></div>" +
+      "</div>";
   }
   function doExport() {
     var blob = new Blob([JSON.stringify(D, null, 2)], { type: "application/json" });
@@ -600,9 +826,16 @@ textarea { width: 100%; resize: vertical; min-height: 84px; }
   }
 
   /* ---------- folhas ---------- */
-  function openSheet(o) { S.sheet = o; paintSheet(); }
-  function closeSheet() { S.sheet = null; var s = $("sheet"); s.hidden = true; s.innerHTML = ""; }
-  function paintSheet() {
+  var lastFocus = null;
+  function openSheet(o) { lastFocus = document.activeElement; S.sheet = o; paintSheet(true); }
+  function closeSheet() {
+    S.sheet = null; var s = $("sheet"); s.hidden = true; s.innerHTML = "";
+    if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
+  }
+  function sheetHead(title, pre) {
+    return '<div class="grab" aria-hidden="true"></div><div class="hd"><div style="display:grid;gap:8px;min-width:0">' + (pre || "") + '<h2 id="sheetTitle">' + title + '</h2></div><button class="iconbtn" data-act="close" aria-label="Fechar">' + ic("x") + "</button></div>";
+  }
+  function paintSheet(first) {
     var o = S.sheet, s = $("sheet");
     if (!o) return;
     var h = "";
@@ -612,78 +845,80 @@ textarea { width: 100%; resize: vertical; min-height: 84px; }
     else if (o.type === "topics") h = sheetTopics(o);
     else if (o.type === "mat") h = sheetMat(o);
     if (!h) { closeSheet(); return; }
-    s.innerHTML = '<div class="panel" role="dialog" aria-modal="true">' + h + "</div>";
+    s.innerHTML = '<div class="panel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">' + h + "</div>";
     s.hidden = false;
-    var f = s.querySelector("input[type=text]"); if (f && o.type !== "task") f.focus();
+    if (first) {
+      var f = s.querySelector("input[type=text], textarea") ;
+      if (f && o.type !== "task") f.focus(); else s.querySelector(".iconbtn").focus();
+    }
   }
   function sheetTask(o) {
     var t = findTask(o.id);
     if (!t) return "";
-    var h = '<div class="meta">' + (t.moduleId ? '<span class="tag">' + esc(modName(t.moduleId)) + "</span>" : "") + dueTag(t) + "</div><h2>" + esc(t.title) + "</h2>";
+    var pre = (t.moduleId || t.due) ? '<div class="meta">' + (t.moduleId ? '<span class="tag">' + esc(modName(t.moduleId)) + "</span>" : "") + dueTag(t) + "</div>" : "";
+    var h = sheetHead(esc(t.title), pre);
     if (isT()) h += '<div class="stu">' + avImg(t.uid) + "<span>" + esc(nm(t.uid)) + "</span></div>";
-    if (t.note) h += '<p style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(t.note) + "</p>";
-    h += '<div class="field"><span class="lbl">Andamento</span><div class="stseg">' + ST.map(function (s) {
+    if (t.note) h += '<div class="field"><span class="lbl">Orientação</span><p class="desc">' + esc(t.note) + "</p></div>";
+    h += '<div class="field"><span class="lbl" id="stLbl">Andamento</span><div class="stseg" role="group" aria-labelledby="stLbl">' + ST.map(function (s) {
       var ok = canSet(t, s.k);
-      return '<button data-act="setSt" data-k="' + s.k + '" aria-pressed="' + (t.status === s.k) + '"' + (ok ? "" : " disabled") + ">" + s.n + "</button>";
-    }).join("") + "</div>" + (!isT() && t.status === "reviewed" ? '<span class="note">Esta tarefa já foi revisada pelo professor.</span>' : "") + "</div>";
+      return '<button data-act="setSt" data-k="' + s.k + '" aria-pressed="' + (t.status === s.k) + '"' + (ok ? "" : " disabled") + ">" + ic(s.i, "sm") + s.n + "</button>";
+    }).join("") + "</div>" + (!isT() && t.status === "reviewed" ? '<span class="help">Esta tarefa já foi revisada pelo professor.</span>' : "") + "</div>";
     if (isT()) {
       h += '<div class="field"><label for="fb">Retorno para o aluno</label><textarea id="fb" placeholder="Ex.: Ótimo! Na próxima, tente com o metrônomo em 70 BPM.">' + esc(t.feedback || "") + "</textarea></div>" +
-        '<div class="btns"><button class="btn danger" data-act="delTask">' + (S.confirm === "t:" + t.id ? "Confirmar exclusão" : "Excluir tarefa") + '</button><button class="btn" data-act="close">Fechar</button><button class="btn pri" data-act="saveFb">Salvar retorno</button></div>';
+        '<div class="btns" style="justify-content:space-between"><button class="btn danger' + (S.confirm === "t:" + t.id ? " on" : "") + '" data-act="delTask">' + ic("trash", "sm") + (S.confirm === "t:" + t.id ? "Confirmar exclusão" : "Excluir") + '</button><button class="btn pri" data-act="saveFb">' + ic("check", "sm") + "Salvar retorno</button></div>";
     } else {
-      if (t.feedback) h += '<div class="field"><span class="lbl">Retorno do professor</span><p style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(t.feedback) + "</p></div>";
-      h += '<div class="btns"><button class="btn pri" data-act="close">Fechar</button></div>';
+      if (t.feedback) h += '<div class="fbbox"><span class="lbl">' + "Retorno do professor</span><p class=\"desc\">" + esc(t.feedback) + "</p></div>";
     }
     return h;
   }
   function stuChecks(modId, pre) {
-    if (!D.students.length) return '<p class="note">Nenhum aluno cadastrado ainda.</p>';
+    if (!D.students.length) return '<p class="note" style="padding:8px">Nenhum aluno cadastrado ainda.</p>';
     return D.students.map(function (s) {
       var on = pre ? pre === s.id : (modId && (s.moduleIds || []).indexOf(modId) > -1);
-      return '<label><input type="checkbox" name="nt-stu" value="' + esc(s.id) + '"' + (on ? " checked" : "") + "> " + esc(s.name) + "</label>";
+      return '<label><input type="checkbox" name="nt-stu" value="' + esc(s.id) + '"' + (on ? " checked" : "") + "> " + avImg(s.id) + esc(s.name) + "</label>";
     }).join("");
   }
   function sheetNew(o) {
-    return "<h2>Nova tarefa</h2>" +
+    return sheetHead("Nova tarefa") +
       '<div class="two"><div class="field"><label for="nt-mod">Módulo</label><select id="nt-mod" data-chg="ntMod"><option value="">Sem módulo</option>' +
       modules().map(function (m) { return '<option value="' + esc(m.id) + '">' + esc(m.title) + "</option>"; }).join("") + "</select></div>" +
       '<div class="field"><label for="nt-top">Tópico da apostila</label><select id="nt-top" data-chg="ntTop"><option value="">Escolha o módulo</option></select></div></div>' +
-      '<div class="field"><label for="nt-title">Título da tarefa</label><input type="text" id="nt-title" placeholder="Ex.: Praticar escala de Ré maior"></div>' +
+      '<div class="field"><label for="nt-title">Título da tarefa *</label><input type="text" id="nt-title" placeholder="Ex.: Praticar escala de Ré maior"><span class="help">Escolher um tópico preenche o título automaticamente.</span></div>' +
       '<div class="field"><label for="nt-note">Orientação</label><textarea id="nt-note" placeholder="Quanto tempo, quantas vezes, com ou sem metrônomo…"></textarea></div>' +
       '<div class="field"><label for="nt-due">Prazo</label><input type="date" id="nt-due"></div>' +
-      '<div class="field"><span class="lbl">Alunos</span><div class="checks" id="nt-stus">' + stuChecks("", o.u) + "</div></div>" +
-      '<div class="btns"><button class="btn" data-act="close">Cancelar</button><button class="btn pri" data-act="createTask">Enviar tarefa</button></div>';
+      '<div class="field"><span class="lbl">Alunos *</span><div class="checks" id="nt-stus">' + stuChecks("", o.u) + "</div></div>" +
+      '<div class="btns"><button class="btn ghost" data-act="close">Cancelar</button><button class="btn pri" data-act="createTask">' + ic("check", "sm") + "Enviar tarefa</button></div>";
   }
   function sheetAddStu() {
-    return "<h2>Adicionar aluno</h2>" +
-      '<div class="field"><label for="as-name">Nome do aluno</label><input type="text" id="as-name" placeholder="Ex.: Ana Souza" autocomplete="off"></div>' +
-      '<div class="field"><span class="lbl">Módulos</span><div class="checks">' +
+    return sheetHead("Adicionar aluno") +
+      '<div class="field"><label for="as-name">Nome do aluno *</label><input type="text" id="as-name" placeholder="Ex.: Ana Souza" autocomplete="off"></div>' +
+      '<div class="field"><span class="lbl">Módulos que vai estudar</span><div class="checks">' +
       modules().map(function (m) { return '<label><input type="checkbox" name="as-mod" value="' + esc(m.id) + '"> ' + esc(m.title) + "</label>"; }).join("") + "</div></div>" +
-      '<div class="btns"><button class="btn" data-act="close">Cancelar</button><button class="btn pri" data-act="saveStudent">Adicionar</button></div>';
+      '<div class="btns"><button class="btn ghost" data-act="close">Cancelar</button><button class="btn pri" data-act="saveStudent">' + ic("plus", "sm") + "Adicionar</button></div>";
   }
   function sheetTopics(o) {
     var m = modById(o.m); if (!m) return "";
     var txt = (m.topics || []).map(function (t) { return t.t + (t.d ? " | " + t.d : ""); }).join("\n");
-    return "<h2>Tópicos de " + esc(m.title) + "</h2>" +
-      '<p class="note">Um tópico por linha. Para incluir uma explicação, escreva “Título | explicação”.</p>' +
-      '<div class="field"><label for="tp-txt">Tópicos</label><textarea id="tp-txt" style="min-height:260px">' + esc(txt) + "</textarea></div>" +
-      '<div class="btns"><button class="btn" data-act="close">Cancelar</button><button class="btn pri" data-act="saveTopics">Salvar</button></div>';
+    return sheetHead("Tópicos de " + esc(m.title)) +
+      '<div class="field"><label for="tp-txt">Tópicos</label><textarea id="tp-txt" style="min-height:280px">' + esc(txt) + '</textarea><span class="help">Um tópico por linha. Para incluir uma explicação, escreva “Título | explicação”.</span></div>' +
+      '<div class="btns"><button class="btn ghost" data-act="close">Cancelar</button><button class="btn pri" data-act="saveTopics">' + ic("check", "sm") + "Salvar</button></div>";
   }
   function sheetMat(o) {
     var m = modById(o.m); if (!m) return "";
-    return "<h2>Novo material em " + esc(m.title) + "</h2>" +
-      '<div class="field"><label for="mt-title">Nome do material</label><input type="text" id="mt-title" placeholder="Ex.: Escalas maiores (PDF)"></div>' +
-      '<div class="field"><label for="mt-url">Link (YouTube, Google Drive, site…)</label><input type="url" id="mt-url" placeholder="https://"></div>' +
-      '<p class="note">Para PDFs e áudios, suba o arquivo no Google Drive ou similar e cole aqui o link de compartilhamento.</p>' +
-      '<div class="btns"><button class="btn" data-act="close">Cancelar</button><button class="btn pri" data-act="saveMat">Adicionar</button></div>';
+    return sheetHead("Novo material", '<span class="tag">' + esc(m.title) + "</span>") +
+      '<div class="field"><label for="mt-title">Nome do material *</label><input type="text" id="mt-title" placeholder="Ex.: Escalas maiores (PDF)"></div>' +
+      '<div class="field"><label for="mt-url">Link *</label><input type="url" id="mt-url" placeholder="https://" inputmode="url"><span class="help">YouTube, Google Drive, site… Para PDFs e áudios, suba o arquivo no Drive e cole o link de compartilhamento.</span></div>' +
+      '<div class="btns"><button class="btn ghost" data-act="close">Cancelar</button><button class="btn pri" data-act="saveMat">' + ic("plus", "sm") + "Adicionar</button></div>";
   }
 
   /* ---------- ações ---------- */
   function val(id) { var e = $(id); return e ? e.value.trim() : ""; }
   function checked(name) { return Array.prototype.map.call(document.querySelectorAll('input[name="' + name + '"]:checked'), function (i) { return i.value; }); }
+  function need(id, msg) { toast(msg); var e = $(id); if (e) e.focus(); }
 
   function createTasks() {
     var title = val("nt-title"), us = checked("nt-stu");
-    if (!title) { toast("Escreva o título da tarefa."); return; }
+    if (!title) { need("nt-title", "Escreva o título da tarefa."); return; }
     if (!us.length) { toast("Escolha pelo menos um aluno."); return; }
     var now = Date.now();
     us.forEach(function (u) {
@@ -694,14 +929,14 @@ textarea { width: 100%; resize: vertical; min-height: 84px; }
   }
   function saveStudent() {
     var name = val("as-name");
-    if (!name) { toast("Escreva o nome do aluno."); return; }
+    if (!name) { need("as-name", "Escreva o nome do aluno."); return; }
     D.students.push({ id: rid(), name: name, moduleIds: checked("as-mod"), createdAt: Date.now() });
     save(); closeSheet(); render(); toast("Aluno adicionado");
   }
   function saveMat() {
     var m = modById(S.sheet.m), title = val("mt-title"), url = val("mt-url");
-    if (!title) { toast("Dê um nome ao material."); return; }
-    if (!/^https?:\/\//.test(url)) { toast("Cole um link que comece com https://"); return; }
+    if (!title) { need("mt-title", "Dê um nome ao material."); return; }
+    if (!/^https?:\/\//.test(url)) { need("mt-url", "Cole um link que comece com https://"); return; }
     m.materials = (m.materials || []).concat([{ id: rid(), title: title, url: url, kind: kindOf(url) }]);
     save(); closeSheet(); render(); toast("Material adicionado");
   }
@@ -732,7 +967,7 @@ textarea { width: 100%; resize: vertical; min-height: 84px; }
     if (!el) { if (e.target.id === "sheet") closeSheet(); return; }
     var a = el.dataset.act, u = el.dataset.u, id = el.dataset.id, m = el.dataset.m;
     if (a !== "delTask" && a !== "rmMat" && a !== "rmStu" && a !== "reset" && S.confirm) S.confirm = "";
-    if (a === "tab") { S.tab = el.dataset.k; pref("tab", S.tab); render(); }
+    if (a === "tab") { S.tab = el.dataset.k; pref("tab", S.tab); render(); window.scrollTo(0, 0); $("main").focus({ preventScroll: true }); }
     else if (a === "view") { S.view = el.dataset.k; pref("view", S.view); render(); }
     else if (a === "open") openSheet({ type: "task", id: id });
     else if (a === "adv") { e.stopPropagation(); var t = findTask(id), n = t && nextOf(t); if (n) setStatus(id, n.k); }
@@ -770,7 +1005,7 @@ textarea { width: 100%; resize: vertical; min-height: 84px; }
     else if (a === "createTask") createTasks();
     else if (a === "saveMat") saveMat();
     else if (a === "saveTopics") saveTopics();
-    else if (a === "saveFb") { var t3 = findTask(S.sheet.id); if (t3) { t3.feedback = val("fb"); save(); toast("Retorno salvo"); } }
+    else if (a === "saveFb") { var t3 = findTask(S.sheet.id); if (t3) { t3.feedback = val("fb"); save(); render(); toast("Retorno salvo"); } }
     else if (a === "delTask") {
       var tid = S.sheet.id;
       if (S.confirm === "t:" + tid) {
@@ -821,6 +1056,7 @@ textarea { width: 100%; resize: vertical; min-height: 84px; }
   document.addEventListener("dragend", function () { drag = null; });
 
   /* ---------- início ---------- */
+  $("logoMark").innerHTML = ic("music");
   D = load();
   S.who = pref("who") || "prof";
   S.tab = pref("tab") || "";
