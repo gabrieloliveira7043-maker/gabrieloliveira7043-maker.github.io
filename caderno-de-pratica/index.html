@@ -175,6 +175,13 @@ p { margin: 0; }
 .authcard h2 { font-size: 26px; font-weight: 800; }
 .authcard input { width: 100%; }
 input[type="password"] { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; min-height: 44px; font-size: 16px; min-width: 0; max-width: 100%; }
+.stuhead { width: 100%; text-align: left; background: none; border: 0; padding: 0; color: inherit; border-radius: 12px; }
+.stuhead:hover h3 { color: var(--accent-text); }
+.keychip { display: inline-flex; align-items: center; gap: 6px; flex: none; font-size: 13px; font-weight: 700; color: var(--accent-text); background: var(--accent-soft); padding: 6px 10px; border-radius: 999px; }
+.cred { display: grid; gap: 12px; background: var(--surface-2); border-radius: var(--r-md); padding: 14px; }
+.credrow { display: flex; align-items: center; gap: 8px; }
+.credrow code { flex: 1; min-width: 0; font: 600 17px/1.3 Consolas, "SF Mono", monospace; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; overflow-wrap: anywhere; }
+.subform { display: grid; gap: 10px; border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px; }
 .pw { position: relative; display: block; }
 .pw input { width: 100%; padding-right: 52px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); min-height: 44px; font-size: 16px; }
 .pw input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
@@ -201,7 +208,11 @@ input[type="password"]:focus { outline: none; border-color: var(--accent); box-s
 .bk.on { background: linear-gradient(180deg, var(--accent-2) 0%, var(--accent) 100%); transform: scaleY(0.96); transition-duration: 90ms; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .wk { background: linear-gradient(180deg, #D9DECB 0%, #E9EDE0 55%, #C9D0B8 100%); } }
 :root[data-theme="dark"] .wk { background: linear-gradient(180deg, #D9DECB 0%, #E9EDE0 55%, #C9D0B8 100%); }
-@media (max-width: 720px) { .keys { height: 32px; } }
+@media (max-width: 720px) {
+  .keys { height: 32px; }
+  /* no celular a navegação fica embaixo; o cabeçalho rola junto para não cobrir o conteúdo */
+  .top { position: static; backdrop-filter: none; -webkit-backdrop-filter: none; padding-bottom: 4px; }
+}
 .tabs { display: flex; gap: 6px; max-width: 1180px; margin: 12px auto 0; padding-bottom: 12px; overflow-x: auto; scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
 .tab { display: inline-flex; align-items: center; gap: 8px; background: none; border: 0; min-height: 44px; padding: 0 16px; border-radius: 999px; font-weight: 600; color: var(--ink-2); white-space: nowrap; transition: background 180ms var(--ease), color 180ms var(--ease); }
@@ -559,6 +570,9 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/>',
     eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
     eyeOff: '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a13.2 13.2 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.39-1.61"/><path d="M2 2l20 20"/>',
+    user: '<circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/>',
+    key: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/>',
+    copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
     moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
     auto: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
@@ -756,6 +770,81 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     }, "Senha alterada");
     if (ok) closeSheet();
   }
+  /* o professor age como o aluno numa instância separada do Firebase (para trocar a senha ou apagar o login),
+     usando a senha guardada no cadastro; a própria sessão do professor não é afetada */
+  async function asStudent(login, pw, fn) {
+    var sec = FB.a.initializeApp(window.CADERNO_FIREBASE, "acesso-" + Date.now());
+    try {
+      var auth2 = FB.au.getAuth(sec);
+      var cred = await FB.au.signInWithEmailAndPassword(auth2, loginToEmail(login), pw);
+      await fn(cred.user, auth2);
+      if (auth2.currentUser) await FB.au.signOut(auth2);
+    } finally { FB.a.deleteApp(sec); }
+  }
+  async function removeStudent(u) {
+    var s = stuById(u); if (!s) return;
+    if (s.login && s.senha) {
+      try { await asStudent(s.login, s.senha, function (user) { return FB.au.deleteUser(user); }); } catch (e) { console.error(e); }
+    }
+    closeSheet();
+    await guard(function () {
+      var b = FB.fs.writeBatch(FB.db);
+      b.delete(dref("students/" + u));
+      D.tasks.filter(function (x) { return x.uid === u; }).forEach(function (x) { b.delete(dref("tasks/" + x.id)); });
+      return b.commit();
+    }, "Aluno e acesso removidos");
+  }
+  /* aluno antigo, sem senha guardada: o professor digita a senha que passou e o caderno confere antes de guardar */
+  async function registerStudentPw(u) {
+    var s = stuById(u), pw = $("ac-reg") ? $("ac-reg").value : "";
+    if (!pw) { need("ac-reg", "Digite a senha que você passou para o aluno."); return; }
+    var ok = await guard(async function () {
+      await asStudent(s.login, pw, function () {});
+      await FB.fs.updateDoc(dref("students/" + u), { senha: pw });
+    }, "Senha conferida e guardada");
+    if (ok) { S.sheet.mode = ""; paintSheet(); }
+  }
+  async function changeStudentPw(u) {
+    var s = stuById(u), nw = val("ac-newpw");
+    if (nw.length < 6) { need("ac-newpw", "A nova senha precisa ter pelo menos 6 caracteres."); return; }
+    var btn = document.querySelector('[data-act="acSavePw"]'); if (btn) btn.disabled = true;
+    var ok = await guard(async function () {
+      await asStudent(s.login, s.senha, function (user) { return FB.au.updatePassword(user, nw); });
+      await FB.fs.updateDoc(dref("students/" + u), { senha: nw });
+    }, "Senha do aluno trocada");
+    if (ok) { S.sheet.mode = ""; paintSheet(); } else if (btn) btn.disabled = false;
+  }
+  /* trocar o usuário = criar um login novo com a mesma senha, passar cadastro e tarefas para ele e apagar o antigo */
+  async function changeStudentLogin(u) {
+    var s = stuById(u), nl = val("ac-newlogin").toLowerCase();
+    if (!validLogin(nl)) { need("ac-newlogin", "Usuário: de 3 a 30 letras minúsculas, números, ponto, hífen ou _ (sem espaços)."); return; }
+    if (nl === s.login) { need("ac-newlogin", "Esse já é o usuário atual."); return; }
+    var btn = document.querySelector('[data-act="acSaveLogin"]'); if (btn) btn.disabled = true;
+    var ok = await guard(async function () {
+      var nu = await createStudentAccount(nl, s.senha);
+      var b = FB.fs.writeBatch(FB.db), data = stripId(s);
+      data.login = nl;
+      b.set(dref("students/" + nu), data);
+      b.delete(dref("students/" + u));
+      D.tasks.filter(function (x) { return x.uid === u; }).forEach(function (x) { b.update(dref("tasks/" + x.id), { uid: nu }); });
+      await b.commit();
+      if (S.fStu === u) S.fStu = nu;
+      try { await asStudent(s.login, s.senha, function (user) { return FB.au.deleteUser(user); }); } catch (e) { console.error(e); }
+    }, "Usuário trocado para " + nl);
+    if (ok) closeSheet(); else if (btn) btn.disabled = false;
+  }
+  function accessText(s) {
+    return "Caderno de Prática\nhttps://crm.huven.com.br/caderno-de-pratica/\nUsuário: " + s.login + (s.senha ? "\nSenha: " + s.senha : "");
+  }
+  async function copyText(t, msg) {
+    try { await navigator.clipboard.writeText(t); }
+    catch (e) {
+      var ta = document.createElement("textarea"); ta.value = t; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch (er) {} ta.remove();
+    }
+    toast(msg || "Copiado");
+  }
+
   /* o professor cria a conta do aluno numa instância separada do Firebase, para não sair da própria conta */
   async function createStudentAccount(login, pw) {
     var sec = FB.a.initializeApp(window.CADERNO_FIREBASE, "cadastro-" + Date.now());
@@ -986,7 +1075,9 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
       var rev = ts.filter(function (t) { return t.status === "done"; }).length;
       var late = ts.filter(isLate).length;
       var pct = ts.length ? Math.round(fin / ts.length * 100) : 0;
-      return '<div class="panelbox"><div class="stu">' + avImg(u, "lg") + '<div style="min-width:0"><h3>' + esc(s.name) + '</h3><span class="note">' + fin + " de " + ts.length + " tarefas feitas</span></div></div>" +
+      return '<div class="panelbox"><button class="stu stuhead" data-act="access" data-u="' + esc(u) + '" aria-label="Ver acesso de ' + esc(s.name) + '">' + avImg(u, "lg") +
+        '<span style="min-width:0;flex:1"><h3>' + esc(s.name) + '</h3><span class="note">' + (s.login ? "Usuário: " + esc(s.login) + " · " : "") + fin + " de " + ts.length + " tarefas feitas</span></span>" +
+        '<span class="keychip">' + ic("key", "sm") + "Acesso</span></button>" +
         '<div class="prog" role="progressbar" aria-valuenow="' + pct + '" aria-valuemin="0" aria-valuemax="100" aria-label="Progresso de ' + esc(s.name) + '"><i style="width:' + pct + '%"></i></div>' +
         ((rev || late) ? '<div class="meta">' + (rev ? '<span class="pill done">' + ic("check", "sm") + rev + " para revisar</span>" : "") + (late ? '<span class="pill late">' + ic("clock", "sm") + late + " atrasada" + (late > 1 ? "s" : "") + "</span>" : "") + "</div>" : "") +
         '<div><div class="lbl" style="margin-bottom:8px">Módulos</div><div class="chips">' +
@@ -1099,7 +1190,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   }
   /* dados chegaram do servidor: só redesenha a tarefa aberta, e nunca enquanto a pessoa digita */
   function refreshSheet() {
-    if (!S.sheet || S.sheet.type !== "task") return;
+    if (!S.sheet || (S.sheet.type !== "task" && S.sheet.type !== "access")) return;
     var a = document.activeElement;
     if ($("sheet").contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
     paintSheet();
@@ -1117,6 +1208,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     else if (o.type === "topics") h = sheetTopics(o);
     else if (o.type === "mat") h = sheetMat(o);
     else if (o.type === "account") h = sheetAccount();
+    else if (o.type === "access") h = sheetAccess(o);
     if (!h) { closeSheet(); return; }
     s.innerHTML = '<div class="panel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">' + h + "</div>";
     s.hidden = false;
@@ -1174,13 +1266,47 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   function sheetAccount() {
     return sheetHead("Minha conta", '<span class="tag">' + (isT() ? "Professor" : "Aluno") + "</span>") +
       '<div class="stu"><span class="av lg c' + hue(S.me.uid) + '" aria-hidden="true">' + esc(initials(S.me.name)) + '</span><div style="min-width:0"><h3>' + esc(S.me.name) + '</h3><span class="note">Usuário: ' + esc(S.me.login) + "</span></div></div>" +
-      '<form data-form="pw" style="display:grid;gap:12px"><h3 style="font-size:16px">Trocar senha</h3>' +
+      (!isT() ? '<p class="note">Esqueceu a senha ou quer trocar? Fale com o professor.</p>' : '<form data-form="pw" style="display:grid;gap:12px"><h3 style="font-size:16px">Trocar senha</h3>' +
       '<input type="text" autocomplete="username" value="' + esc(S.me.login) + '" hidden>' +
       '<div class="field"><label for="pw-cur">Senha atual</label>' + pwField("pw-cur", "current-password") + '</div>' +
       '<div class="two"><div class="field"><label for="pw-new">Nova senha</label>' + pwField("pw-new", "new-password") + '</div>' +
       '<div class="field"><label for="pw-new2">Repita a nova senha</label>' + pwField("pw-new2", "new-password") + '</div></div>' +
-      '<div class="btns"><button class="btn" type="submit">' + ic("check", "sm") + "Salvar nova senha</button></div></form>" +
+      '<div class="btns"><button class="btn" type="submit">' + ic("check", "sm") + "Salvar nova senha</button></div></form>") +
       '<div class="btns" style="justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:14px"><span class="note">Saia sempre que usar um aparelho de outra pessoa.</span><button class="btn danger" data-act="logout">Sair</button></div>';
+  }
+  function sheetAccess(o) {
+    var s = stuById(o.u); if (!s) return "";
+    var mode = o.mode || "";
+    var h = sheetHead("Acesso do aluno", '<div class="stu">' + avImg(s.id) + "<span>" + esc(s.name) + "</span></div>");
+    if (!s.login) return h + '<p class="note">Este aluno foi cadastrado antes do login existir e não tem usuário. Remova e cadastre de novo para criar o acesso.</p>';
+    h += '<div class="cred"><div class="field"><span class="lbl">Usuário</span><div class="credrow"><code>' + esc(s.login) + '</code>' +
+      '<button class="iconbtn" data-act="copy" data-t="login" aria-label="Copiar usuário">' + ic("copy") + "</button></div></div>";
+    if (s.senha) {
+      h += '<div class="field"><span class="lbl">Senha</span><div class="credrow"><code id="ac-pw" data-pw="' + esc(s.senha) + '">••••••••</code>' +
+        '<button class="iconbtn" data-act="peek" aria-label="Mostrar senha" aria-pressed="false">' + ic("eye") + "</button>" +
+        '<button class="iconbtn" data-act="copy" data-t="senha" aria-label="Copiar senha">' + ic("copy") + "</button></div></div></div>" +
+        '<button class="btn pri block" data-act="copy" data-t="tudo">' + ic("copy", "sm") + "Copiar acesso para enviar ao aluno</button>";
+    } else {
+      h += '<div class="field"><span class="lbl">Senha</span><p class="note">A senha deste aluno não foi guardada (ele foi cadastrado antes desta função).</p></div></div>' +
+        '<div class="field"><label for="ac-reg">Se você lembra a senha que passou, digite aqui para guardar</label>' + pwField("ac-reg", "off") +
+        '<span class="help">O caderno confere se a senha está certa antes de guardar.</span></div>' +
+        '<div class="btns"><button class="btn" data-act="acRegPw">' + ic("check", "sm") + "Conferir e guardar</button></div>";
+    }
+    if (s.senha) {
+      if (mode === "pw") {
+        h += '<div class="subform"><div class="field"><label for="ac-newpw">Nova senha</label><input type="text" id="ac-newpw" placeholder="mín. 6 caracteres" autocomplete="off" autocapitalize="none" spellcheck="false"></div>' +
+          '<div class="btns"><button class="btn ghost" data-act="acMode" data-k="">Cancelar</button><button class="btn pri" data-act="acSavePw">' + ic("check", "sm") + "Salvar senha</button></div></div>";
+      } else if (mode === "login") {
+        h += '<div class="subform"><div class="field"><label for="ac-newlogin">Novo usuário</label><input type="text" id="ac-newlogin" value="' + esc(s.login) + '" autocomplete="off" autocapitalize="none" spellcheck="false">' +
+          '<span class="help">As tarefas do aluno continuam com ele. O usuário antigo deixa de funcionar.</span></div>' +
+          '<div class="btns"><button class="btn ghost" data-act="acMode" data-k="">Cancelar</button><button class="btn pri" data-act="acSaveLogin">' + ic("check", "sm") + "Salvar usuário</button></div></div>";
+      } else {
+        h += '<div class="two"><button class="btn" data-act="acMode" data-k="pw">' + ic("key", "sm") + 'Trocar senha</button><button class="btn" data-act="acMode" data-k="login">' + ic("user", "sm") + "Trocar usuário</button></div>";
+      }
+    }
+    h += '<div class="btns" style="justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:14px">' +
+      '<span class="note">Remove o aluno, as tarefas e o login.</span><button class="btn danger' + (S.confirm === "s:" + s.id ? " on" : "") + '" data-act="rmStu" data-u="' + esc(s.id) + '">' + ic("trash", "sm") + (S.confirm === "s:" + s.id ? "Confirmar remoção" : "Remover acesso") + "</button></div>";
+    return h;
   }
   function sheetTopics(o) {
     var m = modById(o.m); if (!m) return "";
@@ -1238,7 +1364,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     var mods = checked("as-mod");
     var ok = await guard(async function () {
       var uid = await createStudentAccount(login, pw);
-      await FB.fs.setDoc(dref("students/" + uid), { name: name, login: login, moduleIds: mods, createdAt: Date.now() });
+      await FB.fs.setDoc(dref("students/" + uid), { name: name, login: login, senha: pw, moduleIds: mods, createdAt: Date.now() });
     }, "Aluno adicionado. Usuário: " + login);
     if (ok) closeSheet(); else if (btn) { btn.disabled = false; btn.textContent = "Adicionar"; }
   }
@@ -1275,7 +1401,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     var el = e.target.closest("[data-act]");
     if (!el) { if (e.target.id === "sheet") closeSheet(); return; }
     var a = el.dataset.act, u = el.dataset.u, id = el.dataset.id, m = el.dataset.m;
-    if (a !== "delTask" && a !== "rmMat" && a !== "rmStu" && S.confirm) S.confirm = "";
+    if (a !== "delTask" && a !== "rmMat" && a !== "rmStu" && a !== "peek" && a !== "copy" && S.confirm) S.confirm = "";
     if (a === "tab") { S.tab = el.dataset.k; pref("tab", S.tab); render(); window.scrollTo(0, 0); $("main").focus({ preventScroll: true }); }
     else if (a === "view") { S.view = el.dataset.k; pref("view", S.view); render(); }
     else if (a === "open") openSheet({ type: "task", id: id });
@@ -1295,13 +1421,8 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
       if (S.confirm === "s:" + u) {
         S.confirm = "";
         if (S.fStu === u) S.fStu = "";
-        guard(function () {
-          var b = FB.fs.writeBatch(FB.db);
-          b.delete(dref("students/" + u));
-          D.tasks.filter(function (x) { return x.uid === u; }).forEach(function (x) { b.delete(dref("tasks/" + x.id)); });
-          return b.commit();
-        }, "Aluno removido");
-      } else { S.confirm = "s:" + u; render(); }
+        removeStudent(u);
+      } else { S.confirm = "s:" + u; render(); if (S.sheet && S.sheet.type === "access") paintSheet(); }
     }
     else if (a === "openMod") { S.openMod = S.openMod === m ? "" : m; render(); }
     else if (a === "editTopics") openSheet({ type: "topics", m: m });
@@ -1327,6 +1448,20 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     }
     else if (a === "theme") setTheme(el.dataset.k);
     else if (a === "togglePw") togglePw(el);
+    else if (a === "access") openSheet({ type: "access", u: u, mode: "" });
+    else if (a === "acMode") { S.sheet.mode = el.dataset.k; paintSheet(); var f = $("ac-newpw") || $("ac-newlogin"); if (f) f.focus(); }
+    else if (a === "acSavePw") changeStudentPw(S.sheet.u);
+    else if (a === "acSaveLogin") changeStudentLogin(S.sheet.u);
+    else if (a === "acRegPw") registerStudentPw(S.sheet.u);
+    else if (a === "peek") {
+      var c = $("ac-pw"), show = el.getAttribute("aria-pressed") !== "true";
+      c.textContent = show ? c.dataset.pw : "••••••••"; el.setAttribute("aria-pressed", String(show));
+      el.setAttribute("aria-label", show ? "Ocultar senha" : "Mostrar senha"); el.innerHTML = ic(show ? "eyeOff" : "eye");
+    }
+    else if (a === "copy") {
+      var st = stuById(S.sheet.u), t = el.dataset.t;
+      copyText(t === "login" ? st.login : t === "senha" ? st.senha : accessText(st), t === "tudo" ? "Acesso copiado. É só colar no WhatsApp." : "Copiado");
+    }
     else if (a === "export") doExport();
     else if (a === "account") openSheet({ type: "account" });
     else if (a === "logout") doLogout();
