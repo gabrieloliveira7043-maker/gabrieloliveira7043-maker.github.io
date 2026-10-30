@@ -175,6 +175,12 @@ p { margin: 0; }
 .authcard h2 { font-size: 26px; font-weight: 800; }
 .authcard input { width: 100%; }
 input[type="password"] { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; min-height: 44px; font-size: 16px; min-width: 0; max-width: 100%; }
+.pw { position: relative; display: block; }
+.pw input { width: 100%; padding-right: 52px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); min-height: 44px; font-size: 16px; }
+.pw input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.pw .eye { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 44px; height: 40px; display: grid; place-items: center; border: 0; background: none; color: var(--ink-3); border-radius: 8px; }
+.pw .eye:hover { color: var(--ink); background: var(--surface-2); }
+.pw .eye[aria-pressed="true"] { color: var(--accent-text); }
 input[type="password"]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 .role { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-text); }
 .role.stu { background: var(--warm-soft); color: var(--warm); }
@@ -551,6 +557,8 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
     reset: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
     alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/>',
+    eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+    eyeOff: '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a13.2 13.2 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.39-1.61"/><path d="M2 2l20 20"/>',
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
     moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
     auto: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
@@ -1070,14 +1078,14 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
         '<p class="note">Crie a conta do professor. Ela é única: depois disso, só você cadastra os alunos.</p>' +
         '<div class="field"><label for="fp-name">Seu nome</label><input type="text" id="fp-name" autocomplete="name"></div>' +
         '<div class="field"><label for="fp-user">Usuário</label><input type="text" id="fp-user" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="ex.: professor"><span class="help">Letras minúsculas, números, ponto ou hífen. Sem espaços.</span></div>' +
-        '<div class="field"><label for="fp-pass">Senha</label><input type="password" id="fp-pass" autocomplete="new-password"><span class="help">Pelo menos 6 caracteres.</span></div>' +
-        '<div class="field"><label for="fp-pass2">Repita a senha</label><input type="password" id="fp-pass2" autocomplete="new-password"></div>' +
+        '<div class="field"><label for="fp-pass">Senha</label>' + pwField("fp-pass", "new-password") + '<span class="help">Pelo menos 6 caracteres.</span></div>' +
+        '<div class="field"><label for="fp-pass2">Repita a senha</label>' + pwField("fp-pass2", "new-password") + '</div>' +
         '<button class="btn pri block" type="submit"' + dis + ">" + (S.busy ? "Criando…" : "Criar conta do professor") + "</button></form></div>";
     }
     return h + '<form class="authcard" data-form="login"><div class="eic">' + ic("music", "lg") + '</div><h2>Entrar</h2>' +
       '<p class="note">Use o usuário e a senha que o seu professor passou.</p>' +
       '<div class="field"><label for="lg-user">Usuário</label><input type="text" id="lg-user" autocomplete="username" autocapitalize="none" spellcheck="false"></div>' +
-      '<div class="field"><label for="lg-pass">Senha</label><input type="password" id="lg-pass" autocomplete="current-password"></div>' +
+      '<div class="field"><label for="lg-pass">Senha</label>' + pwField("lg-pass", "current-password") + '</div>' +
       '<button class="btn pri block" type="submit"' + dis + ">" + (S.busy ? "Entrando…" : "Entrar") + "</button>" +
       '<p class="help">Esqueceu a senha? Fale com o professor.</p></form></div>';
   }
@@ -1168,9 +1176,9 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
       '<div class="stu"><span class="av lg c' + hue(S.me.uid) + '" aria-hidden="true">' + esc(initials(S.me.name)) + '</span><div style="min-width:0"><h3>' + esc(S.me.name) + '</h3><span class="note">Usuário: ' + esc(S.me.login) + "</span></div></div>" +
       '<form data-form="pw" style="display:grid;gap:12px"><h3 style="font-size:16px">Trocar senha</h3>' +
       '<input type="text" autocomplete="username" value="' + esc(S.me.login) + '" hidden>' +
-      '<div class="field"><label for="pw-cur">Senha atual</label><input type="password" id="pw-cur" autocomplete="current-password"></div>' +
-      '<div class="two"><div class="field"><label for="pw-new">Nova senha</label><input type="password" id="pw-new" autocomplete="new-password"></div>' +
-      '<div class="field"><label for="pw-new2">Repita a nova senha</label><input type="password" id="pw-new2" autocomplete="new-password"></div></div>' +
+      '<div class="field"><label for="pw-cur">Senha atual</label>' + pwField("pw-cur", "current-password") + '</div>' +
+      '<div class="two"><div class="field"><label for="pw-new">Nova senha</label>' + pwField("pw-new", "new-password") + '</div>' +
+      '<div class="field"><label for="pw-new2">Repita a nova senha</label>' + pwField("pw-new2", "new-password") + '</div></div>' +
       '<div class="btns"><button class="btn" type="submit">' + ic("check", "sm") + "Salvar nova senha</button></div></form>" +
       '<div class="btns" style="justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:14px"><span class="note">Saia sempre que usar um aparelho de outra pessoa.</span><button class="btn danger" data-act="logout">Sair</button></div>';
   }
@@ -1190,6 +1198,20 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   }
 
   /* ---------- ações ---------- */
+  /* campo de senha com o botão de olho para mostrar ou esconder o que foi digitado */
+  function pwField(id, ac) {
+    return '<span class="pw"><input type="password" id="' + id + '" autocomplete="' + ac + '" autocapitalize="none" spellcheck="false">' +
+      '<button type="button" class="eye" data-act="togglePw" data-id="' + id + '" aria-label="Mostrar senha" aria-pressed="false">' + ic("eye") + "</button></span>";
+  }
+  function togglePw(btn) {
+    var inp = $(btn.dataset.id); if (!inp) return;
+    var show = inp.type === "password";
+    inp.type = show ? "text" : "password";
+    btn.setAttribute("aria-pressed", String(show));
+    btn.setAttribute("aria-label", show ? "Ocultar senha" : "Mostrar senha");
+    btn.innerHTML = ic(show ? "eyeOff" : "eye");
+    inp.focus();
+  }
   function val(id) { var e = $(id); return e ? e.value.trim() : ""; }
   function checked(name) { return Array.prototype.map.call(document.querySelectorAll('input[name="' + name + '"]:checked'), function (i) { return i.value; }); }
   function need(id, msg) { toast(msg); var e = $(id); if (e) e.focus(); }
@@ -1304,6 +1326,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
       } else { S.confirm = "t:" + tid; paintSheet(); }
     }
     else if (a === "theme") setTheme(el.dataset.k);
+    else if (a === "togglePw") togglePw(el);
     else if (a === "export") doExport();
     else if (a === "account") openSheet({ type: "account" });
     else if (a === "logout") doLogout();
