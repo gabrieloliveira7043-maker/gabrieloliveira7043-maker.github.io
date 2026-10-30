@@ -189,6 +189,10 @@ input[type="password"] { background: var(--surface); border: 1px solid var(--lin
 .attinfo span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .attach { cursor: pointer; border-style: dashed; }
 .upl { display: grid; gap: 6px; }
+.previewbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 18px; padding: 12px 14px; border-radius: var(--r-md);
+  background: var(--warm-soft); color: var(--ink); border: 1px solid color-mix(in srgb, var(--warm) 45%, transparent); }
+.previewbar > .ic { color: var(--warm); }
+.previewbar span { flex: 1; min-width: 200px; }
 .subform { display: grid; gap: 10px; border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px; }
 .pw { position: relative; display: block; }
 .pw input { width: 100%; padding-right: 52px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); min-height: 44px; font-size: 16px; }
@@ -695,7 +699,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   }
   async function onUser(user) {
     stopData();
-    S.me = null; closeSheet();
+    S.me = null; S.preview = null; closeSheet();
     try {
       var prof = await readProf();
       if (!user) { S.screen = S.profExists ? "login" : "first"; render(); return; }
@@ -885,6 +889,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     });
   }
   async function uploadAttachment(taskId, file) {
+    if (S.preview) { toast(SO_LEITURA); return; }
     var isImg = /^image\//.test(file.type), isVid = /^video\//.test(file.type);
     if (!isImg && !isVid) { toast("Escolha um vídeo ou uma foto."); return; }
     if (isImg) file = await shrinkImage(file);
@@ -932,13 +937,13 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   }
   function attachSection(t) {
     if (!WORKER) return "";
-    var atts = t.attachments || [], dono = !isT() && t.uid === S.me.uid;
+    var atts = t.attachments || [], dono = !isT() && t.uid === meUid();
     var canEdit = isT() || (dono && t.status !== "reviewed");
     var h = '<div class="field"><span class="lbl">Anexos' + (atts.length ? " (" + atts.length + ")" : "") + "</span>" + attsHtml(t, canEdit);
     if (S.upload && S.upload.task === t.id) {
       h += '<div class="upl"><div class="prog"><i id="upbar" style="width:' + S.upload.pct + '%"></i></div><span class="note">Enviando… <b id="uptxt">' + S.upload.pct + "%</b></span></div>";
     } else if (canEdit && dono && atts.length < 3) {
-      h += '<label class="btn block attach">' + ic("clip", "sm") + 'Anexar vídeo ou foto<input type="file" accept="image/*,video/*" data-chg="attach" hidden></label>' +
+      h += '<label class="btn block attach" data-act="attachPick">' + ic("clip", "sm") + 'Anexar vídeo ou foto<input type="file" accept="image/*,video/*" data-chg="attach" hidden></label>' +
         '<span class="help">Vídeo até 90 MB (uns 2 minutos) · foto até 15 MB · até 3 anexos por tarefa.</span>';
     }
     return h + "</div>";
@@ -967,7 +972,13 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     } finally { FB.a.deleteApp(sec); }
   }
 
-  var isT = function () { return !!S.me && S.me.role === "prof"; };
+  var isT = function () { return !!S.me && S.me.role === "prof" && !S.preview; };
+  /* quem a tela representa: o aluno logado, ou o aluno que a professora está visualizando */
+  function meUid() { return S.preview || S.me.uid; }
+  function meName() { return S.preview ? nm(S.preview) : S.me.name; }
+  var SO_LEITURA = "Modo visualização: nada é salvo. Saia da visualização para editar.";
+  function startPreview(u) { closeSheet(); S.preview = u; S.tab = "tarefas"; S.confirm = ""; render(); window.scrollTo(0, 0); }
+  function endPreview() { S.preview = null; S.tab = "alunos"; closeSheet(); render(); window.scrollTo(0, 0); }
   function stuById(u) { for (var i = 0; i < D.students.length; i++) if (D.students[i].id === u) return D.students[i]; return null; }
   function nm(u) { var s = stuById(u); return s ? s.name : "Aluno removido"; }
   function initials(n) { return String(n).trim().split(/\s+/).slice(0, 2).map(function (w) { return w.charAt(0).toUpperCase(); }).join(""); }
@@ -984,7 +995,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   }
   function allTasks() {
     if (isT()) return D.tasks.filter(function (t) { return stuById(t.uid); });
-    return D.tasks.filter(function (t) { return t.uid === S.me.uid; });
+    return D.tasks.filter(function (t) { return t.uid === meUid(); });
   }
   function sortT(a, b) {
     var da = a.due || "9999", db_ = b.due || "9999";
@@ -1004,6 +1015,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   function pendingReview() { return D.tasks.filter(function (t) { return t.status === "done" && stuById(t.uid); }).length; }
 
   function setStatus(id, k) {
+    if (S.preview) { toast(SO_LEITURA); return; }
     var t = findTask(id);
     if (!t || t.status === k || !canSet(t, k)) return;
     var doneAt = (k === "done" || k === "reviewed") ? (t.doneAt || Date.now()) : null;
@@ -1048,7 +1060,8 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
       return;
     }
     document.body.classList.remove("noapp");
-    $("me").innerHTML = '<button class="who" data-act="account" aria-label="Minha conta: ' + esc(S.me.name) + '"><span class="role' + (isT() ? "" : " stu") + '">' + (isT() ? "Professor" : "Aluno") + "</span>" +
+    var souProf = S.me.role === "prof";
+    $("me").innerHTML = '<button class="who" data-act="account" aria-label="Minha conta: ' + esc(S.me.name) + '"><span class="role' + (souProf ? "" : " stu") + '">' + (souProf ? "Professor" : "Aluno") + "</span>" +
       '<span class="whoname">' + esc(S.me.name) + "</span>" + ic("user", "sm") + "</button>";
     var tabs = tabsFor();
     if (!tabs.some(function (t) { return t.k === S.tab; })) S.tab = tabs[0].k;
@@ -1066,6 +1079,8 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     else if (S.tab === "modulos") h = pageModules();
     else if (S.tab === "backup") h = pageBackup();
     else h = pageMaterials();
+    if (S.preview) h = '<div class="previewbar">' + ic("eye") + '<span>Você está vendo o caderno como <b>' + esc(nm(S.preview)) + "</b>. Nada que você tocar aqui é salvo.</span>" +
+      '<button class="btn sm" data-act="endPreview">' + ic("x", "sm") + "Voltar ao meu painel</button></div>" + h;
     $("main").innerHTML = h;
   }
   function pageHead(title, sub, action) {
@@ -1098,7 +1113,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
         stat("todo", "circle", "A fazer", cnt.todo) + "</div>";
     } else {
       var pct = total ? Math.round(fin / total * 100) : 0;
-      head = pageHead("Olá, " + esc(String(S.me.name).split(" ")[0]) + "!", "Estas são as suas tarefas de prática.");
+      head = pageHead("Olá, " + esc(String(meName()).split(" ")[0]) + "!", "Estas são as suas tarefas de prática.");
       head += '<div class="hero"><div class="ring" style="--p:' + pct + '" role="img" aria-label="' + pct + '% concluído"><span>' + pct + '%</span></div><div>' +
         "<h3>" + fin + " de " + total + " tarefas feitas</h3><p>" + (total && fin === total ? "Tudo em dia. Continue praticando!" : "Um pouco por dia faz toda a diferença.") + "</p>" +
         (late ? '<span class="late-chip">' + ic("clock", "sm") + late + " atrasada" + (late > 1 ? "s" : "") + "</span>" : "") + "</div></div>";
@@ -1198,6 +1213,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
           return '<button class="chip" data-act="togMod" data-u="' + esc(u) + '" data-m="' + esc(m.id) + '" aria-pressed="' + on + '">' + (on ? ic("check", "sm") : "") + esc(m.title) + "</button>";
         }).join("") + "</div></div>" +
         '<div class="btns"><button class="btn sm danger' + (S.confirm === "s:" + u ? " on" : "") + '" data-act="rmStu" data-u="' + esc(u) + '">' + ic("trash", "sm") + (S.confirm === "s:" + u ? "Confirmar remoção" : "Remover") + "</button>" +
+        '<button class="btn sm" data-act="preview" data-u="' + esc(u) + '">' + ic("eye", "sm") + "Ver como aluno</button>" +
         '<button class="btn sm pri" data-act="newTask" data-u="' + esc(u) + '">' + ic("plus", "sm") + "Nova tarefa</button></div></div>";
     }).join("") + "</div>";
     return h;
@@ -1245,7 +1261,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     return pageHead("Apostila", "Tópicos de cada módulo e os materiais de apoio.") + modules().map(function (m) { return accordion(m, true); }).join("");
   }
   function pageMaterials() {
-    var s = stuById(S.me.uid), mine = (s && s.moduleIds) || [];
+    var s = stuById(meUid()), mine = (s && s.moduleIds) || [];
     var ms = modules().filter(function (m) { return mine.indexOf(m.id) > -1; });
     var h = pageHead("Materiais", "O conteúdo dos módulos que você está estudando.");
     if (!ms.length) return h + emptyBig("book", "Nenhum módulo liberado", "Quando o professor liberar o seu módulo, a apostila e os materiais aparecem aqui.");
@@ -1399,7 +1415,8 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
       h += '<div class="field"><span class="lbl">Senha</span><div class="credrow"><code id="ac-pw" data-pw="' + esc(s.senha) + '">••••••••</code>' +
         '<button class="iconbtn" data-act="peek" aria-label="Mostrar senha" aria-pressed="false">' + ic("eye") + "</button>" +
         '<button class="iconbtn" data-act="copy" data-t="senha" aria-label="Copiar senha">' + ic("copy") + "</button></div></div></div>" +
-        '<button class="btn pri block" data-act="copy" data-t="tudo">' + ic("copy", "sm") + "Copiar acesso para enviar ao aluno</button>";
+        '<button class="btn pri block" data-act="copy" data-t="tudo">' + ic("copy", "sm") + "Copiar acesso para enviar ao aluno</button>" +
+        '<button class="btn block" data-act="preview" data-u="' + esc(s.id) + '">' + ic("eye", "sm") + "Ver o caderno como este aluno</button>";
     } else {
       h += '<div class="field"><span class="lbl">Senha</span><p class="note">A senha deste aluno não foi guardada (ele foi cadastrado antes desta função).</p></div></div>' +
         '<div class="field"><label for="ac-reg">Se você lembra a senha que passou, digite aqui para guardar</label>' + pwField("ac-reg", "off") +
@@ -1516,6 +1533,9 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     var el = e.target.closest("[data-act]");
     if (!el) { if (e.target.id === "sheet") closeSheet(); return; }
     var a = el.dataset.act, u = el.dataset.u, id = el.dataset.id, m = el.dataset.m;
+    if (S.preview && ["adv", "toggle", "setSt", "rmAtt", "attachPick", "account"].indexOf(a) > -1) { e.preventDefault(); e.stopPropagation(); toast(SO_LEITURA); return; }
+    if (a === "preview") { startPreview(u); return; }
+    if (a === "endPreview") { endPreview(); return; }
     if (a !== "delTask" && a !== "rmMat" && a !== "rmStu" && a !== "rmAtt" && a !== "peek" && a !== "copy" && S.confirm) S.confirm = "";
     if (a === "tab") { S.tab = el.dataset.k; pref("tab", S.tab); render(); window.scrollTo(0, 0); $("main").focus({ preventScroll: true }); }
     else if (a === "view") { S.view = el.dataset.k; pref("view", S.view); render(); }
