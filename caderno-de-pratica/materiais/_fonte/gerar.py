@@ -77,6 +77,32 @@ def figura(svg, legenda):
 
 
 # ---------- página ----------
+def pauta(notas, titulo="", w=600):
+    """Pentagrama em SVG. notas: [(posição, rótulo)], posição 0 = 1ª linha (de baixo), 1 = 1º espaço, 2 = 2ª linha...
+    Posições negativas ou acima de 8 ganham linhas suplementares."""
+    gap = 12
+    top = 34
+    base = top + 4 * gap   # y da 1ª linha
+    h = base + 56
+    s = [f'<svg viewBox="0 0 {w} {h}" width="100%" style="max-width:{w}px" xmlns="http://www.w3.org/2000/svg">']
+    if titulo:
+        s.append(f'<text x="4" y="14" font-size="12" font-weight="800" fill="#4D5C1B">{html.escape(titulo)}</text>')
+    for i in range(5):
+        y = base - i * gap
+        s.append(f'<line x1="4" y1="{y}" x2="{w - 4}" y2="{y}" stroke="#2B3320" stroke-width="1.2"/>')
+    passo = (w - 70) / max(len(notas), 1)
+    for k, (pos, rot) in enumerate(notas):
+        x = 50 + k * passo + passo / 2
+        y = base - pos * gap / 2
+        for sup in range(-2, pos - 1, -2) if pos <= -2 else []:
+            s.append(f'<line x1="{x - 13}" y1="{base - sup * gap / 2}" x2="{x + 13}" y2="{base - sup * gap / 2}" stroke="#2B3320" stroke-width="1.2"/>')
+        for sup in range(10, pos + 1, 2) if pos >= 10 else []:
+            s.append(f'<line x1="{x - 13}" y1="{base - sup * gap / 2}" x2="{x + 13}" y2="{base - sup * gap / 2}" stroke="#2B3320" stroke-width="1.2"/>')
+        s.append(f'<ellipse cx="{x}" cy="{y}" rx="7.5" ry="5.6" transform="rotate(-18 {x} {y})" fill="#1C2410"/>')
+        s.append(f'<text x="{x}" y="{h - 8}" text-anchor="middle" font-size="11" font-weight="700" fill="#4D5C1B">{html.escape(rot)}</text>')
+    s.append("</svg>")
+    return "".join(s)
+
 
 CSS = """
 @page { size: A4; margin: 16mm 16mm 18mm; }

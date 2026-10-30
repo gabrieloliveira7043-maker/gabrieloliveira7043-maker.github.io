@@ -593,9 +593,11 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   /* Material didático em PDF que vem com o caderno: um arquivo por tópico, na mesma ordem dos tópicos da apostila.
      Gerado por materiais/_fonte/gerar.py. */
   var BUILTIN_PDFS = {
-    tec1: { pasta: "teclado-1", arquivos: ["01-dedos-1-3-5", "02-uso-do-pedal", "03-funcao-de-cada-mao", "04-teclado-e-piano",
-      "05-percepcao-auditiva", "06-acorde-maior-e-menor", "07-troca-de-notas-no-tempo", "08-postura-e-maos",
-      "09-exercicios-de-mobilidade", "10-letras-dos-acordes-maiores", "11-letras-dos-acordes-menores", "12-melodia-e-harmonia"] }
+    tec1: { pasta: "teclado-1", arquivos: ["01-dedos-1-3-5", "02-uso-do-pedal", "03-funcao-de-cada-mao", "04-teclado-e-piano", "05-percepcao-auditiva", "06-acorde-maior-e-menor", "07-troca-de-notas-no-tempo", "08-postura-e-maos", "09-exercicios-de-mobilidade", "10-letras-dos-acordes-maiores", "11-letras-dos-acordes-menores", "12-melodia-e-harmonia"] },
+    tec2: { pasta: "teclado-2", arquivos: ["01-regra-t-t-st", "02-escalas-maiores", "03-campo-harmonico", "04-tons-musicais", "05-tempo-musical", "06-regra-das-escalas", "07-leitura-da-partitura", "08-metronomo-com-a-musica", "09-bemol-e-sustenido"] },
+    tec3: { pasta: "teclado-3", arquivos: ["01-acordes-sustenidos", "02-acordes-sustenidos-menores", "03-figuras-de-tempo", "04-cinco-musicas-inteiras", "05-transposicao-de-tom", "06-inversao-de-acordes", "07-dominio-do-metronomo", "08-dinamica-musical", "09-leitura-de-cifra", "10-escolha-de-timbres", "11-velocidade-e-agilidade"] },
+    tec4: { pasta: "teclado-4", arquivos: ["01-criatividade-musical", "02-improvisacao-e-composicao", "03-todas-as-escalas", "04-notas-e-acordes-da-musica", "05-emprestimo-modal", "06-acordes-diminutos", "07-tirar-musicas-de-ouvido", "08-aumento-de-repertorio", "09-ministracao-com-o-instrumento", "10-escala-e-campo-na-pratica", "11-precisao-ritmica", "12-tocar-em-grupo"] },
+    canto: { pasta: "canto", arquivos: ["01-respiracao-diafragmatica", "02-apoio-e-controle-do-ar", "03-nao-usar-voz-de-garganta", "04-apoio-vocal-suporte", "05-voz-de-peito", "06-voz-de-cabeca", "07-voz-mista", "08-aquecimento-vocal", "09-dinamica-vocal", "10-tons-para-sua-voz", "11-controle-de-intensidade", "12-ornamentos", "13-afinacao-e-percepcao", "14-psicodinamica-da-voz", "15-postura-corporal", "16-uso-do-microfone", "17-cuidados-com-a-voz", "18-ministracao-e-composicao", "19-como-compor"] }
   };
   function builtinMats(modId) {
     var b = BUILTIN_PDFS[modId], seed = SEED_MODULES.filter(function (m) { return m.id === modId; })[0];
