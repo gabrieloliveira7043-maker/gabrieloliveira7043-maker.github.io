@@ -1698,7 +1698,12 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   /* tocar uma tecla: acende e faz um som curto, parecido com piano */
   function tone(midi) {
     try {
+      /* no iPhone: toca mesmo com o botão de silencioso ligado (iOS 17+) */
+      if (navigator.audioSession && navigator.audioSession.type !== "playback") navigator.audioSession.type = "playback";
+      if (audio && audio.state === "closed") audio = null;
       audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      /* o iOS pausa o áudio da página ao sair do app ou bloquear a tela; religa no toque */
+      if (audio.state !== "running") audio.resume();
       var t = audio.currentTime, f = 440 * Math.pow(2, (midi - 69) / 12), g = audio.createGain();
       g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.18, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
       g.connect(audio.destination);
