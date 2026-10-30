@@ -9,3 +9,7 @@ window.CADERNO_FIREBASE = {
   messagingSenderId: "9589711251",
   appId: "1:9589711251:web:1b8d37e0abc1c7c9958866"
 };
+
+/* Endereço do Worker "caderno-admin" no Cloudflare (pasta worker/), ex.: "https://caderno-admin.conta.workers.dev".
+   Vazio: o caderno funciona sem anexos e sem trocar senha de aluno pelo servidor. */
+window.CADERNO_WORKER = "";

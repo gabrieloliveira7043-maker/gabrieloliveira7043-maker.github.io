@@ -5,3 +5,8 @@ compatibility_date = "2025-01-01"
 [vars]
 PROJECT_ID = "caderno-de-pratica"
 ALLOWED_ORIGINS = "https://crm.huven.com.br,http://localhost:8766"
+
+# Bucket do R2 com os anexos das tarefas. Troque bucket_name pelo nome exato do bucket criado no Cloudflare.
+[[r2_buckets]]
+binding = "ANEXOS"
+bucket_name = "caderno-de-pratica-anexos"

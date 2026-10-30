@@ -181,6 +181,14 @@ input[type="password"] { background: var(--surface); border: 1px solid var(--lin
 .cred { display: grid; gap: 12px; background: var(--surface-2); border-radius: var(--r-md); padding: 14px; }
 .credrow { display: flex; align-items: center; gap: 8px; }
 .credrow code { flex: 1; min-width: 0; font: 600 17px/1.3 Consolas, "SF Mono", monospace; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 12px; overflow-wrap: anywhere; }
+.atts { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+.att { border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; background: var(--surface-2); display: grid; }
+.att img, .att video { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #000; }
+.attph { aspect-ratio: 4 / 3; display: grid; place-items: center; align-content: center; gap: 6px; color: var(--ink-3); font-size: 13px; }
+.attinfo { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px 6px 10px; font-size: 12px; color: var(--ink-2); min-width: 0; }
+.attinfo span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attach { cursor: pointer; border-style: dashed; }
+.upl { display: grid; gap: 6px; }
 .subform { display: grid; gap: 10px; border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px; }
 .pw { position: relative; display: block; }
 .pw input { width: 100%; padding-right: 52px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); min-height: 44px; font-size: 16px; }
@@ -571,6 +579,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
     eyeOff: '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a13.2 13.2 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.39-1.61"/><path d="M2 2l20 20"/>',
     user: '<circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/>',
+    clip: '<path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>',
     key: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/>',
     copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
@@ -645,6 +654,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   function dref(path) { return FB.fs.doc(FB.db, path); }
   function cref(path) { return FB.fs.collection(FB.db, path); }
   function errMsg(e) {
+    if (e && e.worker) return e.message.charAt(0).toUpperCase() + e.message.slice(1) + ".";
     var c = (e && e.code) || "";
     if (/invalid-credential|wrong-password|user-not-found|invalid-email/.test(c)) return "Usuário ou senha incorretos.";
     if (/too-many-requests/.test(c)) return "Muitas tentativas. Espere alguns minutos e tente de novo.";
@@ -653,6 +663,16 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     if (/network|unavailable/.test(c)) return "Sem conexão. Verifique a internet e tente de novo.";
     if (/permission-denied/.test(c)) return "Você não tem permissão para fazer isso.";
     return "Algo deu errado. Tente de novo.";
+  }
+  /* Worker "caderno-admin" (Cloudflare): trocar senha sem saber a antiga, apagar login e guardar anexos no R2.
+     Sem o endereço em firebase-config.js, o caderno funciona sem essas funções. */
+  var WORKER = String(window.CADERNO_WORKER || "").replace(/\/+$/, "");
+  async function callWorker(path, body) {
+    var tok = await FB.auth.currentUser.getIdToken();
+    var res = await fetch(WORKER + path, { method: "POST", headers: { Authorization: "Bearer " + tok, "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+    var data = await res.json().catch(function () { return {}; });
+    if (!res.ok) throw { worker: true, message: data.error || "Falha no servidor" };
+    return data;
   }
   async function guard(fn, okMsg) {
     try { await fn(); if (okMsg) toast(okMsg); return true; }
@@ -783,7 +803,9 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   }
   async function removeStudent(u) {
     var s = stuById(u); if (!s) return;
-    if (s.login && s.senha) {
+    if (WORKER) {
+      try { await callWorker("/delete-user", { uid: u }); } catch (e) { console.error(e); toast(errMsg(e)); return; }
+    } else if (s.login && s.senha) {
       try { await asStudent(s.login, s.senha, function (user) { return FB.au.deleteUser(user); }); } catch (e) { console.error(e); }
     }
     closeSheet();
@@ -809,7 +831,8 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     if (nw.length < 6) { need("ac-newpw", "A nova senha precisa ter pelo menos 6 caracteres."); return; }
     var btn = document.querySelector('[data-act="acSavePw"]'); if (btn) btn.disabled = true;
     var ok = await guard(async function () {
-      await asStudent(s.login, s.senha, function (user) { return FB.au.updatePassword(user, nw); });
+      if (WORKER) await callWorker("/set-password", { uid: u, password: nw });
+      else await asStudent(s.login, s.senha, function (user) { return FB.au.updatePassword(user, nw); });
       await FB.fs.updateDoc(dref("students/" + u), { senha: nw });
     }, "Senha do aluno trocada");
     if (ok) { S.sheet.mode = ""; paintSheet(); } else if (btn) btn.disabled = false;
@@ -833,6 +856,94 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     }, "Usuário trocado para " + nl);
     if (ok) closeSheet(); else if (btn) btn.disabled = false;
   }
+  /* anexos das tarefas */
+  var MBYTES = 1024 * 1024, fileUrls = {}, loadingUrls = {};
+  function fmtSize(b) { return b >= MBYTES ? (b / MBYTES).toFixed(1).replace(".", ",") + " MB" : Math.max(1, Math.round(b / 1024)) + " KB"; }
+  async function loadUrls(t) {
+    var falta = (t.attachments || []).some(function (a) { return !fileUrls[a.key]; });
+    if (!falta || loadingUrls[t.id]) return;
+    loadingUrls[t.id] = true;
+    try { var d = await callWorker("/file-urls", { task: t.id }); Object.assign(fileUrls, d.urls || {}); }
+    catch (e) { console.error(e); }
+    finally { loadingUrls[t.id] = false; }
+    if (S.sheet && S.sheet.type === "task" && S.sheet.id === t.id) paintSheet();
+  }
+  /* fotos são reduzidas para no máximo 1600 px antes de enviar */
+  function shrinkImage(file) {
+    return new Promise(function (resolve) {
+      if (/gif/.test(file.type)) return resolve(file);
+      var img = new Image(), url = URL.createObjectURL(file);
+      img.onload = function () {
+        var k = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement("canvas");
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        c.toBlob(function (b) { resolve(b ? new File([b], (file.name || "foto").replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" }) : file); }, "image/jpeg", 0.85);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+  }
+  async function uploadAttachment(taskId, file) {
+    var isImg = /^image\//.test(file.type), isVid = /^video\//.test(file.type);
+    if (!isImg && !isVid) { toast("Escolha um vídeo ou uma foto."); return; }
+    if (isImg) file = await shrinkImage(file);
+    if (isVid && file.size > 90 * MBYTES) { toast("Vídeo maior que 90 MB. Grave um trecho menor (até uns 2 minutos)."); return; }
+    if (isImg && file.size > 15 * MBYTES) { toast("Foto maior que 15 MB."); return; }
+    S.upload = { task: taskId, pct: 0 }; paintSheet();
+    try {
+      var tok = await FB.auth.currentUser.getIdToken();
+      await new Promise(function (resolve, reject) {
+        var x = new XMLHttpRequest();
+        x.open("POST", WORKER + "/upload?task=" + encodeURIComponent(taskId));
+        x.setRequestHeader("Authorization", "Bearer " + tok);
+        x.setRequestHeader("Content-Type", file.type);
+        x.setRequestHeader("X-File-Name", encodeURIComponent(file.name || "anexo"));
+        x.upload.onprogress = function (ev) {
+          if (!ev.lengthComputable || !S.upload) return;
+          S.upload.pct = Math.round(ev.loaded / ev.total * 100);
+          var b = $("upbar"), tx = $("uptxt");
+          if (b) b.style.width = S.upload.pct + "%"; if (tx) tx.textContent = S.upload.pct + "%";
+        };
+        x.onload = function () {
+          var d = {}; try { d = JSON.parse(x.responseText); } catch (e) {}
+          if (x.status < 300) resolve(d); else reject({ worker: true, message: d.error || "falha no envio" });
+        };
+        x.onerror = function () { reject({ code: "network" }); };
+        x.send(file);
+      });
+      toast("Anexo enviado");
+    } catch (e) { console.error(e); toast(errMsg(e)); }
+    S.upload = null; paintSheet();
+  }
+  function attsHtml(t, canDel) {
+    var atts = t.attachments || [];
+    if (!atts.length) return '<p class="note">' + (isT() ? "O aluno ainda não enviou anexos." : "Grave um vídeo ou tire uma foto mostrando a sua prática.") + "</p>";
+    loadUrls(t);
+    return '<div class="atts">' + atts.map(function (a) {
+      var u = fileUrls[a.key], vid = /^video\//.test(a.type);
+      var media = !u ? '<div class="attph">' + ic(vid ? "video" : "image", "lg") + "<span>Carregando…</span></div>"
+        : vid ? '<video controls playsinline preload="metadata" src="' + esc(u) + '"></video>'
+        : '<a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt="' + esc(a.name) + '" loading="lazy"></a>';
+      return '<div class="att">' + media + '<div class="attinfo"><span>' + esc(a.name) + " · " + fmtSize(a.size || 0) + "</span>" +
+        (canDel ? '<button class="btn sm danger' + (S.confirm === "a:" + a.key ? " on" : "") + '" data-act="rmAtt" data-k="' + esc(a.key) + '">' + (S.confirm === "a:" + a.key ? "Confirmar" : ic("trash", "sm")) + "</button>" : "") +
+        "</div></div>";
+    }).join("") + "</div>";
+  }
+  function attachSection(t) {
+    if (!WORKER) return "";
+    var atts = t.attachments || [], dono = !isT() && t.uid === S.me.uid;
+    var canEdit = isT() || (dono && t.status !== "reviewed");
+    var h = '<div class="field"><span class="lbl">Anexos' + (atts.length ? " (" + atts.length + ")" : "") + "</span>" + attsHtml(t, canEdit);
+    if (S.upload && S.upload.task === t.id) {
+      h += '<div class="upl"><div class="prog"><i id="upbar" style="width:' + S.upload.pct + '%"></i></div><span class="note">Enviando… <b id="uptxt">' + S.upload.pct + "%</b></span></div>";
+    } else if (canEdit && dono && atts.length < 3) {
+      h += '<label class="btn block attach">' + ic("clip", "sm") + 'Anexar vídeo ou foto<input type="file" accept="image/*,video/*" data-chg="attach" hidden></label>' +
+        '<span class="help">Vídeo até 90 MB (uns 2 minutos) · foto até 15 MB · até 3 anexos por tarefa.</span>';
+    }
+    return h + "</div>";
+  }
+
   function accessText(s) {
     return "Caderno de Prática\nhttps://crm.huven.com.br/caderno-de-pratica/\nUsuário: " + s.login + (s.senha ? "\nSenha: " + s.senha : "");
   }
@@ -1028,6 +1139,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
       "<h4>" + esc(t.title) + "</h4>" +
       (isT() ? '<div class="stu">' + avImg(t.uid) + "<span>" + esc(nm(t.uid)) + "</span></div>" : "") +
       (t.feedback ? '<div class="fb">' + ic("message", "sm") + "<span>" + esc(t.feedback) + "</span></div>" : "") +
+      ((t.attachments || []).length ? '<div class="fb">' + ic("clip", "sm") + "<span>" + t.attachments.length + (t.attachments.length > 1 ? " anexos" : " anexo") + "</span></div>" : "") +
       (n ? '<button class="btn sm block" data-act="adv" data-id="' + esc(t.id) + '">' + ic(n.i, "sm") + n.n + "</button>" : "") +
       "</article>";
   }
@@ -1193,6 +1305,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     if (!S.sheet || (S.sheet.type !== "task" && S.sheet.type !== "access")) return;
     var a = document.activeElement;
     if ($("sheet").contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
+    if (Array.prototype.some.call($("sheet").querySelectorAll("video"), function (v) { return !v.paused; })) return;
     paintSheet();
   }
   function sheetHead(title, pre) {
@@ -1228,6 +1341,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
       var ok = canSet(t, s.k);
       return '<button data-act="setSt" data-k="' + s.k + '" aria-pressed="' + (t.status === s.k) + '"' + (ok ? "" : " disabled") + ">" + ic(s.i, "sm") + s.n + "</button>";
     }).join("") + "</div>" + (!isT() && t.status === "reviewed" ? '<span class="help">Esta tarefa já foi revisada pelo professor.</span>' : "") + "</div>";
+    h += attachSection(t);
     if (isT()) {
       h += '<div class="field"><label for="fb">Retorno para o aluno</label><textarea id="fb" placeholder="Ex.: Ótimo! Na próxima, tente com o metrônomo em 70 BPM.">' + esc(t.feedback || "") + "</textarea></div>" +
         '<div class="btns" style="justify-content:space-between"><button class="btn danger' + (S.confirm === "t:" + t.id ? " on" : "") + '" data-act="delTask">' + ic("trash", "sm") + (S.confirm === "t:" + t.id ? "Confirmar exclusão" : "Excluir") + '</button><button class="btn pri" data-act="saveFb">' + ic("check", "sm") + "Salvar retorno</button></div>";
@@ -1292,7 +1406,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
         '<span class="help">O caderno confere se a senha está certa antes de guardar.</span></div>' +
         '<div class="btns"><button class="btn" data-act="acRegPw">' + ic("check", "sm") + "Conferir e guardar</button></div>";
     }
-    if (s.senha) {
+    if (s.senha || WORKER) {
       if (mode === "pw") {
         h += '<div class="subform"><div class="field"><label for="ac-newpw">Nova senha</label><input type="text" id="ac-newpw" placeholder="mín. 6 caracteres" autocomplete="off" autocapitalize="none" spellcheck="false"></div>' +
           '<div class="btns"><button class="btn ghost" data-act="acMode" data-k="">Cancelar</button><button class="btn pri" data-act="acSavePw">' + ic("check", "sm") + "Salvar senha</button></div></div>";
@@ -1301,7 +1415,8 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
           '<span class="help">As tarefas do aluno continuam com ele. O usuário antigo deixa de funcionar.</span></div>' +
           '<div class="btns"><button class="btn ghost" data-act="acMode" data-k="">Cancelar</button><button class="btn pri" data-act="acSaveLogin">' + ic("check", "sm") + "Salvar usuário</button></div></div>";
       } else {
-        h += '<div class="two"><button class="btn" data-act="acMode" data-k="pw">' + ic("key", "sm") + 'Trocar senha</button><button class="btn" data-act="acMode" data-k="login">' + ic("user", "sm") + "Trocar usuário</button></div>";
+        h += '<div class="two"><button class="btn" data-act="acMode" data-k="pw">' + ic("key", "sm") + (s.senha ? "Trocar senha" : "Definir senha nova") + "</button>" +
+          (s.senha ? '<button class="btn" data-act="acMode" data-k="login">' + ic("user", "sm") + "Trocar usuário</button>" : "") + "</div>";
       }
     }
     h += '<div class="btns" style="justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:14px">' +
@@ -1401,7 +1516,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     var el = e.target.closest("[data-act]");
     if (!el) { if (e.target.id === "sheet") closeSheet(); return; }
     var a = el.dataset.act, u = el.dataset.u, id = el.dataset.id, m = el.dataset.m;
-    if (a !== "delTask" && a !== "rmMat" && a !== "rmStu" && a !== "peek" && a !== "copy" && S.confirm) S.confirm = "";
+    if (a !== "delTask" && a !== "rmMat" && a !== "rmStu" && a !== "rmAtt" && a !== "peek" && a !== "copy" && S.confirm) S.confirm = "";
     if (a === "tab") { S.tab = el.dataset.k; pref("tab", S.tab); render(); window.scrollTo(0, 0); $("main").focus({ preventScroll: true }); }
     else if (a === "view") { S.view = el.dataset.k; pref("view", S.view); render(); }
     else if (a === "open") openSheet({ type: "task", id: id });
@@ -1443,12 +1558,21 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
       var tid = S.sheet.id;
       if (S.confirm === "t:" + tid) {
         S.confirm = ""; closeSheet();
-        guard(function () { return FB.fs.deleteDoc(dref("tasks/" + tid)); }, "Tarefa excluída");
+        var tAtt = findTask(tid);
+        guard(async function () {
+          if (WORKER && tAtt && (tAtt.attachments || []).length) await callWorker("/delete-task-files", { task: tid });
+          await FB.fs.deleteDoc(dref("tasks/" + tid));
+        }, "Tarefa excluída");
       } else { S.confirm = "t:" + tid; paintSheet(); }
     }
     else if (a === "theme") setTheme(el.dataset.k);
     else if (a === "togglePw") togglePw(el);
     else if (a === "access") openSheet({ type: "access", u: u, mode: "" });
+    else if (a === "rmAtt") {
+      var ak = el.dataset.k, at = S.sheet.id;
+      if (S.confirm === "a:" + ak) { S.confirm = ""; guard(function () { return callWorker("/delete-file", { task: at, key: ak }); }, "Anexo apagado"); }
+      else { S.confirm = "a:" + ak; paintSheet(); }
+    }
     else if (a === "acMode") { S.sheet.mode = el.dataset.k; paintSheet(); var f = $("ac-newpw") || $("ac-newlogin"); if (f) f.focus(); }
     else if (a === "acSavePw") changeStudentPw(S.sheet.u);
     else if (a === "acSaveLogin") changeStudentLogin(S.sheet.u);
@@ -1468,6 +1592,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   });
   document.addEventListener("change", function (e) {
     var k = e.target.dataset && e.target.dataset.chg;
+    if (k === "attach") { var f = e.target.files && e.target.files[0]; e.target.value = ""; if (f && S.sheet) uploadAttachment(S.sheet.id, f); return; }
     if (k === "fStu") { S.fStu = e.target.value; render(); }
     else if (k === "fMod") { S.fMod = e.target.value; render(); }
     else if (k === "ntMod") onModChange();
