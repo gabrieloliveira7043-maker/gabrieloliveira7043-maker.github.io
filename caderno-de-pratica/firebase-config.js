@@ -12,4 +12,4 @@ window.CADERNO_FIREBASE = {
 
 /* Endereço do Worker "caderno-admin" no Cloudflare (pasta worker/), ex.: "https://caderno-admin.conta.workers.dev".
    Vazio: o caderno funciona sem anexos e sem trocar senha de aluno pelo servidor. */
-window.CADERNO_WORKER = "";
+window.CADERNO_WORKER = "https://caderno-admin.rachelsilvaxpto.workers.dev";
