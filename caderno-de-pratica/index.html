@@ -192,6 +192,13 @@ input[type="password"] { background: var(--surface); border: 1px solid var(--lin
 .fbbox.stunote { background: var(--warm-soft); }
 .fbbox .lbl { display: inline-flex; align-items: center; gap: 6px; }
 .card .fb.stu .ic { color: var(--warm); }
+.topics li.ok::before { content: "✓"; background: var(--accent); color: var(--accent-ink); }
+.topics li.ok { background: color-mix(in srgb, var(--accent) 16%, var(--surface-2)); }
+.modprog { display: block; height: 6px; margin-top: 8px; max-width: 260px; }
+.acc .cnt .ic { vertical-align: -3px; margin-right: 3px; color: var(--accent-text); }
+.learnchip { border: 0; color: inherit; cursor: pointer; margin-left: 6px; }
+.checks.learn { max-height: none; }
+.checks.learn label:has(input:checked) { font-weight: 600; }
 .previewbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 18px; padding: 12px 14px; border-radius: var(--r-md);
   background: var(--warm-soft); color: var(--ink); border: 1px solid color-mix(in srgb, var(--warm) 45%, transparent); }
 .previewbar > .ic { color: var(--warm); }
@@ -1118,9 +1125,11 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     } else {
       var pct = total ? Math.round(fin / total * 100) : 0;
       head = pageHead("Olá, " + esc(String(meName()).split(" ")[0]) + "!", "Estas são as suas tarefas de prática.");
+      var lc = learnedCount(meUid(), studentMods(meUid()));
       head += '<div class="hero"><div class="ring" style="--p:' + pct + '" role="img" aria-label="' + pct + '% concluído"><span>' + pct + '%</span></div><div>' +
         "<h3>" + fin + " de " + total + " tarefas feitas</h3><p>" + (total && fin === total ? "Tudo em dia. Continue praticando!" : "Um pouco por dia faz toda a diferença.") + "</p>" +
-        (late ? '<span class="late-chip">' + ic("clock", "sm") + late + " atrasada" + (late > 1 ? "s" : "") + "</span>" : "") + "</div></div>";
+        (late ? '<span class="late-chip">' + ic("clock", "sm") + late + " atrasada" + (late > 1 ? "s" : "") + "</span>" : "") +
+        (lc.total ? '<button class="late-chip learnchip" data-act="tab" data-k="materiais">' + ic("check", "sm") + lc.feito + " de " + lc.total + " tópicos da apostila concluídos</button>" : "") + "</div></div>";
     }
 
     var bar = '<div class="bar"><div class="grp">' +
@@ -1212,6 +1221,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
         '<span class="keychip">' + ic("key", "sm") + "Acesso</span></button>" +
         '<div class="prog" role="progressbar" aria-valuenow="' + pct + '" aria-valuemin="0" aria-valuemax="100" aria-label="Progresso de ' + esc(s.name) + '"><i style="width:' + pct + '%"></i></div>' +
         ((rev || late) ? '<div class="meta">' + (rev ? '<span class="pill done">' + ic("check", "sm") + rev + " para revisar</span>" : "") + (late ? '<span class="pill late">' + ic("clock", "sm") + late + " atrasada" + (late > 1 ? "s" : "") + "</span>" : "") + "</div>" : "") +
+        (function () { var lc = learnedCount(u, studentMods(u)); return lc.total ? '<button class="btn sm block" data-act="progress" data-u="' + esc(u) + '">' + ic("check", "sm") + "Tópicos concluídos · " + lc.feito + " de " + lc.total + "</button>" : ""; })() +
         '<div><div class="lbl" style="margin-bottom:8px">Módulos</div><div class="chips">' +
         modules().map(function (m) {
           var on = mine.indexOf(m.id) > -1;
@@ -1225,7 +1235,21 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   }
 
   /* módulos e materiais (professor) / materiais (aluno) */
-  function topicsHtml(m) {
+  function learnedOf(u, modId) {
+    var s = stuById(u), l = (s && s.learned && s.learned[modId]) || [];
+    var titulos = ((modById(modId) || {}).topics || []).map(function (t) { return t.t; });
+    return l.filter(function (x) { return titulos.indexOf(x) > -1; });
+  }
+  function learnedCount(u, mods) {
+    var feito = 0, total = 0;
+    mods.forEach(function (m) { feito += learnedOf(u, m.id).length; total += (m.topics || []).length; });
+    return { feito: feito, total: total };
+  }
+  function studentMods(u) {
+    var s = stuById(u), mine = (s && s.moduleIds) || [];
+    return modules().filter(function (m) { return mine.indexOf(m.id) > -1; });
+  }
+  function topicsHtml(m, learned) {
     var tp = m.topics || [];
     if (!tp.length) return '<p class="note">Nenhum tópico cadastrado.</p>';
     var pdf = {};
@@ -1233,9 +1257,10 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     return '<ol class="topics">' + tp.map(function (t) {
       var body = "<b>" + esc(t.t) + "</b>" + (t.d ? "<small>" + esc(t.d) + "</small>" : "");
       var x = pdf[t.t];
-      if (!x) return "<li><div>" + body + "</div></li>";
-      return '<li class="lk"><a href="' + esc(safeUrl(x.url)) + '" target="_blank" rel="noopener"><span>' + body +
-        '</span><span class="pdf">' + ic("file", "sm") + "Abrir material</span></a></li>";
+      var ok = learned && learned.indexOf(t.t) > -1, okCls = ok ? " ok" : "", okTxt = ok ? '<span class="sr">(concluído)</span>' : "";
+      if (!x) return '<li class="' + okCls.trim() + '"><div>' + body + okTxt + "</div></li>";
+      return '<li class="lk' + okCls + '"><a href="' + esc(safeUrl(x.url)) + '" target="_blank" rel="noopener"><span>' + body +
+        okTxt + '</span><span class="pdf">' + ic("file", "sm") + "Abrir material</span></a></li>";
     }).join("") + "</ol>";
   }
   function matsHtml(m, edit) {
@@ -1249,13 +1274,15 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   }
   function accordion(m, edit) {
     var open = S.openMod === m.id, mi = modIcon(m);
+    var learned = edit ? null : learnedOf(meUid(), m.id), nTop = (m.topics || []).length;
     var h = '<div class="acc"><button class="h" data-act="openMod" data-m="' + esc(m.id) + '" aria-expanded="' + open + '">' +
       '<span class="mi ' + (mi === "mic" ? "canto" : "") + '">' + ic(mi) + "</span>" +
-      '<span class="ht"><strong>' + esc(m.title) + '</strong><span class="note">' + esc(m.summary || "") + "</span></span>" +
-      '<span class="cnt">' + (m.topics || []).length + " tópicos</span>" +
+      '<span class="ht"><strong>' + esc(m.title) + '</strong><span class="note">' + esc(m.summary || "") + "</span>" +
+      (learned ? '<span class="prog modprog"><i style="width:' + (nTop ? Math.round(learned.length / nTop * 100) : 0) + '%"></i></span>' : "") + "</span>" +
+      '<span class="cnt">' + (learned ? ic("check", "sm") + learned.length + " de " + nTop : nTop + " tópicos") + "</span>" +
       '<span class="chev">' + ic("chevron") + "</span></button>";
     if (open) {
-      h += '<div class="body"><div><div class="lbl" style="margin-bottom:10px">Conteúdo da apostila</div>' + topicsHtml(m) + "</div>" +
+      h += '<div class="body"><div><div class="lbl" style="margin-bottom:10px">Conteúdo da apostila' + (learned ? " · os tópicos com ✓ você já concluiu" : "") + "</div>" + topicsHtml(m, learned) + "</div>" +
         '<div><div class="lbl" style="margin-bottom:10px">Materiais</div>' + matsHtml(m, edit) + "</div>";
       if (edit) h += '<div class="btns"><button class="btn sm" data-act="editTopics" data-m="' + esc(m.id) + '">' + ic("pencil", "sm") + 'Editar tópicos</button><button class="btn sm pri" data-act="addMat" data-m="' + esc(m.id) + '">' + ic("plus", "sm") + "Material</button></div>";
       h += "</div>";
@@ -1343,6 +1370,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     else if (o.type === "mat") h = sheetMat(o);
     else if (o.type === "account") h = sheetAccount();
     else if (o.type === "access") h = sheetAccess(o);
+    else if (o.type === "progress") h = sheetProgress(o);
     if (!h) { closeSheet(); return; }
     s.innerHTML = '<div class="panel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">' + h + "</div>";
     s.hidden = false;
@@ -1412,6 +1440,32 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
       '<div class="field"><label for="pw-new2">Repita a nova senha</label>' + pwField("pw-new2", "new-password") + '</div></div>' +
       '<div class="btns"><button class="btn" type="submit">' + ic("check", "sm") + "Salvar nova senha</button></div></form>") +
       '<div class="btns" style="justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:14px"><span class="note">Saia sempre que usar um aparelho de outra pessoa.</span><button class="btn danger" data-act="logout">Sair</button></div>';
+  }
+  function sheetProgress(o) {
+    var s = stuById(o.u); if (!s) return "";
+    var mods = studentMods(o.u);
+    var h = sheetHead("Tópicos concluídos", '<div class="stu">' + avImg(s.id) + "<span>" + esc(s.name) + "</span></div>");
+    if (!mods.length) return h + '<p class="note">Libere pelo menos um módulo para este aluno no card dele.</p>';
+    var lc = learnedCount(o.u, mods);
+    h += '<p class="note">Marque o que o aluno já aprendeu. Ele vê os tópicos com ✓ na aba Materiais. Salva na hora.</p>' +
+      '<div class="prog" role="progressbar" aria-valuenow="' + lc.feito + '" aria-valuemin="0" aria-valuemax="' + lc.total + '"><i id="lcbar" style="width:' + (lc.total ? Math.round(lc.feito / lc.total * 100) : 0) + '%"></i></div>';
+    mods.forEach(function (m) {
+      var l = learnedOf(o.u, m.id), tp = m.topics || [];
+      h += '<div class="field"><div class="lbl" style="display:flex;justify-content:space-between;gap:8px"><span>' + esc(m.title) + "</span><span id=\"lc-" + esc(m.id) + "\">" + l.length + " de " + tp.length + "</span></div>" +
+        '<div class="checks learn">' + tp.map(function (t, i) {
+          return '<label><input type="checkbox" data-chg="learn" data-u="' + esc(o.u) + '" data-m="' + esc(m.id) + '" data-i="' + i + '"' + (l.indexOf(t.t) > -1 ? " checked" : "") + "> " + esc(t.t) + "</label>";
+        }).join("") + "</div></div>";
+    });
+    return h + '<div class="btns"><button class="btn pri" data-act="close">' + ic("check", "sm") + "Pronto</button></div>";
+  }
+  async function toggleLearned(u, modId, i, on) {
+    var s = stuById(u), m = modById(modId); if (!s || !m || !m.topics[i]) return;
+    var titulo = m.topics[i].t, all = Object.assign({}, s.learned || {});
+    var l = learnedOf(u, modId).filter(function (x) { return x !== titulo; });
+    if (on) l.push(titulo);
+    all[modId] = l;
+    s.learned = all; // mostra na hora; o Firestore confirma em seguida
+    await guard(function () { return FB.fs.updateDoc(dref("students/" + u), { learned: all }); });
   }
   function sheetAccess(o) {
     var s = stuById(o.u); if (!s) return "";
@@ -1544,6 +1598,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     var a = el.dataset.act, u = el.dataset.u, id = el.dataset.id, m = el.dataset.m;
     if (S.preview && ["adv", "toggle", "setSt", "rmAtt", "attachPick", "account", "saveNote"].indexOf(a) > -1) { e.preventDefault(); e.stopPropagation(); toast(SO_LEITURA); return; }
     if (a === "preview") { startPreview(u); return; }
+    if (a === "progress") { openSheet({ type: "progress", u: u }); return; }
     if (a === "endPreview") { endPreview(); return; }
     if (a !== "delTask" && a !== "rmMat" && a !== "rmStu" && a !== "rmAtt" && a !== "peek" && a !== "copy" && S.confirm) S.confirm = "";
     if (a === "tab") { S.tab = el.dataset.k; pref("tab", S.tab); render(); window.scrollTo(0, 0); $("main").focus({ preventScroll: true }); }
@@ -1625,6 +1680,16 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   });
   document.addEventListener("change", function (e) {
     var k = e.target.dataset && e.target.dataset.chg;
+    if (k === "learn") {
+      var cb = e.target;
+      toggleLearned(cb.dataset.u, cb.dataset.m, +cb.dataset.i, cb.checked);
+      /* atualiza só os números, sem redesenhar a janela (não perde a rolagem) */
+      var mm = modById(cb.dataset.m), cnt = $("lc-" + cb.dataset.m), all = learnedCount(cb.dataset.u, studentMods(cb.dataset.u)), bar = $("lcbar");
+      if (cnt && mm) cnt.textContent = learnedOf(cb.dataset.u, cb.dataset.m).length + " de " + (mm.topics || []).length;
+      if (bar) bar.style.width = (all.total ? Math.round(all.feito / all.total * 100) : 0) + "%";
+      render();
+      return;
+    }
     if (k === "attach") { var f = e.target.files && e.target.files[0]; e.target.value = ""; if (f && S.sheet) uploadAttachment(S.sheet.id, f); return; }
     if (k === "fStu") { S.fStu = e.target.value; render(); }
     else if (k === "fMod") { S.fMod = e.target.value; render(); }
