@@ -327,6 +327,14 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
 @media (max-width: 720px) { .board { grid-auto-columns: 84%; margin: 0 -16px; padding: 0 16px 10px; scroll-padding: 0 16px; } }
 .col { background: var(--surface-2); border-radius: var(--r-lg); padding: 12px; display: flex; flex-direction: column; gap: 10px; min-height: 180px; scroll-snap-align: start; min-width: 0; transition: outline-color 160ms var(--ease); outline: 2px dashed transparent; outline-offset: -2px; }
 .col.over { outline-color: var(--accent); }
+/* cada coluna rola sozinha: o cabeçalho fica parado e os cards descem dentro dela */
+.col { max-height: calc(100vh - 120px); max-height: calc(100dvh - 120px); }
+.colbody { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; overscroll-behavior: contain; min-height: 0; flex: 1; margin: 0 -6px; padding: 2px 6px 4px;
+  scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--ink-2) 35%, transparent) transparent; }
+@media (max-width: 720px) { .col { max-height: calc(100vh - 190px); max-height: calc(100dvh - 190px); } }
+.colbody > * { flex-shrink: 0; }
+.colbody::-webkit-scrollbar { width: 6px; }
+.colbody::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--ink-2) 35%, transparent); border-radius: 999px; }
 .col > header { display: flex; align-items: center; gap: 8px; padding: 2px 4px 4px; font-family: var(--f-display); font-weight: 700; font-size: 16px; }
 .col > header .sd { width: 10px; height: 10px; border-radius: 50%; }
 .col > header b { margin-left: auto; font: 600 13px var(--f-body); color: var(--ink-2); background: var(--surface); padding: 2px 9px; border-radius: 999px; }
@@ -1092,7 +1100,11 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     else h = pageMaterials();
     if (S.preview) h = '<div class="previewbar">' + ic("eye") + '<span>Você está vendo o caderno como <b>' + esc(nm(S.preview)) + "</b>. Nada que você tocar aqui é salvo.</span>" +
       '<button class="btn sm" data-act="endPreview">' + ic("x", "sm") + "Voltar ao meu painel</button></div>" + h;
+    // guarda onde cada coluna estava rolada, para não voltar ao topo quando a tela é redesenhada
+    var rol = {};
+    document.querySelectorAll("#main .col").forEach(function (c) { var b = c.querySelector(".colbody"); if (b) rol[c.dataset.drop] = b.scrollTop; });
     $("main").innerHTML = h;
+    document.querySelectorAll("#main .col").forEach(function (c) { var b = c.querySelector(".colbody"); if (b && rol[c.dataset.drop]) b.scrollTop = rol[c.dataset.drop]; });
   }
   function pageHead(title, sub, action) {
     return '<div class="ph"><div><h2>' + title + "</h2>" + (sub ? "<p>" + sub + "</p>" : "") + "</div>" + (action || "") + "</div>";
@@ -1176,7 +1188,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     return '<div class="board">' + ST.map(function (s) {
       var items = list.filter(function (t) { return t.status === s.k; });
       return '<section class="col" data-drop="' + s.k + '" aria-label="' + s.n + '"><header><span class="sd ' + s.k + '"></span>' + s.n + "<b>" + items.length + "</b></header>" +
-        (items.length ? items.map(card).join("") : '<div class="empty">Nada aqui</div>') + "</section>";
+        '<div class="colbody">' + (items.length ? items.map(card).join("") : '<div class="empty">Nada aqui</div>') + "</div></section>";
     }).join("") + "</div>";
   }
   function listView(list) {
