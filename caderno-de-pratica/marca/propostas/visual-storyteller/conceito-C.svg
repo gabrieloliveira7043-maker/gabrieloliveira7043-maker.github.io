@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Conceito C: Dueto. Tema claro. -->
+  <rect width="512" height="512" rx="116" fill="#99AB59"/>
+  <!-- tres teclas brancas (do-re-mi), simetricas em torno de x=256 -->
+  <rect x="95" y="240" width="98" height="196" rx="20" fill="#FBF7EA"/>
+  <rect x="207" y="240" width="98" height="196" rx="20" fill="#FBF7EA"/>
+  <rect x="319" y="240" width="98" height="196" rx="20" fill="#FBF7EA"/>
+  <!-- as duas teclas pretas viram as hastes de duas colcheias ligadas -->
+  <path d="M178 116 L334 76 L334 296 L290 296 L290 131.28 L222 148.72 L222 336 L178 336 Z" fill="#1F2619"/>
+  <!-- cabecas de nota: professora (abaixo) e aluno (um degrau acima) -->
+  <path d="M135.98 362.71 A46 35 -24 1 1 220.02 325.29 A46 35 -24 1 1 135.98 362.71 Z" fill="#1F2619"/>
+  <path d="M247.98 322.71 A46 35 -24 1 1 332.02 285.29 A46 35 -24 1 1 247.98 322.71 Z" fill="#1F2619"/>
+</svg>
