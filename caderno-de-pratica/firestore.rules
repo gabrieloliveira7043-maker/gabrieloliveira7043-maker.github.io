@@ -28,6 +28,13 @@ service cloud.firestore {
       allow write: if isProf();
     }
 
+    // avisos do sininho: criados só pelo servidor; cada pessoa lê, marca como lido e apaga os seus
+    match /notifs/{id} {
+      allow read, delete: if signed() && resource.data.to == request.auth.uid;
+      allow update: if signed() && resource.data.to == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+    }
+
     match /tasks/{id} {
       allow read: if isProf() || (signed() && resource.data.uid == request.auth.uid);
       allow create, delete: if isProf();

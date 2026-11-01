@@ -5,8 +5,14 @@ compatibility_date = "2025-01-01"
 [vars]
 PROJECT_ID = "caderno-de-pratica"
 ALLOWED_ORIGINS = "https://crm.huven.com.br"
+# chave pública das notificações (a privada fica no segredo VAPID_JWK)
+VAPID_PUBLIC = "BAG61gLsNBUWPRCyHyolTPTG7q-2ZNmotWaL8Y0atcQsE2kqeTU4rlxnK1XsQXHYhemcWKv5tC9KLVUIMJg7Kmc"
 
 # Bucket do R2 com os anexos das tarefas. Troque bucket_name pelo nome exato do bucket criado no Cloudflare.
 [[r2_buckets]]
 binding = "ANEXOS"
 bucket_name = "caderno-de-pratica-anexos"
+
+# lembretes de prazo: roda de hora em hora (o Worker só manda entre 9h e 21h de Brasília)
+[triggers]
+crons = ["0 * * * *"]

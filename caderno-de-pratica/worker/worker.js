@@ -10,8 +10,14 @@
    - GET  /file?k=&e=&s=                         abre o arquivo pelo link temporário (aceita Range, para vídeo)
    - POST /delete-file        { task, key }      apaga um anexo        (aluno dono, antes de revisada, ou professora)
    - POST /delete-task-files  { task }           apaga todos os anexos de uma tarefa (professora)
+   Avisos (sininho do app e notificação no celular)
+   - GET  /push-key                              chave pública para o celular assinar as notificações
+   - POST /push-subscribe     { endpoint, keys } liga as notificações neste aparelho   (quem estiver logado)
+   - POST /push-unsubscribe   { endpoint }       desliga neste aparelho
+   - POST /notify             { task, kind }     avisa o outro lado que a tarefa mudou (status, note, feedback, new)
+   - cron de hora em hora: lembretes de prazo para o aluno (véspera, dia e atraso); POST /admin/lembretes roda na hora (ADMIN_TOKEN)
    - GET  /health
-   Segredos (wrangler secret put): SA_JSON, ADMIN_TOKEN, FILE_SECRET.
+   Segredos (wrangler secret put): SA_JSON, ADMIN_TOKEN, FILE_SECRET, VAPID_JWK.
    Variáveis e R2 (wrangler.toml): PROJECT_ID, ALLOWED_ORIGINS e o bucket ANEXOS. */
 
 const enc = new TextEncoder();
@@ -206,7 +212,166 @@ async function deleteFiles(env, items) {
   return items.reduce((s, a) => s + (a.size || 0), 0);
 }
 
+/* ---------- avisos: guardados em notifs/ e mandados para o celular (Web Push) ---------- */
+const SITE = "https://crm.huven.com.br/caderno-de-pratica/";
+const FUSO = "America/Sao_Paulo";
+const ST_NOME = { todo: "voltou para A fazer", doing: "começou a praticar", done: "marcou como feita", reviewed: "foi revisada" };
+
+function juntar(...partes) {
+  const out = new Uint8Array(partes.reduce((s, p) => s + p.length, 0));
+  let o = 0; for (const p of partes) { out.set(p, o); o += p.length; }
+  return out;
+}
+async function hkdf(salt, ikm, info, bytes) {
+  const k = await crypto.subtle.importKey("raw", ikm, "HKDF", false, ["deriveBits"]);
+  return new Uint8Array(await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt, info }, k, bytes * 8));
+}
+// cifra a mensagem para o aparelho (RFC 8291, aes128gcm): só o celular que assinou consegue ler
+async function cifrarPush(p256dh, auth, texto) {
+  const uaPub = b64urlDecode(p256dh), segredo = b64urlDecode(auth);
+  const meu = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+  const meuPub = new Uint8Array(await crypto.subtle.exportKey("raw", meu.publicKey));
+  const dele = await crypto.subtle.importKey("raw", uaPub, { name: "ECDH", namedCurve: "P-256" }, false, []);
+  const comum = new Uint8Array(await crypto.subtle.deriveBits({ name: "ECDH", public: dele }, meu.privateKey, 256));
+  const ikm = await hkdf(segredo, comum, juntar(enc.encode("WebPush: info\0"), uaPub, meuPub), 32);
+  const sal = crypto.getRandomValues(new Uint8Array(16));
+  const cek = await hkdf(sal, ikm, enc.encode("Content-Encoding: aes128gcm\0"), 16);
+  const nonce = await hkdf(sal, ikm, enc.encode("Content-Encoding: nonce\0"), 12);
+  const chave = await crypto.subtle.importKey("raw", cek, "AES-GCM", false, ["encrypt"]);
+  const cifra = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce }, chave, juntar(enc.encode(texto), new Uint8Array([2]))));
+  const cab = new Uint8Array(21);
+  cab.set(sal); new DataView(cab.buffer).setUint32(16, 4096); cab[20] = 65;
+  return juntar(cab, meuPub, cifra);
+}
+// assinatura VAPID: prova para o serviço de push (Apple, Google, Mozilla) que a mensagem vem deste servidor
+async function vapid(env, endpoint) {
+  const jwk = JSON.parse(env.VAPID_JWK);
+  const key = await crypto.subtle.importKey("jwk", { kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y, d: jwk.d }, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+  const now = Math.floor(Date.now() / 1000);
+  const head = b64url(enc.encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
+  const claim = b64url(enc.encode(JSON.stringify({ aud: new URL(endpoint).origin, exp: now + 12 * 3600, sub: SITE })));
+  const sig = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, enc.encode(head + "." + claim));
+  return `vapid t=${head}.${claim}.${b64url(sig)}, k=${env.VAPID_PUBLIC}`;
+}
+async function mandarPush(env, sub, dados) {
+  const corpo = await cifrarPush(sub.p256dh, sub.auth, JSON.stringify(dados));
+  const res = await fetch(sub.endpoint, {
+    method: "POST",
+    headers: { Authorization: await vapid(env, sub.endpoint), "Content-Encoding": "aes128gcm", "Content-Type": "application/octet-stream", TTL: "86400", Urgency: "normal" },
+    body: corpo,
+  });
+  return res.status;
+}
+
+/* consultas e escrita no Firestore com a conta de serviço */
+async function consulta(env, colecao, campo, valor) {
+  const url = `https://firestore.googleapis.com/v1/projects/${env.PROJECT_ID}/databases/(default)/documents:runQuery`;
+  const res = await fetch(url, {
+    method: "POST", headers: { Authorization: "Bearer " + await googleToken(env), "Content-Type": "application/json" },
+    body: JSON.stringify({ structuredQuery: { from: [{ collectionId: colecao }], where: { fieldFilter: { field: { fieldPath: campo }, op: "EQUAL", value: toFs(valor) } }, limit: 200 } }),
+  });
+  if (!res.ok) throw new Error("firestore " + res.status);
+  return (await res.json()).filter((r) => r.document).map((r) => docDe(r.document));
+}
+function docDe(d) {
+  const o = { id: d.name.split("/").pop() };
+  for (const [k, v] of Object.entries(d.fields || {})) o[k] = fromFs(v);
+  return o;
+}
+async function todos(env, colecao) {
+  const out = []; let token = "";
+  do {
+    const res = await fetch(docUrl(env, colecao) + "?pageSize=300" + (token ? "&pageToken=" + encodeURIComponent(token) : ""), { headers: { Authorization: "Bearer " + await googleToken(env) } });
+    if (!res.ok) throw new Error("firestore " + res.status);
+    const data = await res.json();
+    for (const d of data.documents || []) out.push(docDe(d));
+    token = data.nextPageToken || "";
+  } while (token);
+  return out;
+}
+async function apagarDoc(env, path) {
+  await fetch(docUrl(env, path), { method: "DELETE", headers: { Authorization: "Bearer " + await googleToken(env) } });
+}
+async function sha(texto) {
+  return [...new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(texto)))].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 40);
+}
+
+// grava o aviso (aparece no sininho) e manda para os celulares da pessoa; aparelhos que saíram são esquecidos
+async function avisar(env, para, titulo, texto, tarefa, tipo) {
+  if (!para) return;
+  const id = crypto.randomUUID().replace(/-/g, "");
+  await patchDoc(env, "notifs/" + id, { to: para, title: titulo, body: texto, task: tarefa || null, kind: tipo, at: Date.now(), read: false });
+  if (!env.VAPID_JWK || !env.VAPID_PUBLIC) return;
+  const subs = await consulta(env, "pushsubs", "uid", para).catch(() => []);
+  await Promise.all(subs.map(async (s) => {
+    const st = await mandarPush(env, s, { title: titulo, body: texto, tag: tarefa || id, url: SITE + (tarefa ? "?tarefa=" + encodeURIComponent(tarefa) : "") }).catch(() => 0);
+    if (st === 404 || st === 410) await apagarDoc(env, "pushsubs/" + s.id);
+  }));
+}
+function curto(t, n) { t = String(t || "").replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n - 1) + "…" : t; }
+function primeiroNome(n) { return String(n || "Aluno").trim().split(" ")[0]; }
+function dataBr(iso) { const [a, m, d] = String(iso).split("-"); return d + "/" + m; }
+
+/* o que mudou numa tarefa vira aviso para o outro lado: aluno → professora, professora → aluno */
+async function avisoDeTarefa(env, caller, taskId, tipo) {
+  const { task, isProf } = await taskFor(env, caller, taskId, false);
+  const titulo = curto(task.title, 80);
+  if (isProf) {
+    if (tipo === "status" && task.status === "reviewed") return avisar(env, task.uid, "Tarefa revisada ✓", titulo + (task.feedback ? " · " + curto(task.feedback, 120) : ""), taskId, "revisada");
+    if (tipo === "feedback" && task.feedback) return avisar(env, task.uid, "Retorno da professora", titulo + " · " + curto(task.feedback, 140), taskId, "retorno");
+    if (tipo === "new") return avisar(env, task.uid, "Nova tarefa", titulo + (task.due ? " · até " + dataBr(task.due) : ""), taskId, "nova");
+    return;
+  }
+  const prof = await professorUid(env);
+  const aluno = primeiroNome(((await readDoc(env, "students/" + caller)) || {}).name);
+  if (tipo === "status" && ST_NOME[task.status] && task.status !== "reviewed") {
+    if (task.avisoStatus === task.status) return; // não repete o mesmo aviso se o aluno ficar indo e voltando
+    await patchDoc(env, "tasks/" + taskId, { avisoStatus: task.status });
+    return avisar(env, prof, aluno + " " + ST_NOME[task.status], titulo, taskId, "status");
+  }
+  if (tipo === "note" && task.studentNote && Date.now() - (task.studentNoteAt || 0) < 5 * 60000)
+    return avisar(env, prof, aluno + " deixou uma mensagem", titulo + " · " + curto(task.studentNote, 140), taskId, "mensagem");
+}
+
+/* lembretes de prazo (rodam de hora em hora): véspera, dia do prazo e atraso, uma vez cada, a partir das 9h */
+function hojeEm(fuso, maisDias) {
+  const d = new Date(Date.now() + (maisDias || 0) * 86400000);
+  return d.toLocaleDateString("en-CA", { timeZone: fuso });
+}
+async function lembretesDePrazo(env) {
+  const hora = Number(new Date().toLocaleString("en-US", { timeZone: FUSO, hour: "numeric", hour12: false }));
+  if (hora < 9 || hora > 21) return { pulou: "fora do horário" };
+  const hoje = hojeEm(FUSO, 0), amanha = hojeEm(FUSO, 1);
+  const alunos = new Set((await todos(env, "students")).map((s) => s.id));
+  let enviados = 0;
+  for (const t of await todos(env, "tasks")) {
+    if (!t.due || !alunos.has(t.uid) || (t.status !== "todo" && t.status !== "doing")) continue;
+    const etapa = t.due === amanha ? "vespera" : t.due === hoje ? "dia" : t.due < hoje ? "atraso" : null;
+    const feitos = t.lembretes || [], marca = etapa + ":" + t.due; // se o prazo mudar, os lembretes valem de novo
+    if (!etapa || feitos.includes(marca) || (etapa === "atraso" && t.due < hojeEm(FUSO, -7))) continue;
+    const titulo = etapa === "vespera" ? "A tarefa vence amanhã" : etapa === "dia" ? "A tarefa vence hoje" : "Tarefa atrasada";
+    const texto = curto(t.title, 80) + (etapa === "atraso" ? " · venceu em " + dataBr(t.due) + ". Dá tempo de praticar!" : " · ainda não foi concluída.");
+    await patchDoc(env, "tasks/" + t.id, { lembretes: feitos.concat([marca]).slice(-6) });
+    await avisar(env, t.uid, titulo, texto, t.id, "prazo");
+    enviados++;
+  }
+  // avisos com mais de 30 dias saem do sininho
+  const limite = Date.now() - 30 * 86400000;
+  for (const n of (await todos(env, "notifs")).filter((n) => (n.at || 0) < limite).slice(0, 100)) await apagarDoc(env, "notifs/" + n.id);
+  return { enviados };
+}
+
+// só serviços de push de verdade (Google, Apple, Mozilla, Microsoft); o Worker não manda nada para outros endereços
+function endpointOk(u) {
+  try { const h = new URL(u); return h.protocol === "https:" && /(^|\.)(googleapis\.com|push\.apple\.com|push\.services\.mozilla\.com|notify\.windows\.com)$/.test(h.hostname); }
+  catch (e) { return false; }
+}
+
 export default {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(lembretesDePrazo(env).catch((e) => console.error("lembretes", e)));
+  },
+
   async fetch(req, env) {
     const url = new URL(req.url), path = url.pathname, base = url.origin;
     const origin = req.headers.get("Origin") || "";
@@ -218,6 +383,7 @@ export default {
     try {
       if (path === "/health") return json({ ok: true }, 200, cors);
       if (path === "/file" && req.method === "GET") return await serveFile(env, req, url);
+      if (path === "/push-key" && req.method === "GET") return json({ key: env.VAPID_PUBLIC || "" }, 200, cors);
       if (req.method !== "POST") return json({ error: "método não permitido" }, 405, cors);
 
       if (path === "/reset-professor") {
@@ -228,6 +394,12 @@ export default {
         if (!uid) return json({ error: "a conta de professora ainda não existe" }, 404, cors);
         await authAdmin(env, "update", { localId: uid, password: body.password });
         return json({ ok: true }, 200, cors);
+      }
+
+      if (path === "/admin/lembretes") {
+        // roda os lembretes de prazo na hora (os mesmos do cron), para testar
+        if (!env.ADMIN_TOKEN || !igual(req.headers.get("Authorization") || "", "Bearer " + env.ADMIN_TOKEN)) return json({ error: "não autorizado" }, 401, cors);
+        return json(await lembretesDePrazo(env), 200, cors);
       }
 
       // daqui para baixo: precisa estar logado no caderno
@@ -256,11 +428,34 @@ export default {
         const item = { key, name, type, size: salvo.size, at: Date.now(), by: caller };
         await patchDoc(env, "tasks/" + taskId, { attachments: atts.concat([item]) });
         await addUsage(env, salvo.size);
+        const profUid = await professorUid(env);
+        if (caller !== profUid) {
+          const quem = primeiroNome(((await readDoc(env, "students/" + caller)) || {}).name);
+          await avisar(env, profUid, quem + " enviou " + (kind === "video" ? "um vídeo" : "uma foto"), curto(task.title, 80), taskId, "anexo").catch((e) => console.error(e));
+        }
         return json({ ok: true, item }, 200, cors);
       }
 
       const body = await req.json().catch(() => ({}));
 
+      if (path === "/push-subscribe") {
+        const endpoint = String(body.endpoint || ""), keys = body.keys || {};
+        if (!endpointOk(endpoint) || !/^[\w-]{60,120}$/.test(keys.p256dh || "") || !/^[\w-]{16,40}$/.test(keys.auth || "")) return json({ error: "inscrição inválida" }, 400, cors);
+        await patchDoc(env, "pushsubs/" + await sha(endpoint), { uid: caller, endpoint, p256dh: keys.p256dh, auth: keys.auth, at: Date.now() });
+        return json({ ok: true }, 200, cors);
+      }
+      if (path === "/push-unsubscribe") {
+        const id = await sha(String(body.endpoint || ""));
+        const atual = await readDoc(env, "pushsubs/" + id);
+        if (atual && atual.uid === caller) await apagarDoc(env, "pushsubs/" + id);
+        return json({ ok: true }, 200, cors);
+      }
+      if (path === "/notify") {
+        const kind = String(body.kind || "");
+        if (!["status", "note", "feedback", "new"].includes(kind)) return json({ error: "aviso inválido" }, 400, cors);
+        await avisoDeTarefa(env, caller, String(body.task || ""), kind);
+        return json({ ok: true }, 200, cors);
+      }
       if (path === "/file-urls") {
         const { task } = await taskFor(env, caller, String(body.task || ""), false);
         const urls = {};

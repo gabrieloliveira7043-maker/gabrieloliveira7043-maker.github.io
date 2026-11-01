@@ -181,7 +181,7 @@ p { margin: 0; }
 .who { cursor: pointer; font-weight: 600; font-size: 15px; padding-right: 12px; color: var(--ink); }
 .who:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .whoname { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (max-width: 480px) { .whoname { max-width: 90px; } }
+@media (max-width: 480px) { .whoname { max-width: 90px; } #me { min-width: 0; } .who { min-width: 0; } .who .role { display: none; } }
 .auth { min-height: 60dvh; display: grid; place-items: center; padding: 24px 0; }
 .authcard { width: min(420px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 24px; display: grid; gap: 14px; box-shadow: var(--shadow-2); }
 /* luz que corre pela borda do cartão de entrada e vai atrás do mouse (o ângulo --luz é movido pelo JS) */
@@ -222,6 +222,22 @@ input[type="password"] { background: var(--surface); border: 1px solid var(--lin
 .learnchip { border: 0; color: inherit; cursor: pointer; margin-left: 6px; }
 .checks.learn { max-height: none; }
 .checks.learn label:has(input:checked) { font-weight: 600; }
+#me { display: flex; align-items: center; gap: 8px; }
+.bellbtn { position: relative; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-1); color: var(--ink-2); }
+.bellbtn .badge { position: absolute; top: -4px; right: -4px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: var(--warm); color: #fff; font: 700 11px/20px var(--f-body); text-align: center; box-shadow: 0 0 0 2px var(--bg); }
+.pushbox { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 14px; border-radius: var(--r-md); background: var(--surface-2); font-size: 14px; }
+.pushbox > .ic { color: var(--accent-text); }
+.pushbox span { flex: 1; min-width: 180px; }
+.pushbox.on { background: color-mix(in srgb, var(--accent) 16%, var(--surface-2)); }
+.notifs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.notif { width: 100%; display: flex; gap: 12px; align-items: flex-start; text-align: left; padding: 12px 14px; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; font: inherit; }
+.notif:hover { background: var(--surface-2); }
+.notif.novo { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
+.notif.novo .nt b::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-right: 7px; vertical-align: 1px; }
+.notif .nt { flex: 1; display: grid; gap: 2px; min-width: 0; }
+.notif .nt span { color: var(--ink-2); font-size: 14px; }
+.notif .nq { color: var(--ink-3); font-size: 12px; white-space: nowrap; }
+.hero .late-chip.soon { margin-left: 6px; }
 .previewbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 18px; padding: 12px 14px; border-radius: var(--r-md);
   background: var(--warm-soft); color: var(--ink); border: 1px solid color-mix(in srgb, var(--warm) 45%, transparent); }
 .previewbar > .ic { color: var(--warm); }
@@ -592,6 +608,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   /* Ícones (traço único, estilo Lucide) */
   var ICONS = {
     check: '<path d="M20 6 9 17l-5-5"/>',
+    bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     x: '<path d="M18 6 6 18M6 6l12 12"/>',
     chevron: '<path d="m6 9 6 6 6-6"/>',
@@ -642,7 +659,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     { k: "done", n: "Feita", i: "check" },
     { k: "reviewed", n: "Revisada", i: "badge" }
   ];
-  var D = { modules: [], students: [], tasks: [] };  // espelho do Firestore, atualizado em tempo real
+  var D = { modules: [], students: [], tasks: [], notifs: [] };  // espelho do Firestore, atualizado em tempo real
   /* screen: loading | nocfg | login | first | noaccess | app;  me: { uid, name, login, role: "prof" | "aluno" } */
   var S = { screen: "loading", me: null, profExists: null, busy: false, tab: "", view: "quadro", fStu: "", fMod: "", openMod: "", confirm: "", sheet: null };
 
@@ -755,13 +772,21 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
       startData(); render();
     } catch (e) { console.error(e); S.screen = "login"; render(); toast(errMsg(e)); }
   }
-  function stopData() { unsubs.forEach(function (u) { u(); }); unsubs = []; D = { modules: [], students: [], tasks: [] }; }
+  function stopData() { unsubs.forEach(function (u) { u(); }); unsubs = []; D = { modules: [], students: [], tasks: [], notifs: [] }; avisosVistos = null; }
   function listen(q, fn) {
     unsubs.push(FB.fs.onSnapshot(q, fn, function (e) { console.error(e); toast(errMsg(e)); }));
   }
   function docsOf(snap) { return snap.docs.map(function (d) { var o = d.data(); o.id = d.id; return o; }); }
   function startData() {
     var fs = FB.fs;
+    // avisos do sininho (o servidor cria; aqui só lê). Um aviso novo com o app aberto aparece também como balão.
+    listen(fs.query(cref("notifs"), fs.where("to", "==", S.me.uid)), function (snap) {
+      D.notifs = docsOf(snap).sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
+      if (avisosVistos) D.notifs.forEach(function (n) { if (!avisosVistos[n.id] && !n.read) toast(n.title); });
+      avisosVistos = {}; D.notifs.forEach(function (n) { avisosVistos[n.id] = true; });
+      render(); if (S.sheet && S.sheet.type === "notifs") paintSheet();
+    });
+    pushRenovar();
     listen(cref("modules"), function (snap) {
       D.modules = docsOf(snap);
       if (isT()) syncModules();
@@ -770,10 +795,10 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     });
     if (isT()) {
       listen(cref("students"), function (snap) { D.students = docsOf(snap); render(); refreshSheet(); });
-      listen(cref("tasks"), function (snap) { D.tasks = docsOf(snap); render(); refreshSheet(); });
+      listen(cref("tasks"), function (snap) { D.tasks = docsOf(snap); render(); refreshSheet(); abrirTarefaDoLink(); });
     } else {
       listen(dref("students/" + S.me.uid), function (d) { D.students = d.exists() ? [Object.assign({ id: d.id }, d.data())] : []; render(); });
-      listen(fs.query(cref("tasks"), fs.where("uid", "==", S.me.uid)), function (snap) { D.tasks = docsOf(snap); render(); refreshSheet(); });
+      listen(fs.query(cref("tasks"), fs.where("uid", "==", S.me.uid)), function (snap) { D.tasks = docsOf(snap); render(); refreshSheet(); abrirTarefaDoLink(); });
     }
   }
   /* professor: cria os módulos da apostila na primeira vez e acrescenta PDFs novos que vierem com o caderno
@@ -823,7 +848,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
       toast("Conta do professor criada");
     } catch (e) { console.error(e); S.busy = false; render(); toast(errMsg(e)); }
   }
-  async function doLogout() { closeSheet(); await FB.au.signOut(FB.auth); }
+  async function doLogout() { closeSheet(); await pushSair(); await FB.au.signOut(FB.auth); }
   async function changePw() {
     var cur = $("pw-cur").value, nw = $("pw-new").value, nw2 = $("pw-new2").value;
     if (nw.length < 6) { need("pw-new", "A nova senha precisa ter pelo menos 6 caracteres."); return; }
@@ -1058,13 +1083,118 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   var KIND_IC = { "Vídeo": "video", "PDF": "file", "Áudio": "music", "Imagem": "image", "Link": "link" };
   function pendingReview() { return D.tasks.filter(function (t) { return t.status === "done" && stuById(t.uid); }).length; }
 
+  /* ---------- avisos ---------- */
+  var avisosVistos = null;
+  // conta ao servidor o que mudou; ele monta o aviso e manda para o outro lado (aluno → professora, professora → aluno)
+  function avisarServidor(id, kind) { if (WORKER && !S.preview) callWorker("/notify", { task: id, kind: kind }).catch(function (e) { console.error(e); }); }
+  function naoLidos() { return D.notifs.filter(function (n) { return !n.read; }).length; }
+  // a notificação do celular abre o caderno com ?tarefa=ID: abre essa tarefa assim que ela chegar
+  var tarefaDoLink = (function () { try { return new URLSearchParams(location.search).get("tarefa"); } catch (e) { return null; } })();
+  function abrirTarefaDoLink() {
+    if (!tarefaDoLink || !findTask(tarefaDoLink)) return;
+    var id = tarefaDoLink; tarefaDoLink = null;
+    try { history.replaceState(null, "", location.pathname); } catch (e) {}
+    S.tab = "tarefas"; render(); openSheet({ type: "task", id: id });
+  }
+  if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", function (e) {
+    if (e.data && e.data.tarefa) { tarefaDoLink = e.data.tarefa; abrirTarefaDoLink(); }
+  });
+  function pushSuportado() { return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window; }
+  function ehIOS() { return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); }
+  function noAppInstalado() { return (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true; }
+  async function pushInscricao() {
+    if (!pushSuportado()) return null;
+    var reg = await navigator.serviceWorker.getRegistration();
+    return reg ? reg.pushManager.getSubscription() : null;
+  }
+  async function pushEstado() {
+    if (!WORKER) return "semservidor";
+    if (!pushSuportado()) return ehIOS() && !noAppInstalado() ? "ios" : "nao";
+    if (Notification.permission === "denied") return "negado";
+    var sub = await pushInscricao();
+    return sub && Notification.permission === "granted" ? "ligado" : "desligado";
+  }
+  function b64aBytes(b) { var s = atob(b.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((b.length + 3) % 4)); return Uint8Array.from(s, function (c) { return c.charCodeAt(0); }); }
+  async function pushLigar() {
+    if (!pushSuportado()) { toast(ehIOS() ? "No iPhone, adicione o caderno à Tela de Início e abra por lá." : "Este navegador não recebe notificações."); return; }
+    var perm = await Notification.requestPermission();   // pedido logo no toque: o iPhone exige
+    if (perm !== "granted") { toast("Sem permissão para notificar. Libere nas configurações do aparelho."); S.pushEstado = await pushEstado(); paintSheet(); return; }
+    await guard(async function () {
+      var reg = await navigator.serviceWorker.register("sw.js");
+      await navigator.serviceWorker.ready;
+      var chave = (await (await fetch(WORKER + "/push-key")).json()).key;
+      var sub = await reg.pushManager.getSubscription() || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64aBytes(chave) });
+      await callWorker("/push-subscribe", sub.toJSON());
+    }, "Notificações ligadas neste aparelho");
+    S.pushEstado = await pushEstado(); paintSheet();
+  }
+  async function pushDesligar() {
+    await guard(async function () {
+      var sub = await pushInscricao(); if (!sub) return;
+      await callWorker("/push-unsubscribe", { endpoint: sub.endpoint });
+      await sub.unsubscribe();
+    }, "Notificações desligadas neste aparelho");
+    S.pushEstado = await pushEstado(); paintSheet();
+  }
+  // ao entrar: se este aparelho já recebe notificações, confirma que agora elas são desta pessoa
+  async function pushRenovar() {
+    try {
+      if (!WORKER || !pushSuportado() || Notification.permission !== "granted") return;
+      await navigator.serviceWorker.register("sw.js");
+      var sub = await pushInscricao(); if (sub) await callWorker("/push-subscribe", sub.toJSON());
+    } catch (e) { console.error(e); }
+  }
+  // ao sair: o aparelho para de receber os avisos dessa conta
+  async function pushSair() {
+    try { var sub = await pushInscricao(); if (sub && WORKER) { await callWorker("/push-unsubscribe", { endpoint: sub.endpoint }); await sub.unsubscribe(); } } catch (e) { console.error(e); }
+  }
+  function quando(ms) {
+    var dif = Date.now() - ms, min = Math.round(dif / 60000);
+    if (min < 1) return "agora";
+    if (min < 60) return "há " + min + " min";
+    if (min < 24 * 60) return "há " + Math.round(min / 60) + " h";
+    return fmtWhen(ms);
+  }
+  function sheetNotifs() {
+    var lista = D.notifs.slice(0, 40), n = naoLidos(), st = S.pushEstado;
+    var h = sheetHead("Avisos", n ? '<span class="note">' + n + (n > 1 ? " avisos novos" : " aviso novo") + "</span>" : "");
+    var push = "";
+    if (st === "ligado") push = '<div class="pushbox on">' + ic("bell", "sm") + '<span><b>Notificações ligadas neste aparelho.</b> Os avisos chegam mesmo com o caderno fechado.</span><button class="btn sm" data-act="pushOff">Desligar</button></div>';
+    else if (st === "desligado") push = '<div class="pushbox">' + ic("bell", "sm") + "<span><b>Receba os avisos no celular,</b> mesmo com o caderno fechado.</span>" + '<button class="btn sm pri" data-act="pushOn">Ativar</button></div>';
+    else if (st === "ios") push = '<div class="pushbox">' + ic("bell", "sm") + "<span><b>Para receber no iPhone:</b> toque em Compartilhar e em “Adicionar à Tela de Início”. Depois abra o caderno pelo ícone e ative aqui.</span></div>";
+    else if (st === "negado") push = '<div class="pushbox">' + ic("bell", "sm") + "<span><b>As notificações estão bloqueadas</b> para o caderno neste aparelho. Libere nas configurações do navegador ou do celular.</span></div>";
+    else if (st === "nao") push = '<div class="pushbox">' + ic("bell", "sm") + "<span>Este navegador não recebe notificações. Os avisos continuam aparecendo aqui.</span></div>";
+    h += push;
+    if (!lista.length) return h + '<div class="empty">Nenhum aviso por enquanto.</div>';
+    h += '<ul class="notifs">' + lista.map(function (x) {
+      return '<li><button class="notif' + (x.read ? "" : " novo") + '" data-act="openNotif" data-id="' + esc(x.id) + '">' +
+        '<span class="nt"><b>' + esc(x.title) + "</b><span>" + esc(x.body) + "</span></span>" +
+        '<span class="nq">' + esc(quando(x.at || 0)) + "</span></button></li>";
+    }).join("") + "</ul>";
+    if (n) h += '<div class="btns"><button class="btn" data-act="readAll">' + ic("check", "sm") + "Marcar todos como lidos</button></div>";
+    return h;
+  }
+  async function abrirAviso(id) {
+    var x = null; D.notifs.forEach(function (n) { if (n.id === id) x = n; });
+    if (!x) return;
+    if (!x.read) { x.read = true; FB.fs.updateDoc(dref("notifs/" + id), { read: true }).catch(function (e) { console.error(e); }); }
+    if (x.task && findTask(x.task)) { S.tab = "tarefas"; render(); openSheet({ type: "task", id: x.task }); }
+    else { render(); paintSheet(); }
+  }
+  async function lerTodos() {
+    var b = FB.fs.writeBatch(FB.db), n = 0;
+    D.notifs.forEach(function (x) { if (!x.read) { x.read = true; b.update(dref("notifs/" + x.id), { read: true }); n++; } });
+    render(); paintSheet();
+    if (n) guard(function () { return b.commit(); });
+  }
+
   function setStatus(id, k) {
     if (S.preview) { toast(SO_LEITURA); return; }
     var t = findTask(id);
     if (!t || t.status === k || !canSet(t, k)) return;
     var doneAt = (k === "done" || k === "reviewed") ? (t.doneAt || Date.now()) : null;
     guard(function () { return FB.fs.updateDoc(dref("tasks/" + id), { status: k, doneAt: doneAt }); },
-      k === "done" && !isT() ? "Boa! Tarefa marcada como feita" : "");
+      k === "done" && !isT() ? "Boa! Tarefa marcada como feita" : "").then(function (ok) { if (ok) avisarServidor(id, "status"); });
   }
   function nextOf(t) {
     if (t.status === "todo") return { k: "doing", n: "Comecei a praticar", i: "play" };
@@ -1106,7 +1236,10 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     }
     document.body.classList.remove("noapp");
     var souProf = S.me.role === "prof";
-    $("me").innerHTML = '<button class="who" data-act="account" aria-label="Minha conta: ' + esc(S.me.name) + '"><span class="role' + (souProf ? "" : " stu") + '">' + (souProf ? "Professor" : "Aluno") + "</span>" +
+    var nl = naoLidos();
+    $("me").innerHTML = '<button class="iconbtn bellbtn" data-act="notifs" aria-label="Avisos' + (nl ? ": " + nl + " novos" : "") + '">' + ic("bell") +
+      (nl ? '<span class="badge">' + (nl > 9 ? "9+" : nl) + "</span>" : "") + "</button>" +
+      '<button class="who" data-act="account" aria-label="Minha conta: ' + esc(S.me.name) + '"><span class="role' + (souProf ? "" : " stu") + '">' + (souProf ? "Professor" : "Aluno") + "</span>" +
       '<span class="whoname">' + esc(S.me.name) + "</span>" + ic("user", "sm") + "</button>";
     var tabs = tabsFor();
     if (!tabs.some(function (t) { return t.k === S.tab; })) S.tab = tabs[0].k;
@@ -1167,6 +1300,13 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
       head += '<div class="hero"><div class="ring" style="--p:' + pct + '" role="img" aria-label="' + pct + '% concluído"><span>' + pct + '%</span></div><div>' +
         "<h3>" + fin + " de " + total + " tarefas feitas</h3><p>" + (total && fin === total ? "Tudo em dia. Continue praticando!" : "Um pouco por dia faz toda a diferença.") + "</p>" +
         (late ? '<span class="late-chip">' + ic("clock", "sm") + late + " atrasada" + (late > 1 ? "s" : "") + "</span>" : "") +
+        (function () {
+          var abertas = list.filter(function (t) { return t.status === "todo" || t.status === "doing"; });
+          var amanha = new Date(Date.now() + 86400000), am = amanha.getFullYear() + "-" + pad(amanha.getMonth() + 1) + "-" + pad(amanha.getDate());
+          var hoje = abertas.filter(function (t) { return t.due === todayStr(); }).length, dep = abertas.filter(function (t) { return t.due === am; }).length;
+          return (hoje ? '<span class="late-chip soon">' + ic("bell", "sm") + hoje + (hoje > 1 ? " vencem hoje" : " vence hoje") + "</span>" : "") +
+            (dep ? '<span class="late-chip soon">' + ic("calendar", "sm") + dep + (dep > 1 ? " vencem amanhã" : " vence amanhã") + "</span>" : "");
+        })() +
         (lc.total ? '<button class="late-chip learnchip" data-act="tab" data-k="materiais">' + ic("check", "sm") + lc.feito + " de " + lc.total + " tópicos da apostila concluídos</button>" : "") + "</div></div>";
     }
 
@@ -1436,6 +1576,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     else if (o.type === "account") h = sheetAccount();
     else if (o.type === "access") h = sheetAccess(o);
     else if (o.type === "progress") h = sheetProgress(o);
+    else if (o.type === "notifs") h = sheetNotifs();
     if (!h) { closeSheet(); return; }
     s.innerHTML = '<div class="panel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">' + h + "</div>";
     s.hidden = false;
@@ -1608,11 +1749,13 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     if (!us.length) { toast("Escolha pelo menos um aluno."); return; }
     var base = { title: title, note: val("nt-note"), moduleId: val("nt-mod") || null, due: val("nt-due") || null, status: "todo", feedback: "", createdAt: Date.now(), doneAt: null };
     var btn = document.querySelector('[data-act="createTask"]'); if (btn) btn.disabled = true;
+    var novas = [];
     var ok = await guard(function () {
       var b = FB.fs.writeBatch(FB.db);
-      us.forEach(function (u) { b.set(FB.fs.doc(cref("tasks")), Object.assign({ uid: u }, base)); });
+      us.forEach(function (u) { var r = FB.fs.doc(cref("tasks")); novas.push(r.id); b.set(r, Object.assign({ uid: u }, base)); });
       return b.commit();
     }, "Tarefa enviada para " + us.length + (us.length > 1 ? " alunos" : " aluno"));
+    if (ok) novas.forEach(function (id) { avisarServidor(id, "new"); });
     if (ok) closeSheet(); else if (btn) btn.disabled = false;
   }
   async function saveStudent() {
@@ -1669,6 +1812,11 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     if (a === "tab") { S.tab = el.dataset.k; pref("tab", S.tab); render(); window.scrollTo(0, 0); $("main").focus({ preventScroll: true }); }
     else if (a === "view") { S.view = el.dataset.k; pref("view", S.view); render(); }
     else if (a === "open") openSheet({ type: "task", id: id });
+    else if (a === "notifs") { S.pushEstado = ""; openSheet({ type: "notifs" }); pushEstado().then(function (st) { S.pushEstado = st; if (S.sheet && S.sheet.type === "notifs") paintSheet(); }); }
+    else if (a === "openNotif") abrirAviso(id);
+    else if (a === "readAll") lerTodos();
+    else if (a === "pushOn") pushLigar();
+    else if (a === "pushOff") pushDesligar();
     else if (a === "adv") { e.stopPropagation(); var t = findTask(id), n = t && nextOf(t); if (n) setStatus(id, n.k); }
     else if (a === "toggle") { e.stopPropagation(); var t2 = findTask(id); if (t2) setStatus(id, t2.status === "done" ? "todo" : "done"); }
     else if (a === "setSt") setStatus(S.sheet.id, el.dataset.k);
@@ -1704,9 +1852,10 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
     else if (a === "saveTopics") saveTopics();
     else if (a === "saveNote") {
       var snTxt = val("sn").slice(0, 2000), snId = S.sheet.id;
-      guard(function () { return FB.fs.updateDoc(dref("tasks/" + snId), { studentNote: snTxt, studentNoteAt: Date.now() }); }, snTxt ? "Mensagem enviada ao professor" : "Mensagem apagada");
+      guard(function () { return FB.fs.updateDoc(dref("tasks/" + snId), { studentNote: snTxt, studentNoteAt: Date.now() }); }, snTxt ? "Mensagem enviada ao professor" : "Mensagem apagada")
+        .then(function (ok) { if (ok && snTxt) avisarServidor(snId, "note"); });
     }
-    else if (a === "saveFb") { var fbTxt = val("fb"), fbId = S.sheet.id; guard(function () { return FB.fs.updateDoc(dref("tasks/" + fbId), { feedback: fbTxt }); }, "Retorno salvo"); }
+    else if (a === "saveFb") { var fbTxt = val("fb"), fbId = S.sheet.id; guard(function () { return FB.fs.updateDoc(dref("tasks/" + fbId), { feedback: fbTxt }); }, "Retorno salvo").then(function (ok) { if (ok && fbTxt) avisarServidor(fbId, "feedback"); }); }
     else if (a === "delTask") {
       var tid = S.sheet.id;
       if (S.confirm === "t:" + tid) {
