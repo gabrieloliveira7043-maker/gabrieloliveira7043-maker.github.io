@@ -9,6 +9,8 @@ service cloud.firestore {
     function signed() { return request.auth != null; }
     function profDoc() { return /databases/$(database)/documents/config/professor; }
     function isProf() { return signed() && exists(profDoc()) && get(profDoc()).data.uid == request.auth.uid; }
+    // aluno de verdade: tem cadastro feito pela professora (um login qualquer não basta)
+    function isStudent() { return signed() && exists(/databases/$(database)/documents/students/$(request.auth.uid)); }
 
     match /config/professor {
       allow read: if true;
@@ -17,7 +19,7 @@ service cloud.firestore {
     }
 
     match /modules/{id} {
-      allow read: if signed();
+      allow read: if isProf() || isStudent();
       allow write: if isProf();
     }
 

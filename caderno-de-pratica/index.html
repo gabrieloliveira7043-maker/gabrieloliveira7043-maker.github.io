@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- de onde a página pode carregar coisas. Se o endereço do Worker mudar, troque aqui também. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://caderno-admin.rachelsilvaxpto.workers.dev; media-src 'self' blob: https://caderno-admin.rachelsilvaxpto.workers.dev; connect-src 'self' https://*.googleapis.com https://www.gstatic.com https://caderno-admin.rachelsilvaxpto.workers.dev; frame-src https://caderno-de-pratica.firebaseapp.com; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="theme-color" content="#F4F6EC" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0D120B" media="(prefers-color-scheme: dark)">
 <title>Caderno de Prática</title>
@@ -17,6 +20,8 @@
 <script>
   /* aplica o tema escolhido antes de desenhar a página, para não piscar */
   try { var t = localStorage.getItem("cp_theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
+  /* não deixa outro site abrir o caderno escondido dentro dele (golpe de clique disfarçado) */
+  if (window.top !== window.self) { try { window.top.location = window.self.location.href; } catch (e) { document.documentElement.style.display = "none"; } }
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -990,6 +995,8 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
 
   /* o professor cria a conta do aluno numa instância separada do Firebase, para não sair da própria conta */
   async function createStudentAccount(login, pw) {
+    // com o Worker, o login é criado pelo servidor (o cadastro público do Firebase fica desligado)
+    if (WORKER) return (await callWorker("/create-user", { login: login, password: pw })).uid;
     var sec = FB.a.initializeApp(window.CADERNO_FIREBASE, "cadastro-" + Date.now());
     try {
       var auth2 = FB.au.getAuth(sec);

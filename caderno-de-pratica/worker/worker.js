@@ -1,5 +1,6 @@
 /* Worker "caderno-admin": faz pelo servidor o que o navegador não pode no Firebase do Caderno de Prática.
    Senhas
+   - POST /create-user        { login, password } cria o login de um aluno            (professora logada)
    - POST /set-password       { uid, password }  troca a senha de um aluno            (professora logada)
    - POST /delete-user        { uid }            apaga o login e os anexos de um aluno (professora logada)
    - POST /reset-professor    { password }       troca a senha da professora          (só com o ADMIN_TOKEN)
@@ -16,6 +17,20 @@
 const enc = new TextEncoder();
 const MB = 1024 * 1024;
 const LIMITE = { video: 90 * MB, image: 15 * MB, porTarefa: 3, total: 9 * 1024 * MB };
+// só estes formatos entram (SVG e HTML ficam de fora: poderiam levar código junto)
+const TIPOS = {
+  "image/jpeg": "image", "image/png": "image", "image/webp": "image", "image/heic": "image", "image/heif": "image", "image/gif": "image",
+  "video/mp4": "video", "video/quicktime": "video", "video/webm": "video", "video/3gpp": "video", "video/x-m4v": "video",
+};
+const UID_OK = /^[A-Za-z0-9]{1,128}$/;
+
+// compara sem vazar pelo tempo de resposta quantos caracteres batem
+function igual(a, b) {
+  a = String(a); b = String(b);
+  let d = a.length ^ b.length;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) d |= (a.charCodeAt(i) | 0) ^ (b.charCodeAt(i) | 0);
+  return d === 0;
+}
 
 function b64url(bytes) {
   let s = "";
@@ -124,6 +139,16 @@ async function authAdmin(env, action, body) {
   if (!res.ok) throw new Error((data.error && data.error.message) || "auth " + res.status);
   return data;
 }
+// cria o login com a conta de serviço: funciona mesmo com o cadastro público do Firebase desligado
+async function criarLogin(env, email, password) {
+  const res = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signUp", {
+    method: "POST", headers: { Authorization: "Bearer " + await googleToken(env), "Content-Type": "application/json" },
+    body: JSON.stringify({ targetProjectId: env.PROJECT_ID, email, password }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.localId) throw new Error((data.error && data.error.message) || "auth " + res.status);
+  return data;
+}
 async function professorUid(env) { const f = await readDoc(env, "config/professor"); return f ? f.uid : null; }
 
 /* espaço usado no R2, guardado em config/storage para não precisar listar o bucket a cada envio */
@@ -143,12 +168,17 @@ async function signedUrl(env, base, key) {
 }
 async function serveFile(env, req, url) {
   const key = url.searchParams.get("k") || "", exp = Number(url.searchParams.get("e") || 0), sig = url.searchParams.get("s") || "";
-  if (!key || exp < Date.now() / 1000 || sig !== await hmac(env, key + ":" + exp)) return new Response("link inválido ou vencido", { status: 403 });
+  if (!key || exp < Date.now() / 1000 || !igual(sig, await hmac(env, key + ":" + exp))) return new Response("link inválido ou vencido", { status: 403 });
   const obj = await env.ANEXOS.get(key, { range: req.headers });
   if (!obj) return new Response("não encontrado", { status: 404 });
   const h = new Headers();
   obj.writeHttpMetadata(h);
   h.set("ETag", obj.httpEtag); h.set("Accept-Ranges", "bytes"); h.set("Cache-Control", "private, max-age=3600");
+  // o arquivo é só mídia: o navegador não adivinha outro tipo nem roda código vindo dele
+  if (!TIPOS[(h.get("Content-Type") || "").toLowerCase()]) h.set("Content-Type", "application/octet-stream");
+  h.set("X-Content-Type-Options", "nosniff");
+  h.set("Content-Security-Policy", "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; sandbox");
+  h.set("Referrer-Policy", "no-referrer");
   let status = 200;
   if (obj.range && req.headers.get("Range")) {
     const off = obj.range.offset !== undefined ? obj.range.offset : obj.size - obj.range.suffix;
@@ -192,7 +222,7 @@ export default {
 
       if (path === "/reset-professor") {
         const body = await req.json().catch(() => ({}));
-        if (!env.ADMIN_TOKEN || req.headers.get("Authorization") !== "Bearer " + env.ADMIN_TOKEN) return json({ error: "não autorizado" }, 401, cors);
+        if (!env.ADMIN_TOKEN || !igual(req.headers.get("Authorization") || "", "Bearer " + env.ADMIN_TOKEN)) return json({ error: "não autorizado" }, 401, cors);
         if (String(body.password || "").length < 6) return json({ error: "senha com menos de 6 caracteres" }, 400, cors);
         const uid = await professorUid(env);
         if (!uid) return json({ error: "a conta de professora ainda não existe" }, 404, cors);
@@ -209,8 +239,8 @@ export default {
         const { task } = await taskFor(env, caller, taskId, true);
         const type = (req.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
         const size = Number(req.headers.get("Content-Length") || 0);
-        const kind = type.startsWith("video/") ? "video" : type.startsWith("image/") ? "image" : null;
-        if (!kind) return json({ error: "envie só vídeo ou foto" }, 400, cors);
+        const kind = TIPOS[type] || null;
+        if (!kind) return json({ error: "envie só vídeo (MP4, MOV) ou foto (JPG, PNG, HEIC)" }, 400, cors);
         if (!size) return json({ error: "arquivo vazio" }, 400, cors);
         if (size > LIMITE[kind]) return json({ error: kind === "video" ? "vídeo maior que 90 MB" : "foto maior que 15 MB" }, 413, cors);
         const atts = task.attachments || [];
@@ -220,10 +250,12 @@ export default {
         const name = decodeURIComponent(req.headers.get("X-File-Name") || "anexo").slice(0, 120);
         const ext = (name.match(/\.([a-z0-9]{1,5})$/i) || [, kind === "video" ? "mp4" : "jpg"])[1].toLowerCase();
         const key = `anexos/${task.uid}/${taskId}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
-        await env.ANEXOS.put(key, req.body, { httpMetadata: { contentType: type } });
-        const item = { key, name, type, size, at: Date.now(), by: caller };
+        const salvo = await env.ANEXOS.put(key, req.body, { httpMetadata: { contentType: type } });
+        // confere o tamanho que realmente chegou, não só o que o navegador declarou
+        if (!salvo || salvo.size > LIMITE[kind]) { await env.ANEXOS.delete(key); return json({ error: "arquivo maior que o permitido" }, 413, cors); }
+        const item = { key, name, type, size: salvo.size, at: Date.now(), by: caller };
         await patchDoc(env, "tasks/" + taskId, { attachments: atts.concat([item]) });
-        await addUsage(env, size);
+        await addUsage(env, salvo.size);
         return json({ ok: true, item }, 200, cors);
       }
 
@@ -258,8 +290,22 @@ export default {
         return json({ ok: true }, 200, cors);
       }
 
+      if (path === "/create-user") {
+        // o cadastro aberto do Firebase fica desligado; só a professora cria logins, por aqui
+        const login = String(body.login || "").toLowerCase();
+        if (!/^[a-z0-9._-]{3,30}$/.test(login)) return json({ error: "usuário inválido" }, 400, cors);
+        if (String(body.password || "").length < 6) return json({ error: "senha com menos de 6 caracteres" }, 400, cors);
+        try {
+          const novo = await criarLogin(env, login + "@aluno.caderno", String(body.password));
+          return json({ ok: true, uid: novo.localId }, 200, cors);
+        } catch (e) {
+          if (/EMAIL_EXISTS/.test(e.message)) return json({ error: "Esse usuário já existe.", code: "email-already-in-use" }, 409, cors);
+          throw e;
+        }
+      }
+
       const uid = String(body.uid || "");
-      if (!uid || uid === caller) return json({ error: "aluno inválido" }, 400, cors);
+      if (!UID_OK.test(uid) || uid === caller) return json({ error: "aluno inválido" }, 400, cors);
       if (!(await readDoc(env, "students/" + uid))) return json({ error: "aluno não encontrado" }, 404, cors);
 
       if (path === "/set-password") {
@@ -280,7 +326,10 @@ export default {
       }
       return json({ error: "rota não encontrada" }, 404, cors);
     } catch (e) {
-      return json({ error: String(e.message || e) }, e.status || 500, cors);
+      // erros esperados (Erro) explicam o motivo; os internos não expõem detalhes do servidor
+      if (e instanceof Erro) return json({ error: e.message }, e.status, cors);
+      console.error(e);
+      return json({ error: "Falha no servidor. Tente de novo." }, 500, cors);
     }
   },
 };
