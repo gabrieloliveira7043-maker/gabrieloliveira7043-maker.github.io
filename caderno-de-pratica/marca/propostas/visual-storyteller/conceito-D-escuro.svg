@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Conceito D: Voz Amparada. Tema escuro. -->
+  <rect width="512" height="512" rx="116" fill="#1F2619"/>
+  <path d="M138 200 L138 240 A118 118 0 0 0 374 240 L374 200" fill="none" stroke="#99AB59" stroke-width="28" stroke-linecap="round"/>
+  <rect x="242" y="368" width="28" height="44" fill="#99AB59"/>
+  <rect x="176" y="408" width="160" height="32" rx="16" fill="#99AB59"/>
+  <path d="M168 124 A52 52 0 0 1 220 72 L292 72 A52 52 0 0 1 344 124 L344 240 A88 88 0 0 1 168 240 Z" fill="#FBF7EA"/>
+  <rect x="160" y="136" width="192" height="16" fill="#1F2619"/>
+  <rect x="160" y="216" width="192" height="16" fill="#1F2619"/>
+  <!-- no escuro as teclas pretas viram recortes no creme -->
+  <path d="M168 124 L260 124 A8 8 0 0 1 268 132 L268 156 A8 8 0 0 1 260 164 L168 164 Z" fill="#1F2619"/>
+  <path d="M168 204 L260 204 A8 8 0 0 1 268 212 L268 236 A8 8 0 0 1 260 244 L168 244 Z" fill="#1F2619"/>
+</svg>

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>Caderno de Prática · Conceito A · Colcheia-Tecla</title>
+  <rect width="512" height="512" rx="116" fill="#99AB59"/>
+  <!-- cabeça da nota (inclinada, como na partitura) -->
+  <ellipse cx="196" cy="360" rx="76" ry="58" transform="rotate(-20 196 360)" fill="#FBF7EA"/>
+  <!-- haste = tecla branca -->
+  <rect x="210" y="88" width="56" height="257" fill="#FBF7EA"/>
+  <!-- bandeirola = a frase cantada -->
+  <path d="M248 106 C324 116 380 168 356 254" fill="none" stroke="#FBF7EA" stroke-width="36" stroke-linecap="round"/>
+  <!-- tecla preta sobre a haste: transforma a haste em tecla de piano -->
+  <path d="M180 88 H230 V194 A12 12 0 0 1 218 206 H192 A12 12 0 0 1 180 194 Z" fill="#1F2619"/>
+</svg>
