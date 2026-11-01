@@ -184,6 +184,16 @@ p { margin: 0; }
 @media (max-width: 480px) { .whoname { max-width: 90px; } }
 .auth { min-height: 60dvh; display: grid; place-items: center; padding: 24px 0; }
 .authcard { width: min(420px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 24px; display: grid; gap: 14px; box-shadow: var(--shadow-2); }
+/* luz que corre pela borda do cartão de entrada e vai atrás do mouse (o ângulo --luz é movido pelo JS) */
+@property --luz { syntax: "<angle>"; inherits: true; initial-value: 0deg; }
+.authcard { position: relative; isolation: isolate; --luz: 0deg; --luz-brilho: var(--accent-text);
+  --luz-cor: conic-gradient(from var(--luz), transparent 0deg, transparent 285deg, color-mix(in srgb, var(--accent) 65%, transparent) 316deg, var(--luz-brilho) 340deg, var(--accent) 352deg, transparent 360deg); }
+.authcard::before, .authcard::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; background: var(--luz-cor);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .authcard { --luz-brilho: color-mix(in srgb, var(--accent) 35%, #fff); } }
+:root[data-theme="dark"] .authcard { --luz-brilho: color-mix(in srgb, var(--accent) 35%, #fff); }
+.authcard::before { padding: 2px; }
+.authcard::after { padding: 5px; inset: -4px; filter: blur(10px); opacity: .9; z-index: -1; }
 .authcard .eic { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-text); }
 .authcard h2 { font-size: 26px; font-weight: 800; }
 .authcard input { width: 100%; }
@@ -1091,6 +1101,7 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
       var keep = { u: val("lg-user") };
       $("main").innerHTML = pageAuth();
       if (keep.u && $("lg-user")) $("lg-user").value = keep.u;
+      luzLogin();
       return;
     }
     document.body.classList.remove("noapp");
@@ -1345,6 +1356,33 @@ textarea { width: 100%; resize: vertical; min-height: 96px; line-height: 1.5; }
   }
 
   /* telas de acesso (antes do login) */
+  /* a luz da borda do login: dá a volta sozinha e, quando o mouse (ou o dedo) se mexe, desliza até apontar para ele */
+  var luz = { on: false, ang: 0, alvo: null, ultimo: 0, t: 0 };
+  function luzLogin() {
+    if (luz.on) return;
+    luz.on = true; luz.t = performance.now();
+    var calmo = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function quadro(agora) {
+      var card = document.querySelector(".authcard");
+      if (!card) { luz.on = false; return; }
+      var dt = Math.min(64, agora - luz.t); luz.t = agora;
+      if (luz.alvo !== null && agora - luz.ultimo < 1600) {
+        var d = ((luz.alvo - luz.ang) % 360 + 540) % 360 - 180;   // caminho mais curto até o mouse
+        luz.ang += d * Math.min(1, dt / 140);
+      } else if (!calmo) luz.ang += dt * 0.06;                     // uma volta a cada 6 segundos
+      luz.ang = (luz.ang + 360) % 360;
+      card.style.setProperty("--luz", (luz.ang - 340).toFixed(1) + "deg");  // o brilho fica no fim do degradê (340°)
+      requestAnimationFrame(quadro);
+    }
+    requestAnimationFrame(quadro);
+  }
+  document.addEventListener("pointermove", function (e) {
+    if (!luz.on) return;
+    var card = document.querySelector(".authcard"); if (!card) return;
+    var r = card.getBoundingClientRect();
+    luz.alvo = Math.atan2(e.clientX - (r.left + r.width / 2), (r.top + r.height / 2) - e.clientY) * 180 / Math.PI;
+    luz.ultimo = performance.now();
+  }, { passive: true });
   function pageAuth() {
     var h = '<div class="auth">';
     if (S.screen === "loading") return h + '<div class="authcard"><p class="note">Carregando…</p></div></div>';
