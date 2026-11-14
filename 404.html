@@ -20060,14 +20060,39 @@ async function renderCampCloudBox(preset) {
   box.innerHTML = `<div class="wa-line-picker" style="margin-top:8px;">
     <div class="wa-line-picker-title">Modelo da API oficial</div>
     <div class="wa-line-picker-hint" style="margin-bottom:6px;">Pela API oficial, a campanha envia um modelo aprovado pela Meta (as mensagens abaixo valem só para os números conectados por QR Code). A Meta cobra cada envio de modelo na conta do cliente.</div>
+    ${list.length > 1 ? `<input class="field-input" id="camp-cloud-search" placeholder="Pesquisar modelo pelo nome ou pelo texto..." oninput="filterCampCloudTpl(this.value)" style="margin-bottom:6px;">
+    <div id="camp-cloud-count" class="integ-muted" style="font-size:11px;margin:-2px 0 6px;"></div>` : ''}
     <select class="field-input" id="camp-cloud-tpl" onchange="renderCampCloudParams()">
       <option value="">Escolha o modelo</option>
-      ${list.map(t => `<option value="${escapeHtml(t.name + '|' + t.language)}" ${sel === t ? 'selected' : ''}>${escapeHtml(t.name)} (${escapeHtml(t.language)}) · ${t.category === 'MARKETING' ? 'Marketing' : 'Utilidade'}</option>`).join('')}
+      ${list.map(t => `<option value="${escapeHtml(t.name + '|' + t.language)}" data-search="${escapeHtml(campCloudTplSearchText(t))}" ${sel === t ? 'selected' : ''}>${escapeHtml(t.name)} (${escapeHtml(t.language)}) · ${t.category === 'MARKETING' ? 'Marketing' : 'Utilidade'}</option>`).join('')}
     </select>
     ${list.length ? '' : `<div class="integ-muted" style="font-size:12px;margin-top:6px;">Nenhum modelo aprovado ainda. Crie em Conexões → ${escapeHtml(waLineLabel(d.act, line))} → Modelos.</div>`}
     <div id="camp-cloud-params"></div>
   </div>`;
   renderCampCloudParams(sel && keep ? keep.params : null);
+}
+
+// Texto usado na pesquisa de modelos: nome, idioma e o texto do modelo (cabeçalho, corpo, rodapé e botões).
+function campCloudTplSearchText(t) {
+  const parts = [t.name, String(t.name || '').replace(/_/g, ' '), t.language];
+  (t.components || []).forEach(c => { if (c.text) parts.push(c.text); (c.buttons || []).forEach(b => parts.push(b.text || '')); });
+  return parts.join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function filterCampCloudTpl(q) {
+  const sel = document.getElementById('camp-cloud-tpl');
+  if (!sel) return;
+  const words = String(q || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/\s+/).filter(Boolean);
+  let shown = 0, total = 0;
+  [...sel.options].forEach(o => {
+    if (!o.value) return;
+    total++;
+    const ok = !words.length || words.every(w => (o.getAttribute('data-search') || '').includes(w)) || o.selected;
+    o.hidden = !ok; o.disabled = !ok && !o.selected;
+    if (ok) shown++;
+  });
+  const count = document.getElementById('camp-cloud-count');
+  if (count) count.textContent = words.length ? (shown ? `${shown} de ${total} modelos encontrados. Abra a lista abaixo para escolher.` : 'Nenhum modelo encontrado com esse texto.') : '';
 }
 
 function renderCampCloudParams(values) {
