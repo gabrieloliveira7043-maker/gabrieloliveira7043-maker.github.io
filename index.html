@@ -21024,7 +21024,7 @@ async function startDapiPair(act, line) {
   try {
     const r = await window._fb.whatsapp('/whatsapp/dapi-pair', act, { line, phone });
     fb.textContent = '';
-    dapiPairShow(r.code);
+    if (r.code) dapiPairShow(r.code); else document.getElementById('dapi-pair-code').innerHTML = '<div class="integ-muted" style="font-size:13px;">Gerando o código... pode levar até 1 minuto. Não feche esta janela.</div>';
     // A D-API troca o código de tempos em tempos: a janela mostra sempre o atual e avisa quando conectar.
     clearInterval(window._dapiPairTimer);
     window._dapiPairTimer = setInterval(async () => {
