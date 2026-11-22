@@ -21180,8 +21180,10 @@ async function renderWhatsAppView() {
   const clientPanel = document.getElementById('whatsapp-client-panel');
   const adminPanel = document.getElementById('whatsapp-admin-panel');
   const subtitle = document.getElementById('whatsapp-view-subtitle');
-  if (!profile || !clientPanel || !adminPanel) return;
-  try { Object.assign(WHATSAPP_SETTINGS, await window._fb.getWhatsAppSettings()); } catch(e) { console.warn('Configuração de WhatsApp indisponível:', e); }
+  if (!profile || !clientPanel || !adminPanel) { if ((renderWhatsAppView._tries = (renderWhatsAppView._tries || 0) + 1) < 20) setTimeout(() => { const v = document.getElementById('whatsapp-view'); if (v && v.style.display !== 'none') renderWhatsAppView(); }, 700); return; }
+  renderWhatsAppView._tries = 0;
+  // Não deixa a tela vazia se a configuração demorar (aconteceu no Safari do iPad).
+  try { Object.assign(WHATSAPP_SETTINGS, await Promise.race([window._fb.getWhatsAppSettings(), new Promise((_, rej) => setTimeout(() => rej(new Error('demorou')), 6000))])); } catch(e) { console.warn('Configuração de WhatsApp indisponível:', e); }
 
   const sub = document.getElementById('whatsapp-view-subtitle');
   const old = document.getElementById('wa-alert-unmute');
