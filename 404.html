@@ -4,6 +4,10 @@
 <script>
 // Enquanto o CRM ainda não sabe quem está logado, a tela fica escondida (sem piscar o menu completo e "Todos os clientes").
 document.documentElement.classList.add('crm-booting');
+// Manda para o servidor os erros de tela (ajuda a achar problemas que só acontecem num aparelho).
+(function(){ var n = 0; function rep(m){ try { if (n++ > 15) return; navigator.sendBeacon('https://huven-crm-admin.gabrieloliveira7043.workers.dev/client-error', String(m).slice(0, 1200) + ' | ' + navigator.userAgent + ' | ' + location.pathname); } catch(e){} }
+  window.addEventListener('error', function(e){ rep('ERR ' + e.message + ' @' + (e.filename || '').split('/').pop() + ':' + e.lineno + ':' + e.colno); });
+  window.addEventListener('unhandledrejection', function(e){ var r = e.reason; rep('REJ ' + (r && (r.stack || r.message) || r)); }); })();
 setTimeout(function () { document.documentElement.classList.remove('crm-booting'); }, 8000);
 </script>
 <style>
