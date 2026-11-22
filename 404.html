@@ -23024,7 +23024,9 @@ async function loadWhatsAppQr(act, line) {
     if (!qr.startsWith('data:image/')) { setWhatsAppQrBody('<div style="color:var(--muted);">Gerando QR Code...</div>' + swap); return; }
     setWhatsAppQrBody(`<img src="${escapeHtml(qr)}" alt="QR Code do WhatsApp" style="width:260px;height:260px;background:#fff;border-radius:10px;padding:8px;">` + swap);
   } catch (e) {
-    if (waIsDapi(line) && /chave da d-api/i.test(e.message || '')) {
+    let semChave = /chave da d-api/i.test(e.message || '');
+    if (waIsDapi(line) && !semChave) { try { const st = await window._fb.whatsapp('/whatsapp/dapi-status', act, {}); semChave = !st.hasKey; } catch (_) {} }
+    if (waIsDapi(line) && semChave) {
       setWhatsAppQrBody(isAdminUser() ? dapiKeyFormHtml(act, line) + swap : '<div style="color:var(--muted);">Este tipo de conexão ainda está sendo configurado pela Huven. Tente de novo mais tarde.</div>');
       return;
     }
