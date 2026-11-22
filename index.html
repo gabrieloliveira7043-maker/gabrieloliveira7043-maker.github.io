@@ -20701,6 +20701,7 @@ async function renderWaLinesBox(act, el, quiet) {
       ${ok ? `<button style="${wbtn}" onclick="openCloudTemplates('${a}','${id}')">Modelos</button>` : ''}
       ${ok && st.billingUrl ? `<button class="chat-pill" title="Abre a cobrança desta conta do WhatsApp na Meta (cartão e saldo)" onclick="openCloudBilling('${escapeJsString(st.billingUrl)}')">Pagamento</button>` : ''}
       ${isAdminUser() ? `<button class="chat-pill" onclick="openCloudSetup('${a}','${id}')">Credenciais</button>` : ''}
+      ${dapiCanUse(act) ? `<button class="chat-pill" title="Conecta este mesmo número de novo pela janela da Meta (D-API). A linha atual segue funcionando até terminar." onclick="openDapiOfficial('${a}','${id}')">Refazer pela D-API</button>` : ''}
       <button class="chat-pill" onclick="renameWaLine('${a}','${id}')">Renomear</button>
       <button class="chat-pill" title="Nome usado na variável {atendente} das mensagens enviadas por este número" onclick="setWaAttendant('${a}','${id}')">${l.attendant ? 'Atendente: ' + escapeHtml(l.attendant) : 'Definir atendente'}</button>
       ${waLines(act).length > 1 ? `<button class="chat-pill" style="color:var(--red);border-color:rgba(248,113,113,.4);" onclick="removeWaLine('${a}','${id}')">Excluir</button>` : ''}
@@ -20793,17 +20794,18 @@ async function switchWaLineServer(act, line) {
 window.saveDapiKey = saveDapiKey; window.switchWaLineServer = switchWaLineServer;
 
 // API oficial pela D-API: a janela da D-API faz o cadastro na Meta (Embedded Signup) e o CRM guarda a linha.
-function openDapiOfficial(act) {
+function openDapiOfficial(act, line) {
   if (!isAdminUser()) return;
-  const a = escapeJsString(act);
-  openHuvenModal('Conectar API oficial do WhatsApp', `
+  const a = escapeJsString(act), l = escapeJsString(line || '');
+  openHuvenModal(line ? 'Refazer API oficial pela D-API' : 'Conectar API oficial do WhatsApp', `
+    ${line ? '<div style="font-size:12.5px;color:var(--text);line-height:1.55;margin-bottom:10px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;">Escolha na Meta <b>o mesmo número</b> desta linha. Ela continua funcionando até terminar; depois passa a usar a D-API com o mesmo nome, conversas, modelos e campanhas.</div>' : ''}
     <div class="integ-muted" style="font-size:12.5px;line-height:1.55;margin-bottom:12px;">Abre uma janela da Meta (pela D-API). Entre com o Facebook da empresa, escolha ou crie a conta do WhatsApp Business e o número. No fim, o número aparece aqui como API oficial.</div>
     <label class="field-label">Nome desta linha no CRM</label>
-    <input class="field-input" id="dao-label" placeholder="Ex.: Comercial (oficial)" value="API oficial" style="margin-bottom:10px;">
+    <input class="field-input" id="dao-label" placeholder="Ex.: Comercial (oficial)" value="${escapeHtml(line ? waLineLabel(act, line) : 'API oficial')}" style="margin-bottom:10px;">
     <label style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--text);margin-bottom:12px;line-height:1.45;"><input type="checkbox" id="dao-coex" style="margin-top:2px;"> Manter o app WhatsApp Business no mesmo número (coexistência). A Meta pede para ler um QR no app.</label>
-    <div style="display:flex;gap:8px;align-items:center;"><button class="btn-save" id="dao-btn" style="width:auto;padding:9px 16px;" onclick="startDapiOfficial('${a}')">Abrir janela da Meta</button><span id="dao-fb" class="integ-muted" style="font-size:12.5px;"></span></div>`, 520);
+    <div style="display:flex;gap:8px;align-items:center;"><button class="btn-save" id="dao-btn" style="width:auto;padding:9px 16px;" onclick="startDapiOfficial('${a}','${l}')">Abrir janela da Meta</button><span id="dao-fb" class="integ-muted" style="font-size:12.5px;"></span></div>`, 520);
 }
-function startDapiOfficial(act) {
+function startDapiOfficial(act, line) {
   const fb = document.getElementById('dao-fb'), btn = document.getElementById('dao-btn');
   const label = (document.getElementById('dao-label').value || '').trim().slice(0, 30) || 'API oficial';
   const mode = document.getElementById('dao-coex').checked ? 'coexistence' : 'standard';
@@ -20831,11 +20833,11 @@ function startDapiOfficial(act) {
       finish(true);
       fb.style.color = 'var(--muted)'; fb.textContent = 'Número conectado na Meta. Salvando no CRM...';
       try {
-        const r = await window._fb.whatsapp('/whatsapp/dapi-official-save', act, { connectionId: m.data.connectionId, label });
+        const r = await window._fb.whatsapp('/whatsapp/dapi-official-save', act, { connectionId: m.data.connectionId, label, line: line || undefined });
         try { Object.assign(WHATSAPP_SETTINGS, await window._fb.getWhatsAppSettings()); } catch (x) {}
         closeHuvenModal(); refreshWaLinesFor(act);
         showToast(`API oficial conectada: ${r.displayPhone || m.data.phoneNumber || ''}${r.verifiedName ? ' (' + r.verifiedName + ')' : ''}.`, 'success', 10000);
-        if (r.line) openCloudTemplates(act, r.line);
+        if (r.line && !line) openCloudTemplates(act, r.line);
       } catch (err) { btn.disabled = false; fb.style.color = 'var(--red)'; fb.textContent = err.message; }
     }
   }
