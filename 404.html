@@ -10429,7 +10429,10 @@ function renderCampaignSummary() {
   const source = _campaignDraft.source;
   const warnings = [];
   if (cloudMode) {
-    risk.innerHTML = '⚠️ ' + escapeHtml('A Meta limita quantas pessoas diferentes cada número oficial pode chamar por dia (começa em 250 e sobe conforme a qualidade das conversas). Passando disso, os envios do dia falham e aparecem como erro na campanha.');
+    const qAct = _campaignDraft.act;
+    if (qAct && !window._waQuality['loaded|' + qAct]) { window._waQuality['loaded|' + qAct] = 1; window._fb.whatsapp('/whatsapp/lines-status', qAct).then(r => { (r.lines || []).forEach(x => { if (x.provider === 'cloud') window._waQuality[qAct + '|' + x.line] = x.quality || ''; }); renderCampaignSummary(); }).catch(() => {}); }
+    const redNames = campChosenLines().filter(l => window._waQuality[_campaignDraft.act + '|' + l] === 'RED').map(l => (waLines(_campaignDraft.act).find(x => x.id === l) || {}).label || l);
+    risk.innerHTML = (redNames.length ? '🔴 ' + escapeHtml(`${redNames.join(', ')}: ${CLOUD_RED_NOTE}`) + '<br><br>' : '') + '⚠️ ' + escapeHtml('A Meta limita quantas pessoas diferentes cada número oficial pode chamar por dia (começa em 250 e sobe conforme a qualidade das conversas). Passando disso, os envios do dia falham e aparecem como erro na campanha.');
     risk.style.display = 'block';
     return;
   }
@@ -19908,6 +19911,8 @@ const waIsCloud = id => /^api/.test(String(id || ''));
 const isAdminUser = () => ['admin', 'partner'].includes(((window._fb && window._fb.getProfile && window._fb.getProfile()) || {}).role);
 const CLOUD_STATUS = { APPROVED: ['Aprovado', 'var(--green, #34d399)'], PENDING: ['Em análise', '#fbbf24'], REJECTED: ['Recusado', '#f87171'], PAUSED: ['Pausado', '#fbbf24'], DISABLED: ['Desativado', '#f87171'], IN_APPEAL: ['Em recurso', '#fbbf24'] };
 const CLOUD_QUALITY = { GREEN: 'Qualidade alta', YELLOW: 'Qualidade média', RED: 'Qualidade baixa' };
+window._waQuality = window._waQuality || {};
+const CLOUD_RED_NOTE = 'Qualidade baixa na Meta: os disparos deste número saem devagar (até 25 por hora e 200 por dia) para a Meta não bloquear o número. Para a qualidade voltar: mande só para quem pediu contato, com modelo útil e opção de sair, e prefira outro número oficial para disparos grandes.';
 let _cloudTplCache = {};
 let _cloudCtx = null;
 
@@ -20720,7 +20725,7 @@ async function renderWaLinesBox(act, el, quiet) {
   if (!el) return;
   if (!quiet) el.innerHTML = '<span style="color:var(--muted);font-size:12px;">verificando...</span>';
   let states = [];
-  try { states = (await window._fb.whatsapp('/whatsapp/lines-status', act)).lines || []; }
+  try { states = (await window._fb.whatsapp('/whatsapp/lines-status', act)).lines || []; states.forEach(x => { if (x.provider === 'cloud') window._waQuality[act + '|' + x.line] = x.quality || ''; }); }
   catch (e) { el.innerHTML = `<span style="color:#f87171;font-size:12px;">Servidor do WhatsApp fora do ar</span>`; return; }
   const a = escapeJsString(act);
   el.innerHTML = waLines(act).map(l => {
@@ -20730,7 +20735,7 @@ async function renderWaLinesBox(act, el, quiet) {
     if (waIsCloud(l.id)) {
       const ok = st.state === 'open';
       return `<div class="wa-line-row">
-      <div style="flex:1;min-width:0;"><div class="wa-line-name">${escapeHtml(l.label)} <span class="chat-tag" style="background:var(--blue-dim);color:var(--blue);">API oficial</span></div><div class="wa-line-sub"><span style="color:${ok ? '#34d399' : '#fbbf24'};font-weight:600;">● ${ok ? 'Conectado' : 'Falta configurar'}</span>${num ? ' · ' + escapeHtml(num) : ''}${st.profileName ? ' · ' + escapeHtml(st.profileName) : ''}${st.quality ? ' · ' + escapeHtml(CLOUD_QUALITY[st.quality] || st.quality) : ''}</div>${ok ? cloudHookLine(st) : ''}</div>
+      <div style="flex:1;min-width:0;"><div class="wa-line-name">${escapeHtml(l.label)} <span class="chat-tag" style="background:var(--blue-dim);color:var(--blue);">API oficial</span></div><div class="wa-line-sub"><span style="color:${ok ? '#34d399' : '#fbbf24'};font-weight:600;">● ${ok ? 'Conectado' : 'Falta configurar'}</span>${num ? ' · ' + escapeHtml(num) : ''}${st.profileName ? ' · ' + escapeHtml(st.profileName) : ''}${st.quality ? ' · ' + escapeHtml(CLOUD_QUALITY[st.quality] || st.quality) : ''}</div>${ok ? cloudHookLine(st) : ''}${ok && st.quality === 'RED' ? `<div class="wa-line-sub" style="color:#f87171;white-space:normal;">⚠ ${escapeHtml(CLOUD_RED_NOTE)}</div>` : ''}</div>
       ${ok ? `<button style="${wbtn}" onclick="openCloudTemplates('${a}','${id}')">Modelos</button>` : ''}
       ${ok && st.billingUrl ? `<button class="chat-pill" title="Abre a cobrança desta conta do WhatsApp na Meta (cartão e saldo)" onclick="openCloudBilling('${escapeJsString(st.billingUrl)}')">Pagamento</button>` : ''}
       ${isAdminUser() ? `<button class="chat-pill" onclick="openCloudSetup('${a}','${id}')">Credenciais</button>` : ''}
