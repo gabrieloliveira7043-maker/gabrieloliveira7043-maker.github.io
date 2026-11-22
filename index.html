@@ -17321,7 +17321,7 @@ function renderChatHeader() {
       ${sibs.length > 1 ? `<div class="chat-line-switch" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px;font-size:12px;color:var(--muted2);">${uiIco('phone', 12)} Conversa pelo número:${sibs.map(x => `<button class="chat-pill${x.id === c.id ? ' active' : ''}" style="padding:3px 10px;font-size:12px;" ${x.id === c.id ? 'disabled' : `onclick="openChat('${escapeJsString(x.id)}')"`} title="${x.id === c.id ? 'Conversa aberta' : 'Abrir a conversa deste contato por este número'}">${escapeHtml(waLineLabel(_chatAct, x.line || waLineOfKey(x.id)))}</button>`).join('')}</div>` : ''}
     </div>
     ${!lead && c.phone && !chatContactFor(c, chatContactIndex(_chatAct)) ? `<button class="chat-pill" onclick="saveChatAsContact()" title="Guarda este número na base de contatos do CRM">＋ Salvar contato</button>` : ''}
-    ${c.phone && !c.isGroup && c.channel !== 'instagram' ? `<button class="chat-pill" onclick="callWhatsApp({ phone: '${escapeJsString(c.phone)}', leadId: '${lead ? escapeJsString(lead.id) : ''}', act: '${escapeJsString(_chatAct || '')}', chatKey: '${escapeJsString(c.id)}', name: '${escapeJsString(chatName(c, lead))}' })" title="Abre a conversa no WhatsApp para ligar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg> Ligar</button>` : ''}
+    ${c.phone && !c.isGroup && c.channel !== 'instagram' ? `<button class="chat-pill" onclick="callWhatsApp({ phone: '${escapeJsString(c.phone)}', leadId: '${lead ? escapeJsString(lead.id) : ''}', act: '${escapeJsString(_chatAct || '')}', chatKey: '${escapeJsString(c.id)}', name: '${escapeJsString(chatName(c, lead))}', line: '${escapeJsString(c.line || waLineOfKey(c.id) || '')}' })" title="${waIsDapi(c.line || waLineOfKey(c.id), _chatAct) ? 'Liga pelo CRM, com o microfone deste computador' : 'Abre a conversa no WhatsApp para ligar'}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg> Ligar</button>` : ''}
     <button class="chat-pill" onclick="toggleChatSearch()" title="Pesquisar mensagens nesta conversa"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg> Pesquisar</button>
     <button class="chat-pill chat-info-btn" onclick="toggleChatInfoDrawer(true)" title="Dados do contato">${uiIco('user', 13)} Dados</button>
     <button class="chat-pill" onclick="openChatTags()">${uiIco('tag')} Etiquetas</button>
@@ -20845,6 +20845,87 @@ function startDapiOfficial(act, line) {
   window.addEventListener('message', onMsg);
 }
 window.openDapiOfficial = openDapiOfficial; window.startDapiOfficial = startDapiOfficial;
+
+// ---------- Ligação de WhatsApp pelo CRM (D-API): microfone e fone deste computador ----------
+let _dapiCall = null;
+const DAPI_SDK_URL = 'https://cdn.jsdelivr.net/npm/d-api-sdk@1.6.0/+esm';
+function dapiCallPanel(html) {
+  let el = document.getElementById('dapi-call-panel');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'dapi-call-panel';
+    el.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:10050;width:280px;max-width:calc(100vw - 32px);background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.35);padding:14px;color:var(--text);';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = html;
+}
+function dapiCallRender() {
+  const c = _dapiCall; if (!c) return;
+  const secs = c.startedAt ? Math.floor((Date.now() - c.startedAt) / 1000) : 0;
+  const time = c.startedAt ? ` · ${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}` : '';
+  const live = !c.over;
+  dapiCallPanel(`
+    <div style="font-size:12px;color:var(--muted2);">Ligação pelo WhatsApp · ${escapeHtml(waLineLabel(c.act, c.line))}</div>
+    <div style="font-size:15px;font-weight:600;margin:3px 0 2px;">${escapeHtml(c.name)}</div>
+    <div style="font-size:12.5px;color:${c.over ? 'var(--muted2)' : 'var(--text)'};margin-bottom:10px;">${escapeHtml(c.status)}${time}</div>
+    <div style="display:flex;gap:8px;">
+      ${live ? `<button class="chat-pill" onclick="dapiCallMute()">${c.muted ? 'Ativar microfone' : 'Mudo'}</button>
+      <button class="chat-pill" style="background:#dc2626;color:#fff;border-color:#dc2626;" onclick="dapiCallHangup()">Desligar</button>`
+      : `<button class="chat-pill" onclick="dapiCallClose()">Fechar</button>`}
+    </div>`);
+}
+async function dapiCallStart(opts, digits, lead) {
+  if (_dapiCall && !_dapiCall.over) return showToast('Já tem uma ligação em andamento.', 'warning');
+  const name = opts.name || (lead && lead.name) || chatFormatPhone(digits);
+  _dapiCall = { act: opts.act, line: opts.line, name, status: 'Abrindo o microfone...', muted: false, over: false, startedAt: 0, call: null, chatKey: opts.chatKey || chatPhoneKey(digits) };
+  const me = _dapiCall;
+  dapiCallRender();
+  try {
+    // Pede o microfone já no clique (o navegador só libera áudio a partir de uma ação da pessoa).
+    const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mic.getTracks().forEach(t => t.stop());
+    me.status = 'Chamando...'; dapiCallRender();
+    const [{ LiveCall }, r] = await Promise.all([import(DAPI_SDK_URL), window._fb.whatsapp('/whatsapp/dapi-call', opts.act, { line: opts.line, phone: digits })]);
+    const call = await LiveCall.connect(r.callId, r.wsUrl, { transport: 'webrtc' });
+    me.call = call;
+    const labels = { calling: 'Chamando...', ringing: 'Tocando...', accepted: 'Em ligação', connected: 'Em ligação', rejected: 'Recusou a ligação', busy: 'Ocupado', not_answered: 'Não atendeu', ended: 'Ligação encerrada' };
+    call.on('event', e => {
+      const t = String(e && e.type || '');
+      if ((t === 'accepted' || t === 'connected') && !me.startedAt) { me.startedAt = Date.now(); me.timer = setInterval(dapiCallRender, 1000); }
+      if (labels[t]) { me.status = labels[t]; dapiCallRender(); }
+    });
+    const end = e => {
+      if (me.over) return;
+      me.over = true; clearInterval(me.timer);
+      const t = String(e && e.type || 'ended');
+      me.status = me.startedAt ? 'Ligação encerrada' : (labels[t] && t !== 'ended' ? labels[t] : 'Não atendeu');
+      dapiCallRender();
+      const dur = me.startedAt ? Math.round((Date.now() - me.startedAt) / 1000) : 0;
+      if (me.act && me.chatKey) {
+        const u = chatMe();
+        window._fb.addChatNote({ act: me.act, chatKey: me.chatKey, chatName: me.name, text: dur ? `📞 Ligação pelo CRM: ${Math.floor(dur / 60)} min ${dur % 60} s` : '📞 Ligação pelo CRM: não atendida', by: u.name, byUid: u.uid, at: new Date().toISOString(), done: true, call: 'whatsapp' }).catch(() => {});
+      }
+    };
+    call.on('ended', end);
+    call.on('close', () => end());
+    call.on('error', err => { if (!me.startedAt && !me.over) { me.status = 'Erro: ' + (err && err.message || 'falha na ligação'); dapiCallRender(); } });
+    call.on('recording', rec => {
+      if (!rec || !rec.url || !me.act || !me.chatKey) return;
+      const u = chatMe();
+      window._fb.addChatNote({ act: me.act, chatKey: me.chatKey, chatName: me.name, text: '🎙️ Gravação da ligação: ' + rec.url, by: u.name, byUid: u.uid, at: new Date().toISOString(), done: true, call: 'whatsapp' }).catch(() => {});
+    });
+    if (lead) logWhatsAppCall(lead);
+    if (me.act) rotLogCall(me.act, chatPhoneKey(digits));
+  } catch (e) {
+    me.over = true;
+    me.status = /Permission|NotAllowed|denied/i.test(e && (e.name + ' ' + e.message) || '') ? 'Libere o microfone para o CRM no navegador.' : 'Não deu para ligar: ' + (e && e.message || e);
+    dapiCallRender();
+  }
+}
+function dapiCallMute() { const c = _dapiCall; if (!c || !c.call) return; c.muted = !c.muted; try { c.call.mute(c.muted); } catch (e) {} dapiCallRender(); }
+function dapiCallHangup() { const c = _dapiCall; if (!c) return; try { c.call && c.call.hangup(); } catch (e) {} if (!c.call) { c.over = true; c.status = 'Cancelada'; dapiCallRender(); } }
+function dapiCallClose() { const el = document.getElementById('dapi-call-panel'); if (el) el.remove(); if (_dapiCall && _dapiCall.over) _dapiCall = null; }
+window.dapiCallMute = dapiCallMute; window.dapiCallHangup = dapiCallHangup; window.dapiCallClose = dapiCallClose;
 
 async function addWaLine(act) {
   const label = (prompt('Nome deste WhatsApp (ex.: Comercial, Suporte, Filial Centro):') || '').trim().slice(0, 30);
@@ -24957,6 +25038,9 @@ function callWhatsApp(opts) {
   let digits = String(opts.phone || (lead && (lead.phone || lead.whatsappPhone)) || '').replace(/\D/g, '');
   if (!digits) return showToast('Este contato não tem telefone.', 'warning');
   if (!(digits.startsWith('55') && digits.length >= 12)) digits = '55' + digits;
+  // Número conectado pela D-API: a ligação sai pelo próprio CRM.
+  const dapiAct = normalizeActValue(opts.act || (lead && lead.act) || '');
+  if (opts.line && dapiAct && waIsDapi(opts.line, dapiAct)) return dapiCallStart({ ...opts, act: dapiAct }, digits, lead);
   const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   const target = mobile ? 'app' : waCallTarget();
   if (!target) {
