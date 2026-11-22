@@ -10458,6 +10458,20 @@ async function saveCampaign(start) {
   if (startInfo.error) { setFb('#f87171', startInfo.error); return; }
   const startLabel = startInfo.startAt ? `a partir de ${new Date(startInfo.startAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}` : 'começando agora';
   const unitLabel = _campaignDraft.source === 'groups' && campGroupsMode() === 'inside' ? 'grupo(s)' : 'contato(s)';
+  if (start && campLines.every(l => waIsDapi(l, _campaignDraft.act)) && _campaignDraft.recipients.some(r => r.phone)) {
+    setFb('var(--muted)', 'Conferindo quem tem WhatsApp...');
+    try {
+      const chk = await window._fb.whatsapp('/whatsapp/dapi-check', _campaignDraft.act, { line: campLines[0], numbers: _campaignDraft.recipients.filter(r => r.phone).map(r => r.phone) });
+      const bad = new Set((chk.without || []).map(n => String(n).slice(-10)));
+      if (bad.size) {
+        const before = _campaignDraft.recipients.length;
+        _campaignDraft.recipients = _campaignDraft.recipients.filter(r => !r.phone || !bad.has(String(r.phone).replace(/\D/g, '').slice(-10)));
+        showToast(`${before - _campaignDraft.recipients.length} número(s) sem WhatsApp saíram da lista.`, 'info', 7000);
+      }
+      setFb('var(--muted)', '');
+      if (!_campaignDraft.recipients.length) { setFb('#f87171', 'Nenhum contato da lista tem WhatsApp.'); return; }
+    } catch (e) { setFb('var(--muted)', ''); }
+  }
   if (start && !await showConfirm(`Enviar para ${_campaignDraft.recipients.length} ${unitLabel}, ${startLabel}: ${describeDispatch(read.dispatch)}.`, startInfo.startAt ? 'Programar disparo' : 'Iniciar disparo', startInfo.startAt ? 'Programar' : 'Iniciar')) return;
   setFb('var(--muted)', 'Salvando...');
   try {
@@ -16736,6 +16750,7 @@ async function saveChatTags() {
   const contact = lead ? null : chatContactFor(c, chatContactIndex(act));
   const fb = document.getElementById('chat-tags-fb');
   if (fb) fb.textContent = 'Salvando...';
+  const tagsBefore = chatTagIds(c, lead, contact);
   try {
     if (lead && lead._docId) {
       await window._fb.saveLeadsBatch([{ _docId: lead._docId, tags, updatedAt: new Date().toISOString() }]);
@@ -16747,6 +16762,13 @@ async function saveChatTags() {
     }
     // A conversa guarda uma cópia: assim o filtro do Chat funciona mesmo sem lead/contato.
     await window._fb.updateInboxChat(act, c.id, { tags });
+    if (!c.isGroup && waIsDapi(c.line || waLineOfKey(c.id), act)) {
+      const all = _contactTagsCache[act] || [];
+      const nameOf = id => (all.find(t => t.id === id) || {}).name;
+      const add = tags.filter(id => !tagsBefore.includes(id)).map(id => ({ name: nameOf(id), colorIndex: all.findIndex(t => t.id === id) })).filter(t => t.name);
+      const remove = tagsBefore.filter(id => !tags.includes(id)).map(nameOf).filter(Boolean);
+      if (add.length || remove.length) window._fb.whatsapp('/whatsapp/dapi-labels', act, { chatKey: c.id, add, remove }).catch(e => console.warn('Etiqueta do WhatsApp:', e.message));
+    }
     c.tags = tags;
     if (_chatExtra[c.id]) _chatExtra[c.id].tags = tags;
     closeHuvenModal();
@@ -17098,6 +17120,7 @@ function openChat(key) {
         <button class="chat-pill chat-tool" title="Respostas prontas (ou digite / no começo da mensagem)" onclick="toggleQuickReplies()" aria-label="Respostas prontas">${uiIco('bolt', 18)}</button>
         <button class="chat-pill chat-tool" title="Emojis e figurinhas" onclick="toggleEmojiPicker()" aria-label="Emojis e figurinhas">${uiIco('smile', 18)}</button>
         <textarea id="chat-text" class="field-input" rows="1" placeholder="Mensagem ( / respostas prontas, Ctrl+V cola print)" onkeydown="chatTextKey(event)" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,140)+'px';chatQrInput(this)" onblur="setTimeout(() => { if (_qrBySlash) closeQuickReplies(); }, 200)"></textarea>
+        ${waIsDapi(waLineOfKey(key), _chatAct) ? `<button class="chat-pill chat-tool" title="Botões, lista, carrossel, PIX, localização, contato ou álbum" onclick="openDapiExtras()" aria-label="Mensagens especiais" style="font-weight:700;font-size:17px;">＋</button>` : ''}
         <button class="chat-pill chat-tool" title="Nota interna ou lembrete (só a equipe vê)" onclick="openChatNote()" aria-label="Nota interna">${uiIco('note', 18)}</button>
         <button class="chat-pill chat-tool" title="Agendar mensagem" onclick="openScheduleMessage()" aria-label="Agendar mensagem">${uiIco('clock', 18)}</button>
         <button class="chat-pill chat-tool" id="chat-mic-btn" title="Gravar áudio" onclick="chatRecStart()" aria-label="Gravar áudio">${uiIco('mic', 18)}</button>
@@ -17322,6 +17345,7 @@ function renderChatHeader() {
     </div>
     ${!lead && c.phone && !chatContactFor(c, chatContactIndex(_chatAct)) ? `<button class="chat-pill" onclick="saveChatAsContact()" title="Guarda este número na base de contatos do CRM">＋ Salvar contato</button>` : ''}
     ${c.phone && !c.isGroup && c.channel !== 'instagram' ? `<button class="chat-pill" onclick="callWhatsApp({ phone: '${escapeJsString(c.phone)}', leadId: '${lead ? escapeJsString(lead.id) : ''}', act: '${escapeJsString(_chatAct || '')}', chatKey: '${escapeJsString(c.id)}', name: '${escapeJsString(chatName(c, lead))}', line: '${escapeJsString(c.line || waLineOfKey(c.id) || '')}' })" title="${waIsDapi(c.line || waLineOfKey(c.id), _chatAct) ? 'Liga pelo CRM, com o microfone deste computador' : 'Abre a conversa no WhatsApp para ligar'}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg> Ligar</button>` : ''}
+    ${!c.isGroup && dapiDefault(_chatAct) && waIsCloud(c.line || waLineOfKey(c.id)) ? `<button class="chat-pill" title="Quando outro sistema está no mesmo número oficial: traz esta conversa para o CRM responder" onclick="dapiTakeThread()">Assumir conversa</button>` : ''}
     <button class="chat-pill" onclick="toggleChatSearch()" title="Pesquisar mensagens nesta conversa"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg> Pesquisar</button>
     <button class="chat-pill chat-info-btn" onclick="toggleChatInfoDrawer(true)" title="Dados do contato">${uiIco('user', 13)} Dados</button>
     <button class="chat-pill" onclick="openChatTags()">${uiIco('tag')} Etiquetas</button>
@@ -17467,10 +17491,14 @@ function renderChatMessages() {
     const cloudChat = waIsCloud(waLineOfKey(_chatOpenKey)); // a API oficial não edita nem apaga
     const canEdit = !cloudChat && m.fromMe && ['text', 'image', 'video'].includes(m.type || 'text') && age < 15 * 60000 && !/^(crm|sch)\d/.test(m.id);
     const canDel = !cloudChat && m.fromMe && age < 2 * 86400000 && !/^(crm|sch)\d/.test(m.id);
-    const menu = canEdit || canDel ? `<button class="chat-msg-more" title="Editar ou apagar" onclick="openChatMsgMenu(event, '${escapeJsString(m.id)}', ${canEdit}, ${canDel})">⋯</button>` : '';
+    const dapiChat = waIsDapi(waLineOfKey(_chatOpenKey), _chatAct) && !/^(crm|sch)\d/.test(m.id);
+    const menu = canEdit || canDel || dapiChat ? `<button class="chat-msg-more" title="${dapiChat ? 'Reagir, editar ou apagar' : 'Editar ou apagar'}" onclick="openChatMsgMenu(event, '${escapeJsString(m.id)}', ${canEdit}, ${canDel})">⋯</button>` : '';
+    const ticks = m.fromMe && (m.read || m.delivered) ? `<span title="${m.read ? 'Lida' : 'Entregue'}" style="color:${m.read ? '#53bdeb' : 'var(--muted2)'};font-weight:700;letter-spacing:-3px;margin-left:4px;">✓✓</span>` : '';
+    const reacts = [m.reaction, m.myReaction].filter(Boolean);
+    const reactHtml = reacts.length ? `<div style="margin-top:4px;font-size:15px;line-height:1;" title="Reação">${reacts.map(escapeHtml).join(' ')}</div>` : '';
     const sender = !m.fromMe && (m.senderName || m.senderPhone) ? `<div style="font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:2px;">${escapeHtml(m.senderName || chatFormatPhone(m.senderPhone))}${m.senderName && m.senderPhone ? ` <span style="font-weight:400;color:var(--muted2);">${escapeHtml(chatFormatPhone(m.senderPhone))}</span>` : ''}</div>` : '';
     const autoTag = !m.fromMe && m.autoReply ? `<div style="font-size:11px;color:var(--muted2);margin-bottom:3px;">${uiIco('bot', 11)} resposta automática do WhatsApp do contato (não conta como resposta)</div>` : '';
-    parts.push(`<div class="chat-bubble ${m.fromMe ? 'out' : 'in'}" data-mid="${escapeHtml(m.id)}">${menu}${sender}${autoTag}${media}${chatSearchMark(chatMentionsHtml(chatLinkify(escapeHtml(bodyText))))}${chatTplButtonsHtml(m)}${m.failed ? `<div style="font-size:11px;color:var(--red);margin-top:4px;">${uiIco('alert', 12)} Não entregue: ${escapeHtml(m.error || '')}</div>` : ''}<div class="chat-meta">${who ? escapeHtml(who) + ' · ' : ''}${m.edited ? 'editada · ' : ''}${time}</div></div>`);
+    parts.push(`<div class="chat-bubble ${m.fromMe ? 'out' : 'in'}" data-mid="${escapeHtml(m.id)}">${menu}${sender}${autoTag}${media}${chatSearchMark(chatMentionsHtml(chatLinkify(escapeHtml(bodyText))))}${chatTplButtonsHtml(m)}${m.failed ? `<div style="font-size:11px;color:var(--red);margin-top:4px;">${uiIco('alert', 12)} Não entregue: ${escapeHtml(m.error || '')}</div>` : ''}${reactHtml}<div class="chat-meta">${who ? escapeHtml(who) + ' · ' : ''}${m.edited ? 'editada · ' : ''}${time}${ticks}</div></div>`);
   });
   pendingSched.forEach(s => {
     const when = new Date(s.sendAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -17508,7 +17536,8 @@ function openChatMsgMenu(ev, id, canEdit, canDel) {
   const menu = document.createElement('div');
   menu.id = 'chat-msg-menu';
   menu.className = 'chat-msg-menu';
-  menu.innerHTML = (canEdit ? `<button onclick="editChatMessage('${escapeJsString(id)}')">${uiIco('edit', 14)} Editar</button>` : '')
+  const reactRow = waIsDapi(waLineOfKey(_chatOpenKey), _chatAct) ? `<div style="display:flex;gap:2px;padding:6px 8px;border-bottom:1px solid var(--border);">${['👍', '❤️', '😂', '😮', '😢', '🙏'].map(e => `<button style="padding:4px 6px;font-size:18px;" title="Reagir" onclick="dapiReact('${escapeJsString(id)}','${e}')">${e}</button>`).join('')}</div>` : '';
+  menu.innerHTML = reactRow + (canEdit ? `<button onclick="editChatMessage('${escapeJsString(id)}')">${uiIco('edit', 14)} Editar</button>` : '')
     + (canDel ? `<button style="color:var(--red);" onclick="deleteChatMessage('${escapeJsString(id)}')">${uiIco('trash', 14)} Apagar para todos</button>` : '');
   document.body.appendChild(menu);
   const r = ev.currentTarget.getBoundingClientRect();
@@ -20701,7 +20730,7 @@ async function renderWaLinesBox(act, el, quiet) {
       ${ok ? `<button style="${wbtn}" onclick="openCloudTemplates('${a}','${id}')">Modelos</button>` : ''}
       ${ok && st.billingUrl ? `<button class="chat-pill" title="Abre a cobrança desta conta do WhatsApp na Meta (cartão e saldo)" onclick="openCloudBilling('${escapeJsString(st.billingUrl)}')">Pagamento</button>` : ''}
       ${isAdminUser() ? `<button class="chat-pill" onclick="openCloudSetup('${a}','${id}')">Credenciais</button>` : ''}
-      ${dapiCanUse(act) ? `<button class="chat-pill" title="Conecta este mesmo número de novo pela janela da Meta (D-API). A linha atual segue funcionando até terminar." onclick="openDapiOfficial('${a}','${id}')">Refazer pela D-API</button>` : ''}
+      ${dapiCanUse(act) ? `<button class="chat-pill" title="Conecta este mesmo número de novo pela janela da Meta (D-API). A linha atual segue funcionando até terminar." onclick="openDapiOfficial('${a}','${id}')">Refazer pela D-API</button> <button class="chat-pill" title="Mostra quais sistemas estão neste número e quem responde as conversas" onclick="openDapiRouting('${a}','${id}')">Quem atende</button>` : ''}
       <button class="chat-pill" onclick="renameWaLine('${a}','${id}')">Renomear</button>
       <button class="chat-pill" title="Nome usado na variável {atendente} das mensagens enviadas por este número" onclick="setWaAttendant('${a}','${id}')">${l.attendant ? 'Atendente: ' + escapeHtml(l.attendant) : 'Definir atendente'}</button>
       ${waLines(act).length > 1 ? `<button class="chat-pill" style="color:var(--red);border-color:rgba(248,113,113,.4);" onclick="removeWaLine('${a}','${id}')">Excluir</button>` : ''}
@@ -20926,6 +20955,150 @@ function dapiCallMute() { const c = _dapiCall; if (!c || !c.call) return; c.mute
 function dapiCallHangup() { const c = _dapiCall; if (!c) return; try { c.call && c.call.hangup(); } catch (e) {} if (!c.call) { c.over = true; c.status = 'Cancelada'; dapiCallRender(); } }
 function dapiCallClose() { const el = document.getElementById('dapi-call-panel'); if (el) el.remove(); if (_dapiCall && _dapiCall.over) _dapiCall = null; }
 window.dapiCallMute = dapiCallMute; window.dapiCallHangup = dapiCallHangup; window.dapiCallClose = dapiCallClose;
+
+// Ligação recebida num número da D-API: painel "Tocando" para quem usa o cliente.
+let _dapiRingSeen = '';
+function dapiRingCheck(list) {
+  const now = Date.now();
+  const ring = (list || []).find(x => x && x.ringing && x.ringing.callId && x.act && dapiDefault(x.act) && now - Date.parse(x.ringing.at || 0) < 60000);
+  const panel = document.getElementById('dapi-call-panel');
+  if (!ring) { if (_dapiRingSeen && _dapiCall && _dapiCall.ringing) { _dapiCall = null; if (panel) panel.remove(); } _dapiRingSeen = ''; return; }
+  if (_dapiRingSeen === ring.ringing.callId || (_dapiCall && !_dapiCall.over && !_dapiCall.ringing)) return;
+  _dapiRingSeen = ring.ringing.callId;
+  const phone = String(ring.ringing.phone || '').replace(/\D/g, '');
+  const act = ring.act, line = ring.line || '';
+  const lead = phone ? (_leadsCache || []).find(l => normalizeActValue(l.act) === normalizeActValue(act) && String(l.phone || '').replace(/\D/g, '').slice(-8) === phone.slice(-8)) : null;
+  const name = (lead && lead.name) || (phone ? chatFormatPhone(phone) : 'Número oculto');
+  _dapiCall = { act, line, name, ringing: true, callId: ring.ringing.callId, from: ring.ringing.from || phone, phone, over: false, chatKey: phone ? chatPhoneKey(phone) : '' };
+  dapiCallPanel(`
+    <div style="font-size:12px;color:var(--muted2);">Ligação recebida · ${escapeHtml(waLineLabel(act, line))}</div>
+    <div style="font-size:15px;font-weight:600;margin:3px 0 10px;">${escapeHtml(name)}</div>
+    <div style="display:flex;gap:8px;">
+      <button class="chat-pill" style="background:#16a34a;color:#fff;border-color:#16a34a;" onclick="dapiAnswer(true)">Atender</button>
+      <button class="chat-pill" style="background:#dc2626;color:#fff;border-color:#dc2626;" onclick="dapiAnswer(false)">Recusar</button>
+    </div>`);
+  try { navigator.vibrate && navigator.vibrate([300, 200, 300]); } catch (e) {}
+}
+async function dapiAnswer(accept) {
+  const c = _dapiCall; if (!c || !c.ringing) return;
+  c.ringing = false;
+  if (!accept) {
+    window._fb.whatsapp('/whatsapp/dapi-call-answer', c.act, { line: c.line, callId: c.callId, from: c.from, action: 'reject' }).catch(() => {});
+    dapiCallClose(); _dapiCall = null; return;
+  }
+  c.status = 'Atendendo...'; c.muted = false; c.startedAt = 0; dapiCallRender();
+  try {
+    const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mic.getTracks().forEach(t => t.stop());
+    const [{ LiveCall }, r] = await Promise.all([import(DAPI_SDK_URL), window._fb.whatsapp('/whatsapp/dapi-call-answer', c.act, { line: c.line, callId: c.callId, from: c.from, action: 'accept' })]);
+    const call = await LiveCall.connect(r.callId, r.wsUrl, { transport: 'webrtc' });
+    c.call = call; c.startedAt = Date.now(); c.status = 'Em ligação'; c.timer = setInterval(dapiCallRender, 1000); dapiCallRender();
+    const end = () => {
+      if (c.over) return; c.over = true; clearInterval(c.timer); c.status = 'Ligação encerrada'; dapiCallRender();
+      const dur = Math.round((Date.now() - c.startedAt) / 1000);
+      if (c.chatKey) { const u = chatMe(); window._fb.addChatNote({ act: c.act, chatKey: c.chatKey, chatName: c.name, text: `📞 Ligação recebida pelo CRM: ${Math.floor(dur / 60)} min ${dur % 60} s`, by: u.name, byUid: u.uid, at: new Date().toISOString(), done: true, call: 'whatsapp' }).catch(() => {}); }
+    };
+    call.on('ended', end); call.on('close', end);
+    call.on('recording', rec => { if (rec && rec.url && c.chatKey) { const u = chatMe(); window._fb.addChatNote({ act: c.act, chatKey: c.chatKey, chatName: c.name, text: '🎙️ Gravação da ligação: ' + rec.url, by: u.name, byUid: u.uid, at: new Date().toISOString(), done: true, call: 'whatsapp' }).catch(() => {}); } });
+  } catch (e) { c.over = true; c.status = /Permission|NotAllowed|denied/i.test(e && (e.name + ' ' + e.message) || '') ? 'Libere o microfone para o CRM no navegador.' : 'Não deu para atender: ' + (e && e.message || e); dapiCallRender(); }
+}
+window.dapiAnswer = dapiAnswer;
+
+// Conectar por código (sem QR): o CRM mostra 8 letras para digitar no celular.
+function openDapiPair(act, line) {
+  openHuvenModal('Conectar com código', `
+    <div class="integ-muted" style="font-size:12.5px;line-height:1.55;margin-bottom:10px;">Digite o número do WhatsApp que vai conectar. O CRM mostra um código; no celular, abra <b>WhatsApp → Aparelhos conectados → Conectar um aparelho → Conectar com número de telefone</b> e digite o código.</div>
+    <input class="field-input" id="dapi-pair-phone" inputmode="tel" placeholder="(61) 99999-9999" style="margin-bottom:10px;">
+    <div style="display:flex;gap:8px;align-items:center;"><button class="btn-save" id="dapi-pair-btn" style="width:auto;padding:9px 16px;" onclick="startDapiPair('${escapeJsString(act)}','${escapeJsString(line)}')">Gerar código</button><span id="dapi-pair-fb" class="integ-muted" style="font-size:12.5px;"></span></div>
+    <div id="dapi-pair-code" style="margin-top:14px;"></div>`, 460);
+}
+async function startDapiPair(act, line) {
+  const fb = document.getElementById('dapi-pair-fb'), btn = document.getElementById('dapi-pair-btn');
+  const phone = (document.getElementById('dapi-pair-phone').value || '').replace(/\D/g, '');
+  if (phone.length < 10) { fb.style.color = 'var(--red)'; fb.textContent = 'Digite o número com DDD.'; return; }
+  btn.disabled = true; fb.style.color = 'var(--muted)'; fb.textContent = 'Gerando...';
+  try {
+    const r = await window._fb.whatsapp('/whatsapp/dapi-pair', act, { line, phone });
+    const code = String(r.code || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    fb.textContent = '';
+    document.getElementById('dapi-pair-code').innerHTML = `<div style="font-size:12px;color:var(--muted2);margin-bottom:4px;">Digite no celular:</div><div style="font-size:30px;font-weight:800;letter-spacing:6px;font-family:monospace;color:var(--text);">${escapeHtml(code.length === 8 ? code.slice(0, 4) + '-' + code.slice(4) : code)}</div><div class="integ-muted" style="font-size:12px;margin-top:6px;">Quando conectar, esta janela pode ser fechada. O número aparece como conectado em Conexões.</div>`;
+  } catch (e) { btn.disabled = false; fb.style.color = 'var(--red)'; fb.textContent = e.message; }
+}
+window.openDapiPair = openDapiPair; window.startDapiPair = startDapiPair;
+
+async function dapiReact(id, emoji) {
+  closeChatMsgMenu();
+  const m = _chatMsgs.find(x => x.id === id);
+  try { await window._fb.whatsapp('/whatsapp/dapi-send', _chatAct, { chatKey: _chatOpenKey, kind: 'reaction', data: { messageId: id, emoji, fromMe: !!(m && m.fromMe) } }); }
+  catch (e) { showToast('Não reagiu: ' + e.message, 'error'); }
+}
+window.dapiReact = dapiReact;
+
+// Mensagens especiais da D-API: botões, lista, carrossel, PIX, localização, contato e álbum.
+const DAPI_EXTRA_KINDS = [['buttons', 'Botões'], ['list', 'Lista'], ['carousel', 'Carrossel'], ['pix', 'PIX'], ['location', 'Localização'], ['contact', 'Contato'], ['album', 'Álbum']];
+let _dapiExtraKind = 'buttons', _dapiExtraFiles = {};
+function openDapiExtras(kind) {
+  _dapiExtraKind = kind || _dapiExtraKind; _dapiExtraFiles = {};
+  const k = _dapiExtraKind;
+  const inp = (id, ph, extra) => `<input class="field-input" id="dx-${id}" placeholder="${escapeHtml(ph)}" style="margin-bottom:8px;" ${extra || ''}>`;
+  const area = (id, ph) => `<textarea class="field-input" id="dx-${id}" rows="3" placeholder="${escapeHtml(ph)}" style="margin-bottom:8px;width:100%;box-sizing:border-box;resize:vertical;"></textarea>`;
+  const file = (id, label, multi) => `<label class="chat-pill" style="display:inline-flex;margin-bottom:8px;cursor:pointer;">${label}<input type="file" accept="image/jpeg,image/png,image/webp${multi ? ',video/mp4' : ''}" ${multi ? 'multiple' : ''} style="display:none;" onchange="dapiExtraFile('${id}', this)"></label> <span id="dx-${id}-name" class="integ-muted" style="font-size:12px;"></span><br>`;
+  const btnRow = i => `<div style="display:flex;gap:6px;flex-wrap:wrap;"><select class="field-input" id="dx-bt${i}" style="width:auto;margin-bottom:8px;"><option value="quick_reply">Resposta</option><option value="url">Link</option><option value="call">Ligar</option><option value="copy">Copiar código</option></select>${inp('bn' + i, 'Texto do botão ' + i, 'style="flex:1;min-width:120px;margin-bottom:8px;"')}${inp('bv' + i, 'Link, telefone ou código (se precisar)', 'style="flex:1;min-width:150px;margin-bottom:8px;"')}</div>`;
+  const forms = {
+    buttons: area('body', 'Texto da mensagem') + inp('footer', 'Rodapé (opcional)') + btnRow(1) + btnRow(2) + btnRow(3) + file('img', 'Imagem (opcional)'),
+    list: area('body', 'Texto da mensagem') + inp('buttonText', 'Texto do botão que abre a lista (ex.: Ver opções)') + Array.from({ length: 6 }, (_, i) => inp('r' + i, 'Opção ' + (i + 1) + (i ? ' (opcional)' : ''))).join(''),
+    carousel: area('body', 'Texto antes dos cartões (opcional)') + [1, 2, 3].map(i => `<div style="border:1px solid var(--border);border-radius:10px;padding:8px;margin-bottom:8px;"><div style="font-size:12px;font-weight:600;margin-bottom:6px;">Cartão ${i}${i > 1 ? ' (opcional)' : ''}</div>${file('c' + i, 'Imagem do cartão')}${inp('cb' + i, 'Texto do cartão')}${inp('cn' + i, 'Texto do botão (opcional)')}${inp('cu' + i, 'Link do botão (opcional)')}</div>`).join(''),
+    pix: area('body', 'Texto da mensagem (ex.: Segue o PIX para pagamento)') + inp('pixKey', 'Chave PIX') + inp('amount', 'Valor em R$ (opcional)', 'inputmode="decimal"') + inp('pixMessage', 'Descrição do pagamento (opcional)'),
+    location: inp('name', 'Nome do lugar (ex.: Escritório)') + inp('address', 'Endereço (opcional)') + inp('coords', 'Latitude, longitude (ex.: -15.7939, -47.8828). Dá para colar do Google Maps'),
+    contact: inp('name', 'Nome do contato') + inp('phone', 'Telefone com DDD', 'inputmode="tel"'),
+    album: file('album', 'Escolher fotos ou vídeos (2 a 10)', true) + area('caption', 'Legenda (opcional)')
+  };
+  openHuvenModal('Mensagem especial', `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">${DAPI_EXTRA_KINDS.map(([id, l]) => `<button class="chat-pill${id === k ? ' active' : ''}" onclick="openDapiExtras('${id}')">${l}</button>`).join('')}</div>
+    ${forms[k]}
+    <div style="display:flex;gap:8px;align-items:center;margin-top:4px;"><button class="btn-save" id="dx-send" style="width:auto;padding:9px 16px;" onclick="sendDapiExtra()">Enviar</button><span id="dx-fb" class="integ-muted" style="font-size:12.5px;"></span></div>`, 560);
+}
+function dapiExtraFile(id, input) {
+  _dapiExtraFiles[id] = [...(input.files || [])];
+  const n = document.getElementById('dx-' + id + '-name');
+  if (n) n.textContent = _dapiExtraFiles[id].map(f => f.name).join(', ');
+}
+async function sendDapiExtra() {
+  const v = id => ((document.getElementById('dx-' + id) || {}).value || '').trim();
+  const fb = document.getElementById('dx-fb'), btn = document.getElementById('dx-send');
+  const act = _chatAct, k = _dapiExtraKind;
+  const up = async id => { const fl = _dapiExtraFiles[id] || []; const out = []; for (const file of fl) out.push(await window._fb.uploadCampaignMedia(act, file)); return out; };
+  btn.disabled = true; fb.style.color = 'var(--muted)'; fb.textContent = 'Enviando...';
+  try {
+    let data;
+    if (k === 'buttons') data = { body: v('body'), footer: v('footer'), buttons: [1, 2, 3].map(i => ({ type: v('bt' + i), title: v('bn' + i), value: v('bv' + i) })).filter(b => b.title), imageUrl: ((await up('img'))[0] || {}).url };
+    else if (k === 'list') data = { body: v('body'), buttonText: v('buttonText'), rows: Array.from({ length: 6 }, (_, i) => ({ title: v('r' + i) })).filter(r => r.title) };
+    else if (k === 'carousel') { const cards = []; for (const i of [1, 2, 3]) { if (!v('cb' + i)) continue; cards.push({ body: v('cb' + i), imageUrl: ((await up('c' + i))[0] || {}).url, buttons: v('cn' + i) ? [{ title: v('cn' + i), url: v('cu' + i) || undefined }] : [] }); } data = { body: v('body'), cards }; }
+    else if (k === 'pix') data = { body: v('body'), pixKey: v('pixKey'), amount: v('amount'), pixMessage: v('pixMessage') };
+    else if (k === 'location') { const m = v('coords').match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/); data = { name: v('name'), address: v('address'), latitude: m ? Number(m[1]) : NaN, longitude: m ? Number(m[2]) : NaN }; }
+    else if (k === 'contact') data = { name: v('name'), phone: v('phone') };
+    else if (k === 'album') data = { caption: v('caption'), media: (await up('album')).map(m => ({ type: m.type === 'video' ? 'video' : 'image', url: m.url })) };
+    await window._fb.whatsapp('/whatsapp/dapi-send', act, { chatKey: _chatOpenKey, kind: k, data });
+    closeHuvenModal();
+    showToast('Enviado.', 'success', 2500);
+  } catch (e) { btn.disabled = false; fb.style.color = 'var(--red)'; fb.textContent = e.message; }
+}
+async function openDapiRouting(act, line) {
+  openHuvenModal('Quem atende este número', '<div class="integ-muted">Consultando a Meta...</div>', 480);
+  try {
+    const r = await window._fb.whatsapp('/whatsapp/dapi-routing', act, { line });
+    const sit = { exclusive: 'Só a D-API está neste número. O CRM recebe e responde tudo.', shared_without_routing: 'Tem outro sistema no número e nenhuma regra: os dois recebem tudo e os dois podem responder.', routed: 'Tem regra de quem atende: cada conversa tem um dono.' }[r.situation] || r.situation;
+    document.getElementById('huven-modal-body').innerHTML = `<div style="font-size:13px;line-height:1.6;color:var(--text);">${escapeHtml(sit)}</div>
+      ${r.apps.length ? `<div class="integ-muted" style="font-size:12.5px;margin-top:10px;">Sistemas no número: ${r.apps.map(a => escapeHtml(a.name) + (a.current ? ' (o CRM)' : '')).join(', ')}</div>` : ''}
+      ${r.situation === 'routed' ? `<div class="integ-muted" style="font-size:12.5px;margin-top:6px;">O CRM ${r.isStandby ? 'recebe cópia das conversas dos outros' : 'não recebe cópia'}${r.isEscalation ? ' e pode assumir qualquer conversa (botão Assumir conversa no Chat)' : ''}.</div>` : ''}`;
+  } catch (e) { document.getElementById('huven-modal-body').innerHTML = `<div class="integ-error">${escapeHtml(e.message)}</div>`; }
+}
+async function dapiTakeThread() {
+  try { await window._fb.whatsapp('/whatsapp/dapi-thread', _chatAct, { chatKey: _chatOpenKey, action: 'take' }); showToast('Conversa assumida: agora o CRM responde este contato.', 'success'); }
+  catch (e) { showToast(e.message, 'error', 7000); }
+}
+window.openDapiRouting = openDapiRouting; window.dapiTakeThread = dapiTakeThread;
+window.openDapiExtras = openDapiExtras; window.dapiExtraFile = dapiExtraFile; window.sendDapiExtra = sendDapiExtra;
 
 async function addWaLine(act) {
   const label = (prompt('Nome deste WhatsApp (ex.: Comercial, Suporte, Filial Centro):') || '').trim().slice(0, 30);
@@ -23158,7 +23331,7 @@ async function loadWhatsAppQr(act, line) {
     if (r.state === 'open') { onWhatsAppConnected(); return; }
     const qr = String(r.qr || '');
     if (!qr.startsWith('data:image/')) { setWhatsAppQrBody('<div style="color:var(--muted);">Gerando QR Code...</div>' + swap); return; }
-    setWhatsAppQrBody(`<img src="${escapeHtml(qr)}" alt="QR Code do WhatsApp" style="width:260px;height:260px;background:#fff;border-radius:10px;padding:8px;">` + swap);
+    setWhatsAppQrBody(`<img src="${escapeHtml(qr)}" alt="QR Code do WhatsApp" style="width:260px;height:260px;background:#fff;border-radius:10px;padding:8px;">` + swap + (waIsDapi(line, act) ? `<div style="margin-top:8px;"><a href="#" style="font-size:12.5px;" onclick="openDapiPair('${escapeJsString(act)}','${escapeJsString(line)}');return false;">Celular longe? Conectar com código, sem QR</a></div>` : ''));
   } catch (e) {
     let semChave = /chave da d-api/i.test(e.message || '');
     if (waIsDapi(line, act) && !semChave) { try { const st = await window._fb.whatsapp('/whatsapp/dapi-status', act, {}); semChave = !st.hasKey; } catch (_) {} }
@@ -26097,7 +26270,7 @@ let _waDownBefore = new Set();
 function startWhatsAppStatusWatch() {
   if (_waStatusUnsub || !window._fb || typeof window._fb.listenWhatsAppStatus !== 'function') return;
   try {
-    _waStatusUnsub = window._fb.listenWhatsAppStatus(list => { _waStatusList = list || []; renderWhatsAppAlert(); try { updateHistoryBtn(); } catch (e) {} });
+    _waStatusUnsub = window._fb.listenWhatsAppStatus(list => { _waStatusList = list || []; renderWhatsAppAlert(); try { updateHistoryBtn(); } catch (e) {} try { dapiRingCheck(_waStatusList); } catch (e) {} });
   } catch (e) { console.warn('Aviso do WhatsApp indisponível:', e); }
 }
 
