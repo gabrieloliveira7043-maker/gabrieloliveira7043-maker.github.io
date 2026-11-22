@@ -20707,13 +20707,13 @@ async function renderWaLinesBox(act, el, quiet) {
     </div>`;
     }
     return `<div class="wa-line-row">
-      <div style="flex:1;min-width:0;"><div class="wa-line-name">${escapeHtml(l.label)}${waIsDapi(l.id) ? ' <span class="chat-tag" style="background:var(--surface3);color:var(--text);">D-API</span>' : ''}</div><div class="wa-line-sub">${whatsappStateBadge(st)}${num ? ' · ' + escapeHtml(num) : ''}</div></div>
+      <div style="flex:1;min-width:0;"><div class="wa-line-name">${escapeHtml(l.label)}${waIsDapi(l.id) && isAdminUser() ? ' <span style="font-size:11px;color:var(--muted2);font-weight:400;">· D-API</span>' : ''}</div><div class="wa-line-sub">${whatsappStateBadge(st)}${num ? ' · ' + escapeHtml(num) : ''}</div></div>
       ${st.state === 'open' ? `<button style="${wbtn}" onclick="disconnectWhatsApp('${a}','${id}')">Desconectar</button>` : `<button style="${wbtn}" onclick="openWhatsAppConnect('${a}','${escapeJsString(getClientDisplayName(act) + ' · ' + l.label)}','${id}')">Conectar</button>`}
       <button class="chat-pill" onclick="renameWaLine('${a}','${id}')">Renomear</button>
       <button class="chat-pill" title="Nome usado na variável {atendente} das mensagens enviadas por este número" onclick="setWaAttendant('${a}','${id}')">${l.attendant ? 'Atendente: ' + escapeHtml(l.attendant) : 'Definir atendente'}</button>
       ${waLines(act).length > 1 ? `<button class="chat-pill" style="color:var(--red);border-color:rgba(248,113,113,.4);" onclick="removeWaLine('${a}','${id}')">Excluir</button>` : ''}
     </div>`;
-  }).join('') + `<button class="chat-pill" style="margin-top:6px;" onclick="addWaLine('${a}')">+ Conectar outro WhatsApp</button>${isAdminUser() ? ` <button class="chat-pill" style="margin-top:6px;" onclick="openCloudSetup('${a}')">+ API oficial</button>` : ''}${dapiCanUse(act) ? ` <button class="chat-pill" style="margin-top:6px;" title="Conecta um número pela D-API (teste)" onclick="addDapiLine('${a}')">+ D-API (teste)</button> <button class="chat-pill" style="margin-top:6px;" onclick="openDapiKey('${a}')">Chave D-API</button>` : ''}`;
+  }).join('') + `<button class="chat-pill" style="margin-top:6px;" onclick="addWaLine('${a}')">+ Conectar outro WhatsApp</button>${isAdminUser() ? ` <button class="chat-pill" style="margin-top:6px;" onclick="openCloudSetup('${a}')">+ API oficial</button>` : ''}`;
 }
 
 // 1ª mensagem automática: por qual(is) número(s) sai. Vários marcados = alterna entre eles (mesclar).
@@ -20745,63 +20745,60 @@ function refreshWaLinesFor(act) {
   document.querySelectorAll('[data-wa-lines]').forEach(el => { if (el.getAttribute('data-wa-lines') === act) renderWaLinesBox(act, el); });
 }
 
-// ---------- D-API (teste só no cliente Huven): linhas "dap..." conectadas por QR Code na nuvem da D-API ----------
+// ---------- D-API (teste só no cliente Huven e nos logins dele): número novo conecta pela D-API ----------
+// Para quem usa, nada muda: é o mesmo QR Code. Linhas antigas (Evolution) continuam como estão.
 const DAPI_ACTS = ['act_1712273919281701'];
 const waIsDapi = id => /^dap/.test(String(id || ''));
-function dapiCanUse(act) { return isAdminUser() && DAPI_ACTS.includes(normalizeActValue(act)); }
-function openDapiKey(act, thenAdd) {
-  openHuvenModal('Chave da D-API', `
-    <div style="font-size:12.5px;color:var(--muted2);margin-bottom:10px;line-height:1.5;">Copie a API Key em app.d-api.cloud, Minha conta. Ela fica guardada só no servidor do CRM: depois de salva, ninguém vê a chave pelo CRM.</div>
-    <label class="field-label">API Key</label>
-    <input type="password" id="dapi-key" class="field-input" autocomplete="off" spellcheck="false" style="margin-bottom:10px;">
-    <div style="display:flex;gap:8px;align-items:center;"><button class="btn-save" id="dapi-key-btn" style="width:auto;padding:9px 16px;" onclick="saveDapiKey('${escapeJsString(act)}', ${thenAdd ? 1 : 0})">Salvar chave</button><span id="dapi-key-fb" style="font-size:12px;color:var(--muted2);"></span></div>`, 460);
-  setTimeout(() => { const i = document.getElementById('dapi-key'); if (i) i.focus(); }, 50);
+const dapiDefault = act => DAPI_ACTS.includes(normalizeActValue(act));
+function dapiCanUse(act) { return isAdminUser() && dapiDefault(act); }
+function dapiKeyFormHtml(act, line) {
+  return `<div style="max-width:340px;margin:0 auto;text-align:left;">
+    <div style="font-size:13px;color:var(--text);font-weight:600;margin-bottom:4px;">Falta a chave da D-API</div>
+    <div style="font-size:12px;color:var(--muted2);margin-bottom:10px;line-height:1.5;">Cole uma única vez a API Key da sua conta (app.d-api.cloud, Minha conta). Vale para o sistema todo e fica só no servidor.</div>
+    <input type="password" id="dapi-key" class="field-input" autocomplete="off" spellcheck="false" placeholder="API Key" style="margin-bottom:8px;">
+    <div style="display:flex;gap:8px;align-items:center;"><button class="btn-save" id="dapi-key-btn" style="width:auto;padding:9px 16px;" onclick="saveDapiKey('${escapeJsString(act)}','${escapeJsString(line)}')">Salvar e gerar QR Code</button><span id="dapi-key-fb" style="font-size:12px;color:var(--muted2);"></span></div>
+  </div>`;
 }
-async function saveDapiKey(act, thenAdd) {
+async function saveDapiKey(act, line) {
   const input = document.getElementById('dapi-key');
   const fb = document.getElementById('dapi-key-fb');
   const btn = document.getElementById('dapi-key-btn');
   const apiKey = (input && input.value || '').trim();
   if (!apiKey) { fb.style.color = 'var(--red)'; fb.textContent = 'Cole a chave.'; return; }
-  btn.disabled = true; fb.style.color = 'var(--muted2)'; fb.textContent = 'Conferindo com a D-API...';
+  btn.disabled = true; fb.style.color = 'var(--muted2)'; fb.textContent = 'Conferindo...';
   try {
-    const r = await window._fb.whatsapp('/whatsapp/dapi-key', act, { apiKey });
+    await window._fb.whatsapp('/whatsapp/dapi-key', act, { apiKey });
     if (input) input.value = '';
-    closeHuvenModal();
-    showToast('Chave da D-API salva (final ' + (r.keyEnd || '') + ').', 'success');
-    if (thenAdd) addDapiLine(act, true);
+    setWhatsAppQrBody('<div style="color:var(--muted);">Gerando QR Code...</div>');
+    loadWhatsAppQr(act, line);
   } catch (e) { btn.disabled = false; fb.style.color = 'var(--red)'; fb.textContent = e.message; }
 }
-async function addDapiLine(act, keyOk) {
-  if (!keyOk) {
-    try {
-      const st = await window._fb.whatsapp('/whatsapp/dapi-status', act, {});
-      if (!st.hasKey) { openDapiKey(act, true); return; }
-    } catch (e) { showToast('Erro: ' + e.message, 'error'); return; }
-  }
-  const label = (prompt('Nome deste WhatsApp na D-API (ex.: Gustavo D-API):') || '').trim().slice(0, 30);
-  if (!label) return;
+// Só para o admin, num número que acabou de ser criado: trocar o servidor da conexão (D-API <-> Evolution).
+async function switchWaLineServer(act, line) {
   const s = WHATSAPP_SETTINGS[act] || {};
-  const lines = (Array.isArray(s.lines) ? s.lines : []).slice();
-  if (lines.length >= 9) { showToast('Máximo de WhatsApps por cliente atingido.', 'warning'); return; }
-  const id = 'dap' + Date.now().toString(36).slice(-6);
-  lines.push({ id, label });
+  const cur = (s.lines || []).find(l => l.id === line);
+  if (!cur) return;
+  const id = (waIsDapi(line) ? 'l' : 'dap') + Date.now().toString(36).slice(-6);
+  const lines = (s.lines || []).map(l => l.id === line ? { ...l, id } : l);
   try {
     await window._fb.saveWhatsAppSettings(act, { lines });
     WHATSAPP_SETTINGS[act] = { ...s, lines };
+    window._fb.whatsapp('/whatsapp/delete-line', act, { line }).catch(() => {});
+    window._waNewLine = id;
     refreshWaLinesFor(act);
-    openWhatsAppConnect(act, getClientDisplayName(act) + ' · ' + label, id);
+    openWhatsAppConnect(act, getClientDisplayName(act) + ' · ' + cur.label, id);
   } catch (e) { showToast('Erro: ' + e.message, 'error'); }
 }
-window.openDapiKey = openDapiKey; window.saveDapiKey = saveDapiKey; window.addDapiLine = addDapiLine;
+window.saveDapiKey = saveDapiKey; window.switchWaLineServer = switchWaLineServer;
 
 async function addWaLine(act) {
   const label = (prompt('Nome deste WhatsApp (ex.: Comercial, Suporte, Filial Centro):') || '').trim().slice(0, 30);
   if (!label) return;
   const s = WHATSAPP_SETTINGS[act] || {};
   const lines = (Array.isArray(s.lines) ? s.lines : []).slice();
-  if (lines.length >= 5) { showToast('Máximo de 6 WhatsApps por cliente.', 'warning'); return; }
-  const id = 'l' + Date.now().toString(36).slice(-6);
+  if (lines.length >= (dapiDefault(act) ? 9 : 5)) { showToast('Máximo de WhatsApps por cliente atingido.', 'warning'); return; }
+  const id = (dapiDefault(act) ? 'dap' : 'l') + Date.now().toString(36).slice(-6);
+  window._waNewLine = id;
   lines.push({ id, label });
   try {
     await window._fb.saveWhatsAppSettings(act, { lines });
@@ -23017,14 +23014,21 @@ function setWhatsAppQrBody(html) {
 }
 
 async function loadWhatsAppQr(act, line) {
+  if (document.getElementById('dapi-key')) return; // admin colando a chave: não apaga o campo
+  const swap = window._waNewLine === line && dapiCanUse(act)
+    ? `<div style="margin-top:10px;"><button class="chat-pill" style="font-size:11.5px;padding:3px 10px;" onclick="switchWaLineServer('${escapeJsString(act)}','${escapeJsString(line)}')">Conectar pela ${waIsDapi(line) ? 'Evolution' : 'D-API'}</button></div>` : '';
   try {
     const r = await window._fb.whatsapp('/whatsapp/connect', act, { line: line || WA_MAIN });
     if (r.state === 'open') { onWhatsAppConnected(); return; }
     const qr = String(r.qr || '');
-    if (!qr.startsWith('data:image/')) { setWhatsAppQrBody('<div style="color:var(--muted);">Gerando QR Code...</div>'); return; }
-    setWhatsAppQrBody(`<img src="${escapeHtml(qr)}" alt="QR Code do WhatsApp" style="width:260px;height:260px;background:#fff;border-radius:10px;padding:8px;">`);
+    if (!qr.startsWith('data:image/')) { setWhatsAppQrBody('<div style="color:var(--muted);">Gerando QR Code...</div>' + swap); return; }
+    setWhatsAppQrBody(`<img src="${escapeHtml(qr)}" alt="QR Code do WhatsApp" style="width:260px;height:260px;background:#fff;border-radius:10px;padding:8px;">` + swap);
   } catch (e) {
-    setWhatsAppQrBody(`<div style="color:#f87171;">${escapeHtml(e.message)}</div>`);
+    if (waIsDapi(line) && /chave da d-api/i.test(e.message || '')) {
+      setWhatsAppQrBody(isAdminUser() ? dapiKeyFormHtml(act, line) + swap : '<div style="color:var(--muted);">Este tipo de conexão ainda está sendo configurado pela Huven. Tente de novo mais tarde.</div>');
+      return;
+    }
+    setWhatsAppQrBody(`<div style="color:#f87171;">${escapeHtml(e.message)}</div>` + swap);
   }
 }
 
