@@ -21023,10 +21023,28 @@ async function startDapiPair(act, line) {
   btn.disabled = true; fb.style.color = 'var(--muted)'; fb.textContent = 'Gerando...';
   try {
     const r = await window._fb.whatsapp('/whatsapp/dapi-pair', act, { line, phone });
-    const code = String(r.code || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
     fb.textContent = '';
-    document.getElementById('dapi-pair-code').innerHTML = `<div style="font-size:12px;color:var(--muted2);margin-bottom:4px;">Digite no celular:</div><div style="font-size:30px;font-weight:800;letter-spacing:6px;font-family:monospace;color:var(--text);">${escapeHtml(code.length === 8 ? code.slice(0, 4) + '-' + code.slice(4) : code)}</div><div class="integ-muted" style="font-size:12px;margin-top:6px;">Quando conectar, esta janela pode ser fechada. O número aparece como conectado em Conexões.</div>`;
+    dapiPairShow(r.code);
+    // A D-API troca o código de tempos em tempos: a janela mostra sempre o atual e avisa quando conectar.
+    clearInterval(window._dapiPairTimer);
+    window._dapiPairTimer = setInterval(async () => {
+      const box = document.getElementById('dapi-pair-code');
+      if (!box) return clearInterval(window._dapiPairTimer);
+      try {
+        const p = await window._fb.whatsapp('/whatsapp/dapi-pair', act, { line, phone, poll: true });
+        if (p.state === 'open') { clearInterval(window._dapiPairTimer); box.innerHTML = '<div style="font-size:15px;font-weight:700;color:var(--green, #22c55e);">Conectado! Pode fechar esta janela.</div>'; if (typeof renderWhatsAppView === 'function') renderWhatsAppView(); return; }
+        if (p.code) dapiPairShow(p.code);
+      } catch (e) {}
+    }, 4000);
   } catch (e) { btn.disabled = false; fb.style.color = 'var(--red)'; fb.textContent = e.message; }
+}
+function dapiPairShow(raw) {
+  const box = document.getElementById('dapi-pair-code'); if (!box) return;
+  const code = String(raw || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  const txt = code.length === 8 ? code.slice(0, 4) + '-' + code.slice(4) : code;
+  if (box.dataset.code === txt) return;
+  const changed = !!box.dataset.code; box.dataset.code = txt;
+  box.innerHTML = `<div style="font-size:12px;color:var(--muted2);margin-bottom:4px;">Digite no celular${changed ? ' (o código mudou, use este novo)' : ''}:</div><div style="font-size:30px;font-weight:800;letter-spacing:6px;font-family:monospace;color:var(--text);">${escapeHtml(txt)}</div><div class="integ-muted" style="font-size:12px;margin-top:6px;">O código se atualiza sozinho. Se o celular ficar carregando, cancele no celular e digite o código que estiver aqui agora.</div>`;
 }
 window.openDapiPair = openDapiPair; window.startDapiPair = startDapiPair;
 
