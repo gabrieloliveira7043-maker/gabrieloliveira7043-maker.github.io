@@ -19912,7 +19912,7 @@ const isAdminUser = () => ['admin', 'partner'].includes(((window._fb && window._
 const CLOUD_STATUS = { APPROVED: ['Aprovado', 'var(--green, #34d399)'], PENDING: ['Em análise', '#fbbf24'], REJECTED: ['Recusado', '#f87171'], PAUSED: ['Pausado', '#fbbf24'], DISABLED: ['Desativado', '#f87171'], IN_APPEAL: ['Em recurso', '#fbbf24'] };
 const CLOUD_QUALITY = { GREEN: 'Qualidade alta', YELLOW: 'Qualidade média', RED: 'Qualidade baixa' };
 window._waQuality = window._waQuality || {};
-const CLOUD_RED_NOTE = 'Qualidade baixa na Meta: os disparos deste número saem devagar (até 25 por hora e 200 por dia) para a Meta não bloquear o número. Para a qualidade voltar: mande só para quem pediu contato, com modelo útil e opção de sair, e prefira outro número oficial para disparos grandes.';
+const CLOUD_RED_NOTE = 'Qualidade baixa na Meta: se a qualidade não melhorar, a Meta pode limitar ou bloquear este número. Para a qualidade voltar: mande só para quem pediu contato, com modelo útil e opção de sair, e prefira outro número oficial para disparos grandes.';
 let _cloudTplCache = {};
 let _cloudCtx = null;
 
@@ -23358,6 +23358,7 @@ async function loadWhatsAppQr(act, line) {
     ? `<div style="margin-top:10px;"><button class="chat-pill" style="font-size:11.5px;padding:3px 10px;" onclick="switchWaLineServer('${escapeJsString(act)}','${escapeJsString(line)}')">Conectar pela ${waIsDapi(line) ? 'Evolution' : 'D-API'}</button></div>` : '';
   try {
     const r = await window._fb.whatsapp('/whatsapp/connect', act, { line: line || WA_MAIN });
+    window._waQrFails = 0;
     if (r.state === 'open') { onWhatsAppConnected(); return; }
     const qr = String(r.qr || '');
     if (!qr.startsWith('data:image/')) { setWhatsAppQrBody('<div style="color:var(--muted);">Gerando QR Code...</div>' + swap); return; }
@@ -23369,7 +23370,15 @@ async function loadWhatsAppQr(act, line) {
       setWhatsAppQrBody(isAdminUser() ? dapiKeyFormHtml(act, line) + swap : '<div style="color:var(--muted);">Este tipo de conexão ainda está sendo configurado pela Huven. Tente de novo mais tarde.</div>');
       return;
     }
-    setWhatsAppQrBody(`<div style="color:#f87171;">${escapeHtml(e.message)}</div>` + swap);
+    // Falha passageira (o servidor do WhatsApp demora a responder): tenta de novo sozinho antes de mostrar erro.
+    window._waQrFails = (window._waQrFails || 0) + 1;
+    if (window._waQrFails <= 3) {
+      setWhatsAppQrBody('<div style="color:var(--muted);">Gerando QR Code...</div>' + swap);
+      setTimeout(() => { if (document.getElementById('whatsapp-qr-body')) loadWhatsAppQr(act, line); }, 4000);
+      return;
+    }
+    window._waQrFails = 0;
+    setWhatsAppQrBody(`<div style="color:#f87171;">${escapeHtml(e.message)}</div><div style="margin-top:10px;"><button class="chat-pill" onclick="loadWhatsAppQr('${escapeJsString(act)}','${escapeJsString(line)}')">Tentar de novo</button></div>` + swap);
   }
 }
 
