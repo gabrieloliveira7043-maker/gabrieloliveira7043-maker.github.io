@@ -22010,7 +22010,7 @@ function openHistoryImport() {
   const lines = waLines(act).filter(l => !waIsCloud(l.id));
   if (!lines.length) return showToast('Este cliente não tem WhatsApp por QR Code conectado.', 'warning');
   openHuvenModal('Puxar conversas antigas', `
-    <div class="integ-muted" style="font-size:12.5px;line-height:1.55;margin-bottom:12px;">Traz para o Chat as mensagens que o WhatsApp já tinha. Ao ler o QR Code, o CRM já puxa os últimos 30 dias sozinho; aqui dá para puxar mais. Não marca como não lidas e não dispara automação nem IA. Mensagens que já estão no Chat não mudam.</div>
+    <div class="integ-muted" style="font-size:12.5px;line-height:1.55;margin-bottom:12px;">Traz para o Chat as mensagens que o WhatsApp já tinha. Ao ler o QR Code, o CRM já puxa os últimos 7 dias sozinho; aqui dá para puxar mais. Não marca como não lidas e não dispara automação nem IA. Mensagens que já estão no Chat não mudam.</div>
     <div id="hi-jobs">${histJobsHtml(act)}</div>
     ${lines.length > 1 ? `<label class="field-label">De qual WhatsApp</label><select class="field-input" id="hi-line" style="margin-bottom:10px;">${lines.map(l => `<option value="${escapeHtml(l.id)}">${escapeHtml(l.label)}</option>`).join('')}</select>` : `<input type="hidden" id="hi-line" value="${escapeHtml(lines[0].id)}">`}
     <label class="field-label">Período</label>
