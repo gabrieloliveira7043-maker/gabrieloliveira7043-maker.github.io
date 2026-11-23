@@ -23377,6 +23377,9 @@ async function loadWhatsAppQr(act, line, refresh) {
     const qr = String(r.qr || '');
     // Na troca periódica sem QR novo (a pessoa pode estar lendo agora): mantém o que está na tela.
     if (refresh && !qr.startsWith('data:image/')) return;
+    // A D-API troca o código a cada 30 a 60 s e o anterior deixa de valer: a janela confere a cada 5 s e só redesenha quando muda.
+    if (refresh && qr === window._waLastQr) return;
+    window._waLastQr = qr;
     if (!qr.startsWith('data:image/')) { setWhatsAppQrBody('<div style="color:var(--muted);">Gerando QR Code...</div>' + swap); return; }
     setWhatsAppQrBody(`<img src="${escapeHtml(qr)}" alt="QR Code do WhatsApp" style="width:260px;height:260px;background:#fff;border-radius:10px;padding:8px;">` + swap + (waIsDapi(line, act) ? `<div style="margin-top:8px;"><a href="#" style="font-size:12.5px;" onclick="openDapiPair('${escapeJsString(act)}','${escapeJsString(line)}');return false;">Celular longe? Conectar com código, sem QR</a></div>` : ''));
   } catch (e) {
@@ -23436,7 +23439,7 @@ async function openWhatsAppConnect(act, name, line) {
   }
   await loadWhatsAppQr(act, line);
 
-  // Confere a conexão a cada 5 s e troca o QR Code a cada ~25 s (ele expira). Para depois de 5 min.
+  // Confere a conexão a cada 5 s e troca o QR Code quando ele muda (D-API: confere a cada 5 s; Evolution: a cada ~25 s). Para depois de 5 min.
   let ticks = 0;
   clearInterval(_whatsappPoll);
   _whatsappPoll = setInterval(async () => {
@@ -23449,7 +23452,7 @@ async function openWhatsAppConnect(act, name, line) {
       setWhatsAppQrBody(`<div style="color:var(--muted);">O QR Code expirou.</div><button style="${wbtn}" onclick="openWhatsAppConnect('${escapeJsString(act)}','','${escapeJsString(line)}')">Gerar outro</button>`);
       return;
     }
-    if (ticks % 5 === 0) loadWhatsAppQr(act, line, true);
+    if (waIsDapi(line, act) || ticks % 5 === 0) loadWhatsAppQr(act, line, true);
   }, 5000);
 }
 
