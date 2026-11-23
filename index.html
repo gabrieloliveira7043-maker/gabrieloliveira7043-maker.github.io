@@ -1991,7 +1991,7 @@ html.ui-vidro .ntc-box { background: var(--ui-glass); -webkit-backdrop-filter: b
 .wa-lines { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 10px; }
 .wa-line-row { display: flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; flex-wrap: wrap; background: var(--surface2); margin-bottom: 8px; }
 /* Nome e situação ocupam a linha inteira; os botões vêm embaixo, lado a lado. */
-.wa-line-row > div:first-child { flex: 1 1 100%; margin-bottom: 4px; }
+.wa-line-row > div:first-child { flex: 1 1 100% !important; min-width: 0; margin-bottom: 4px; }
 .wa-line-row > div:first-child .wa-line-sub { line-height: 1.5; }
 .wa-line-row > button { font-size: 12px; padding: 5px 11px; }
 .wa-line-name { font-size: 13px; font-weight: 700; color: var(--text); }
