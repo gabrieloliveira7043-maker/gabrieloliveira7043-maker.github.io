@@ -23366,18 +23366,21 @@ function setWhatsAppQrBody(html) {
   if (body) body.innerHTML = html;
 }
 
-async function loadWhatsAppQr(act, line) {
+async function loadWhatsAppQr(act, line, refresh) {
   if (document.getElementById('dapi-key')) return; // admin colando a chave: não apaga o campo
   const swap = false
     ? `<div style="margin-top:10px;"><button class="chat-pill" style="font-size:11.5px;padding:3px 10px;" onclick="switchWaLineServer('${escapeJsString(act)}','${escapeJsString(line)}')">Conectar pela ${waIsDapi(line) ? 'Evolution' : 'D-API'}</button></div>` : '';
   try {
-    const r = await window._fb.whatsapp('/whatsapp/connect', act, { line: line || WA_MAIN });
+    const r = await window._fb.whatsapp('/whatsapp/connect', act, { line: line || WA_MAIN, ...(refresh ? { refresh: true } : {}) });
     window._waQrFails = 0;
     if (r.state === 'open') { onWhatsAppConnected(); return; }
     const qr = String(r.qr || '');
+    // Na troca periódica sem QR novo (a pessoa pode estar lendo agora): mantém o que está na tela.
+    if (refresh && !qr.startsWith('data:image/')) return;
     if (!qr.startsWith('data:image/')) { setWhatsAppQrBody('<div style="color:var(--muted);">Gerando QR Code...</div>' + swap); return; }
     setWhatsAppQrBody(`<img src="${escapeHtml(qr)}" alt="QR Code do WhatsApp" style="width:260px;height:260px;background:#fff;border-radius:10px;padding:8px;">` + swap + (waIsDapi(line, act) ? `<div style="margin-top:8px;"><a href="#" style="font-size:12.5px;" onclick="openDapiPair('${escapeJsString(act)}','${escapeJsString(line)}');return false;">Celular longe? Conectar com código, sem QR</a></div>` : ''));
   } catch (e) {
+    if (refresh) return; // troca periódica falhou: segue com o QR da tela, a próxima tenta de novo
     let semChave = /chave da d-api/i.test(e.message || '');
     if (waIsDapi(line, act) && !semChave) { try { const st = await window._fb.whatsapp('/whatsapp/dapi-status', act, {}); semChave = !st.hasKey; } catch (_) {} }
     if (waIsDapi(line, act) && semChave) {
@@ -23446,7 +23449,7 @@ async function openWhatsAppConnect(act, name, line) {
       setWhatsAppQrBody(`<div style="color:var(--muted);">O QR Code expirou.</div><button style="${wbtn}" onclick="openWhatsAppConnect('${escapeJsString(act)}','','${escapeJsString(line)}')">Gerar outro</button>`);
       return;
     }
-    if (ticks % 5 === 0) loadWhatsAppQr(act, line);
+    if (ticks % 5 === 0) loadWhatsAppQr(act, line, true);
   }, 5000);
 }
 
