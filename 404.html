@@ -9662,7 +9662,7 @@ function openCampaignEditor(copyFrom, opts = {}) {
       <select class="field-input" id="camp-prev-filter" onchange="loadPreviousCampaignRecipients()" style="width:auto;">
         <option value="all">Todos os contatos da campanha</option>
         <option value="sent">Só quem recebeu a mensagem</option>
-        <option value="notsent">Só quem não recebeu (pulados, com erro ou na fila)</option>
+        <option value="notsent">Só quem não recebeu (não entregues, pulados, com erro ou na fila)</option>
       </select>
     </div>` : ''}
     <div id="camp-src-pick-box" class="camp-src-box" style="display:none;">
@@ -9765,7 +9765,10 @@ async function loadPreviousCampaignRecipients() {
   try {
     if (!_campaignDraft.prevRows) _campaignDraft.prevRows = await window._fb.getCampaignRecipients(c.id, 20000);
     if (!_campaignDraft || _campaignDraft.source !== 'previous') return;
-    const rows = _campaignDraft.prevRows.filter(r => filter === 'all' || (filter === 'sent' ? r.status === 'sent' : r.status !== 'sent'));
+    // Recebeu = enviada e a Meta não recusou a entrega. Quem não tem WhatsApp (131026) ou parou de receber marketing (131050) não volta.
+    const got = r => r.status === 'sent' && r.delivery !== 'failed';
+    const dead = r => [131026, 131050].includes(Number(r.deliveryErrorCode) || 0);
+    const rows = _campaignDraft.prevRows.filter(r => filter === 'all' || (filter === 'sent' ? got(r) : !got(r) && !dead(r)));
     const labels = { all: '', sent: ', só quem recebeu', notsent: ', só quem não recebeu' };
     setCampaignRecipients(rows.map(r => ({ name: r.name, phone: r.phone, jid: r.jid, fields: r.fields })), `Contatos de "${c.name || 'Campanha'}"${labels[filter]}`);
   } catch (e) {
