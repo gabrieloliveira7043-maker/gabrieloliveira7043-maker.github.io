@@ -23376,7 +23376,16 @@ async function loadWhatsAppQr(act, line, refresh) {
     if (r.state === 'open') { onWhatsAppConnected(); return; }
     const qr = String(r.qr || '');
     // Na troca periódica sem QR novo (a pessoa pode estar lendo agora): mantém o que está na tela.
-    if (refresh && !qr.startsWith('data:image/')) return;
+    // Sem QR na troca: ou a pessoa está lendo, ou a sessão esgotou o tempo de leitura. Depois de 3 vezes seguidas (15 s)
+    // pede um QR novo de verdade, para não deixar na tela um código que já não vale.
+    if (refresh && !qr.startsWith('data:image/')) {
+      // Só conta quando a D-API diz que a sessão parou (tempo esgotado, desconectada). Lendo o QR, não mexe.
+      const dead = /timeout|disconnect|close|fail|logged|missing|expired/i.test(String(r.dapiStatus || ''));
+      window._waNoQr = dead ? (window._waNoQr || 0) + 1 : 0;
+      if (window._waNoQr >= 2) { window._waNoQr = 0; window._waLastQr = ''; setWhatsAppQrBody('<div style="color:var(--muted);">Gerando um QR Code novo...</div>'); loadWhatsAppQr(act, line); }
+      return;
+    }
+    window._waNoQr = 0;
     // A D-API troca o código a cada 30 a 60 s e o anterior deixa de valer: a janela confere a cada 5 s e só redesenha quando muda.
     if (refresh && qr === window._waLastQr) return;
     window._waLastQr = qr;
