@@ -16896,12 +16896,18 @@ async function chatRefreshSummary(btn) {
   if (m && c) m.innerHTML = chatAiSideHtml(c);
 }
 
+// Conversas dentro do WhatsApp e da campanha escolhidos (os números dos filtros contam só essas).
+function chatInScope(c) {
+  if (_chatLineFilter !== 'all' && (c.line || waLineOfKey(c.id)) !== _chatLineFilter) return false;
+  if (_chatCampFilter !== 'all' && _chatCampPhones && !_chatCampPhones.has(chatPhoneKey(c.phone))) return false;
+  return true;
+}
 function renderChatFilters() {
   const box = document.getElementById('chat-filters');
   if (!box) return;
   const me = chatMe();
   box.innerHTML = CHAT_FILTERS.map(([k, label]) => {
-    const n = _chatItems.filter(c => chatMatchesFilter(c, k, me)).length;
+    const n = _chatItems.filter(c => chatInScope(c) && chatMatchesFilter(c, k, me)).length;
     return `<button class="chat-pill ${_chatFilter === k ? 'active' : ''}" onclick="setChatFilter('${k}')">${label}${k !== 'all' && n ? ` · ${n}` : ''}</button>`;
   }).join('') + (_chatItems.some(c => c.unread > 0 && (_chatLineFilter === 'all' || (c.line || waLineOfKey(c.id)) === _chatLineFilter))
     ? `<button class="chat-pill" onclick="chatMarkAllRead()" title="Zera o contador de não lidas de todas as conversas${_chatLineFilter !== 'all' ? ' deste WhatsApp' : ''}">✓ Marcar todas como lidas</button>`
@@ -16982,8 +16988,7 @@ function renderChatList() {
   if (chatLines(_chatAct).length < 2) _chatLineFilter = 'all';
   const rows = _chatItems.filter(c => {
     if (!chatMatchesFilter(c, _chatFilter, me)) return false;
-    if (_chatLineFilter !== 'all' && (c.line || waLineOfKey(c.id)) !== _chatLineFilter) return false;
-    if (_chatCampFilter !== 'all' && _chatCampPhones && !_chatCampPhones.has(chatPhoneKey(c.phone))) return false;
+    if (!chatInScope(c)) return false;
     const lead = chatLeadFor(c, index);
     if (_chatTagFilter.size && !chatTagIds(c, lead, chatContactFor(c, contactIndex)).some(id => _chatTagFilter.has(id))) return false;
     if (!term) return true;
