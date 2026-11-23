@@ -2776,8 +2776,10 @@ html.is-partner #admin-logins-list .admin-login-card > div:has(> [onclick^="save
       return snap.docs.map(d => d.data().phone || '').filter(Boolean);
     },
     async getCampaignRecipients(id, max) {
-      const snap = await getDocs(query(collection(db, 'campaigns', id, 'recipients'), limit(max || 500)));
-      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // O Firestore não aceita limite acima de 10 mil: acima disso lê tudo e corta aqui.
+      const col = collection(db, 'campaigns', id, 'recipients'), n = max || 500;
+      const snap = await getDocs(n > 10000 ? col : query(col, limit(n)));
+      return snap.docs.slice(0, n).map(d => ({ id: d.id, ...d.data() }));
     },
     // Editar campanha: mode 'replace' tira quem ainda não recebeu e entra a lista nova; 'add' só acrescenta.
     // Quem já recebeu (ou já está na campanha, no 'add') não entra de novo.
