@@ -1989,7 +1989,11 @@ html.ui-vidro .ntc-box { background: var(--ui-glass); -webkit-backdrop-filter: b
 
 /* Vários WhatsApps */
 .wa-lines { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 10px; }
-.wa-line-row { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; flex-wrap: wrap; }
+.wa-line-row { display: flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; flex-wrap: wrap; background: var(--surface2); margin-bottom: 8px; }
+/* Nome e situação ocupam a linha inteira; os botões vêm embaixo, lado a lado. */
+.wa-line-row > div:first-child { flex: 1 1 100%; margin-bottom: 4px; }
+.wa-line-row > div:first-child .wa-line-sub { line-height: 1.5; }
+.wa-line-row > button { font-size: 12px; padding: 5px 11px; }
 .wa-line-name { font-size: 13px; font-weight: 700; color: var(--text); }
 .wa-line-sub { font-size: 12px; color: var(--muted2); margin-top: 1px; }
 .wa-line-picker { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin: 8px 0 12px; display: flex; flex-wrap: wrap; gap: 8px 14px; background: var(--surface2); }
