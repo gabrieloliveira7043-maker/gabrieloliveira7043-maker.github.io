@@ -2864,6 +2864,22 @@ html.is-partner #admin-logins-list .admin-login-card > div:has(> [onclick^="save
       await deleteDoc(doc(db, 'campaigns', id));
     },
     // Chat: conversas 1 a 1 gravadas pelo Worker (inbox/{act}/chats/{chave}/messages/{id}).
+    // Conversas pela última mensagem RECEBIDA: um disparo grande atualiza centenas de conversas e empurra
+    // quem respondeu para fora das mais recentes. Login restrito a alguns números precisa do índice (line, lastInAt);
+    // sem ele, usa as conversas com mensagem não lida (índice que já existe).
+    listenInboxChatsByIn(act, max, callback) {
+      const lf = chatLineWhere();
+      const base = collection(db, 'inbox', normalizeAct(act), 'chats');
+      const map = snap => snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      let unsub2 = null;
+      const unsub1 = onSnapshot(lf ? query(base, lf, orderBy('lastInAt', 'desc'), limit(max)) : query(base, orderBy('lastInAt', 'desc'), limit(max)), snap => callback(map(snap)), error => {
+        console.warn('Chat (últimas recebidas):', error && error.message);
+        window._chatInIndexError = error && error.message || '';
+        if (lf) unsub2 = onSnapshot(query(base, lf, where('unread', '>', 0), limit(max)), snap => callback(map(snap)), () => callback([]));
+        else callback([]);
+      });
+      return () => { unsub1(); if (unsub2) unsub2(); };
+    },
     listenInboxChats(act, max, callback) {
       const lf = chatLineWhere();
       return onSnapshot(lf ? query(collection(db, 'inbox', normalizeAct(act), 'chats'), lf, orderBy('lastAt', 'desc'), limit(max)) : query(collection(db, 'inbox', normalizeAct(act), 'chats'), orderBy('lastAt', 'desc'), limit(max)), snap => {
@@ -16534,6 +16550,13 @@ let _chatMedia = {};
 let _chatPendingMedia = null;
 let _chatSending = false;
 let _chatExtra = {}; // conversas abertas pelo card/contato que não estão entre as mais recentes
+let _chatMainItems = null, _chatInItems = [], _chatInUnsub = null; // mais recentes por qualquer mensagem / por mensagem recebida
+// Junta as conversas mais recentes, as que receberam mensagem por último e as abertas pelo card (sem repetir).
+function chatMergeItems(act) {
+  const seen = new Set(), out = [];
+  for (const c of (_chatMainItems || []).concat(_chatInItems || [], Object.values(_chatExtra))) { if (c && !seen.has(c.id)) { seen.add(c.id); out.push(c); } }
+  return out.filter(chatVisibleFilter(act));
+}
 let _chatCampFilter = 'all';  // Chat: 'all' ou o id da campanha (mostra só quem recebeu o disparo)
 let _chatCampPhones = null;   // Set com os telefones (chatPhoneKey) da campanha escolhida
 let _chatCampList = { act: '', list: null, loading: false };
@@ -16675,6 +16698,7 @@ let _chatRenderTimer = null;
 function onChatClientChange() {
   const act = chatAct();
   if (_chatUnsub && _chatAct !== act) { _chatUnsub(); _chatUnsub = null; _chatExtra = {}; closeChat(); }
+  if (_chatInUnsub && _chatAct !== act) { _chatInUnsub(); _chatInUnsub = null; _chatInItems = []; _chatMainItems = null; }
   const list = document.getElementById('chat-list');
   if (!act) {
     _chatAct = null; _chatItems = [];
@@ -16686,11 +16710,21 @@ function onChatClientChange() {
   ensureWaSettings(act).then(() => { autoSyncChatContacts(act); if (_chatAct === act) renderChatList(); }).catch(() => {});
   if (!_contactTagsCache[act]) loadContactTags(act).then(() => { renderChatList(); renderChatHeader(); });
   ensureImportedContacts(act, () => { renderChatList(); renderChatHeader(); });
+  if (!_chatInUnsub && window._fb.listenInboxChatsByIn) {
+    _chatInUnsub = window._fb.listenInboxChatsByIn(act, 300, items => {
+      if (_chatAct !== act) return;
+      _chatInItems = items || [];
+      if (!_chatMainItems) return;
+      _chatItems = chatMergeItems(act);
+      if (!_chatRenderTimer) _chatRenderTimer = setTimeout(() => { _chatRenderTimer = null; if (_chatAct === act) { renderChatList(); renderChatHeader(); } }, 100);
+    });
+  }
   if (!_chatUnsub) {
     list.innerHTML = '<div class="chat-empty">Carregando conversas...</div>';
     _chatUnsub = window._fb.listenInboxChats(act, _chatLimit, (items, error) => {
       if (!items) { list.innerHTML = `<div class="chat-empty" style="color:var(--red);">Não foi possível carregar: ${escapeHtml(error && error.message || '')}</div>`; return; }
-      _chatItems = items.concat(Object.values(_chatExtra).filter(x => !items.some(i => i.id === x.id))).filter(chatVisibleFilter(act));
+      _chatMainItems = items;
+      _chatItems = chatMergeItems(act);
       // Várias conversas mudando ao mesmo tempo viram um redesenho só.
       if (!_chatRenderTimer) _chatRenderTimer = setTimeout(() => {
         _chatRenderTimer = null;
