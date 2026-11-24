@@ -17453,7 +17453,7 @@ async function chatDownload(url, name) {
       return;
     }
     // Arquivo guardado pela D-API: baixa pelo servidor (o link direto não deixa o navegador salvar).
-    const dm = /d-api.cloud//.test(url) && (_chatMsgs.find(x => x.mediaUrl === url) || {}).id;
+    const dm = url.includes('d-api.cloud/') && (_chatMsgs.find(x => x.mediaUrl === url) || {}).id;
     if (dm) {
       const s = await window._fb.whatsapp('/whatsapp/chat-media', _chatAct, { messageId: dm, line: waLineOfKey(_chatOpenKey), chatKey: _chatOpenKey });
       const bytes = Uint8Array.from(atob(s.base64), ch => ch.charCodeAt(0));
