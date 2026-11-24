@@ -2184,6 +2184,43 @@ html.ui-vidro .ntc-box { background: var(--ui-glass); -webkit-backdrop-filter: b
   .flow-inspector.open { display: block; }
 }
 
+/* Discador */
+.dial-q { padding: 14px 16px; cursor: pointer; transition: border-color .15s; }
+.dial-q:hover { border-color: var(--accent2); }
+.dial-bar { height: 6px; border-radius: 6px; background: var(--surface2); overflow: hidden; margin: 10px 0 6px; }
+.dial-bar span { display: block; height: 100%; background: var(--accent2); border-radius: 6px; transition: width .3s; }
+.dial-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.dial-score { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); margin-bottom: 14px; }
+.dial-score b { color: var(--text); font-size: 14px; }
+.dial-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+.dial-main, .dial-side { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r2); padding: 18px; }
+.dial-side { padding: 12px; max-height: 70vh; overflow: auto; }
+.dial-status { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 10px; }
+.dial-status.live { color: #34d399; }
+.dial-lead-name { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1.2; margin-bottom: 4px; }
+.dial-obs { margin-top: 10px; font-size: 12.5px; color: var(--muted); background: var(--surface2); border-radius: 10px; padding: 8px 10px; white-space: pre-wrap; }
+.dial-results { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-top: 14px; }
+.dial-res { padding: 14px 10px; border-radius: 12px; border: 1px solid var(--border2); background: var(--surface2); color: var(--text); font-weight: 600; font-size: 14px; cursor: pointer; display: flex; flex-direction: column; gap: 3px; align-items: center; }
+.dial-res:hover { border-color: var(--accent2); }
+.dial-res small { font-size: 11px; font-weight: 400; color: var(--muted2); }
+.dial-msgs { margin-top: 16px; display: flex; flex-direction: column; gap: 4px; }
+.dial-msg { font-size: 12.5px; padding: 6px 10px; border-radius: 10px; max-width: 85%; background: var(--surface2); color: var(--text); }
+.dial-msg.out { align-self: flex-end; background: rgba(52,211,153,.12); }
+.dial-item { display: flex; align-items: center; gap: 6px; padding: 7px 6px; border-radius: 8px; }
+.dial-item.cur { background: var(--surface2); }
+.dial-item .chat-pill { padding: 2px 7px; }
+.dial-item-name { font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dw-steps { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; font-size: 12px; }
+.dw-steps span { padding: 4px 10px; border-radius: 20px; background: var(--surface2); color: var(--muted2); }
+.dw-steps span.on { background: var(--accent2); color: #fff; }
+.dw-steps span.ok { color: var(--text); }
+.dw-kinds { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.dw-count { margin: 12px 0 4px; font-size: 13px; color: var(--muted); }
+.dw-count b { color: var(--text); font-size: 18px; }
+.dw-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 16px; }
+.dw-nums { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; margin-top: 6px; }
+@media (max-width: 860px) { .dial-grid { grid-template-columns: 1fr; } .dial-side { max-height: none; } .dw-nums { grid-template-columns: 1fr; } }
+
 /* Clientes (admin) */
 .huv-view { padding: 28px 36px; }
 .huv-header { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
@@ -3332,6 +3369,7 @@ html.is-partner #admin-logins-list .admin-login-card > div:has(> [onclick^="save
     <button type="button" class="mnav-sheet-item" onclick="closeMobileMore(); switchView('historico'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Histórico</span></button>
     <button type="button" class="mnav-sheet-item" onclick="closeMobileMore(); switchView('instagram'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17.5 6.5h.01"/></svg><span>Instagram</span></button>
     <button type="button" class="mnav-sheet-item" onclick="closeMobileMore(); switchView('posts'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><span>Postagens</span></button>
+    <button type="button" class="mnav-sheet-item" id="mnav-discador" style="display:none;" onclick="closeMobileMore(); switchView('discador'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/><path d="M15 3h6v6M21 3l-6 6"/></svg><span>Discador</span></button>
     <button type="button" class="mnav-sheet-item"  onclick="closeMobileMore(); switchView('cadencia'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM16 2v4M8 2v4M3 10h18"/></svg><span>Cadência</span></button>
     <button type="button" class="mnav-sheet-item"  onclick="closeMobileMore(); switchView('whatsapp'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4"/></svg><span>Conexões</span></button>
     <button type="button" class="mnav-sheet-item" onclick="closeMobileMore(); switchView('modelos'); setMobileNav('mais')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Modelos API oficial</button>
@@ -3438,6 +3476,10 @@ html.is-partner #admin-logins-list .admin-login-card > div:has(> [onclick^="save
         <div class="nav-item" id="nav-campanhas" onclick="switchView('campanhas')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
           Campanhas
+        </div>
+        <div class="nav-item" id="nav-discador" onclick="switchView('discador')" style="display:none;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/><path d="M15 3h6v6M21 3l-6 6"/></svg>
+          Discador
         </div>
         <div class="nav-item" id="nav-cadencia" onclick="switchView('cadencia')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 14v3l2 1"/></svg>
@@ -4467,6 +4509,7 @@ html.is-partner #admin-logins-list .admin-login-card > div:has(> [onclick^="save
     <div id="agenteia-view" class="huv-view" style="display:none;"><div id="agenteia-body"></div></div>
     <div id="calendario-view" class="huv-view" style="display:none;"><div id="calendario-body"></div></div>
     <div id="atividades-view" class="huv-view" style="display:none;"><div id="atividades-body"></div></div>
+    <div id="discador-view" class="huv-view" style="display:none;"><div id="discador-body" style="max-width:1100px;"></div></div>
 
     <!-- Prospecção View -->
     <div id="prospeccao-view" class="huv-view" style="display:none;"><div id="prospeccao-body"></div></div>
@@ -8119,6 +8162,7 @@ function renderContatosBulkBar() {
     <button class="chat-pill" onclick="openBulkTag('remove')">Tirar etiqueta</button>
     <button class="chat-pill active" onclick="openSendToFunnel()">➜ Enviar para o funil</button>
     <button class="chat-pill active" onclick="openGroupAdd()">+ Adicionar a grupos</button>
+    ${dialerLines(contatosAct()).length && userCanView('discador') ? `<button class="chat-pill active" onclick="dialerFromContacts()">${uiIco('phone', 13)} Ligar em sequência</button>` : ''}
     <button class="chat-pill" onclick="_contatosSelected.clear(); renderContatos();">Limpar seleção</button>`;
 }
 
@@ -8531,10 +8575,15 @@ function switchView(view) {
     view = firstAllowedView();
   }
   try { localStorage.setItem('crm_last_view', JSON.stringify({ view, at: Date.now() })); } catch (e) {}
-  ['report','analise','clientes','automacoes','agenteia','calendario','atividades','capi','historico','instagram','posts','prospeccao','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','contatos','integracoes','modelos'].forEach(v => {
+  ['report','analise','clientes','automacoes','agenteia','calendario','atividades','capi','historico','instagram','posts','prospeccao','crm','ajuda','conta','whatsapp','campanhas','chat','cadencia','contatos','integracoes','modelos','discador'].forEach(v => {
     const el = document.getElementById('nav-' + v);
     if (el) el.classList.toggle('active', v === view);
   });
+  const discadorView = document.getElementById('discador-view');
+  if (discadorView) discadorView.style.display = view === 'discador' ? 'block' : 'none';
+  if (typeof refreshDialerNav === 'function') refreshDialerNav();
+  if (view === 'discador') renderDiscadorView();
+  else { try { if (_dial && _dial.q) setTimeout(dialerRender, 0); } catch (e) {} }
   document.querySelector('.topbar').style.display = view === 'report' ? 'flex' : 'none';
   syncMobileFilters(view === 'report');
   document.querySelector('.content').style.display = view === 'report' ? 'block' : 'none';
@@ -20945,6 +20994,7 @@ function dapiCallPanel(html) {
 }
 function dapiCallRender() {
   const c = _dapiCall; if (!c) return;
+  if (c.dialer && typeof dialerOnCallUpdate === 'function') return dialerOnCallUpdate();
   const secs = c.startedAt ? Math.floor((Date.now() - c.startedAt) / 1000) : 0;
   const time = c.startedAt ? ` · ${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}` : '';
   const live = !c.over;
@@ -20959,9 +21009,10 @@ function dapiCallRender() {
     </div>`);
 }
 async function dapiCallStart(opts, digits, lead) {
-  if (_dapiCall && !_dapiCall.over) return showToast('Já tem uma ligação em andamento.', 'warning');
+  if (_dapiCall && !_dapiCall.over) { if (opts.onEnd) { try { opts.onEnd({ error: 'Já tem uma ligação em andamento.' }); } catch (x) {} } return showToast('Já tem uma ligação em andamento.', 'warning'); }
   const name = opts.name || (lead && lead.name) || chatFormatPhone(digits);
-  _dapiCall = { act: opts.act, line: opts.line, name, status: 'Abrindo o microfone...', muted: false, over: false, startedAt: 0, call: null, chatKey: opts.chatKey || chatPhoneKey(digits) };
+  // dialer: ligação aberta pelo Discador (ele desenha a tela e recebe o fim da chamada em onEnd).
+  _dapiCall = { act: opts.act, line: opts.line, name, status: 'Abrindo o microfone...', muted: false, over: false, startedAt: 0, call: null, chatKey: opts.chatKey || chatPhoneKey(digits), dialer: !!opts.dialer };
   const me = _dapiCall;
   dapiCallRender();
   try {
@@ -20989,6 +21040,7 @@ async function dapiCallStart(opts, digits, lead) {
         const u = chatMe();
         window._fb.addChatNote({ act: me.act, chatKey: me.chatKey, chatName: me.name, text: dur ? `📞 Ligação pelo CRM: ${Math.floor(dur / 60)} min ${dur % 60} s` : '📞 Ligação pelo CRM: não atendida', by: u.name, byUid: u.uid, at: new Date().toISOString(), done: true, call: 'whatsapp' }).catch(() => {});
       }
+      if (opts.onEnd) { try { opts.onEnd({ answered: !!me.startedAt, dur, type: t }); } catch (x) { console.warn('Discador:', x); } }
     };
     call.on('ended', end);
     call.on('close', () => end());
@@ -21004,6 +21056,7 @@ async function dapiCallStart(opts, digits, lead) {
     me.over = true;
     me.status = /Permission|NotAllowed|denied/i.test(e && (e.name + ' ' + e.message) || '') ? 'Libere o microfone para o CRM no navegador.' : 'Não deu para ligar: ' + (e && e.message || e);
     dapiCallRender();
+    if (opts.onEnd) { try { opts.onEnd({ error: me.status }); } catch (x) {} }
   }
 }
 function dapiCallMute() { const c = _dapiCall; if (!c || !c.call) return; c.muted = !c.muted; try { c.call.mute(c.muted); } catch (e) {} dapiCallRender(); }
@@ -24547,6 +24600,14 @@ function renderKanbanNow() {
         actBtn.innerHTML = uiIco('clipboard', 13); actBtn.style.padding = '1px 8px';
         actBtn.addEventListener('click', e => { e.stopPropagation(); actBulkOpen(stage.id); });
         headerLeft.appendChild(actBtn);
+        if (dialerLines(filterAct).length && userCanView('discador')) {
+          const dialBtn = document.createElement('button');
+          dialBtn.className = 'col-auto-btn';
+          dialBtn.title = 'Ligar em sequência para os leads desta coluna (Discador)';
+          dialBtn.innerHTML = uiIco('phone', 13); dialBtn.style.padding = '1px 8px';
+          dialBtn.addEventListener('click', e => { e.stopPropagation(); dialerFromColumn(stage.id); });
+          headerLeft.appendChild(dialBtn);
+        }
       }
       if (colAuto && colAuto.active && stageLeads.length) {
         const playBtn = document.createElement('button');
@@ -25817,6 +25878,601 @@ function moveLeadTo(id, stageId, pipelineId) {
   document.getElementById('move-modal').classList.remove('open');
   renderKanban(); renderFunilChart(); renderFunilEvolucao();
 }
+
+
+// ===== DISCADOR: fila de ligações pelo WhatsApp (D-API), um lead atrás do outro =====
+// A fila fica no servidor (dialer_queues). A ligação usa o microfone deste navegador (dapiCallStart).
+// Não atendeu, recusou ou ocupado: espera alguns segundos e liga para o próximo. Atendeu: ao desligar,
+// a pessoa marca o resultado (pode mover o card) e o discador segue.
+const DIALER_RESULTS_DEFAULT = [
+  { id: 'interessado', label: 'Interessado' },
+  { id: 'seminteresse', label: 'Sem interesse' },
+  { id: 'agendar', label: 'Agendar' },
+  { id: 'depois', label: 'Ligar depois' }
+];
+let _dial = { act: '', list: [], q: null, cur: -1, phase: 'idle', paused: true, timer: null, tick: null, until: 0, last: null, msgs: null, err: '' };
+let _dw = null;
+
+const dialerAct = () => normalizeActValue(getActForStages() || (typeof activeClient !== 'undefined' && activeClient ? activeClient.account : '') || '');
+const dialerLines = act => waLines(act).filter(l => waIsDapi(l.id, act));
+const dialerApi = (path, body) => window._fb.whatsapp('/dialer/' + path, body.act || _dial.act, body);
+const dialerChatKey = (line, phone) => (line && line !== WA_MAIN ? line + '__' : '') + chatPhoneKey(phone);
+const dialerFmtDur = s => { s = Math.max(0, Math.round(s || 0)); return s >= 3600 ? Math.floor(s / 3600) + ' h ' + Math.floor(s % 3600 / 60) + ' min' : Math.floor(s / 60) + ' min ' + (s % 60) + ' s'; };
+const dialerIsOn = () => !!(_dial.q && !_dial.paused);
+function dialerViewVisible() { const v = document.getElementById('discador-view'); return !!(v && v.style.display !== 'none'); }
+
+function refreshDialerNav() {
+  const act = dialerAct();
+  const show = isAdmin || (act && dapiDefault(act)) || DAPI_ACTS.some(a => typeof activeClient !== 'undefined' && activeClient && normalizeActValue(activeClient.account) === a);
+  ['nav-discador', 'mnav-discador'].forEach(id => { const el = document.getElementById(id); if (el && userCanView('discador')) el.style.display = show ? '' : 'none'; });
+}
+
+// ---------- Lista de filas ----------
+async function renderDiscadorView() {
+  const box = document.getElementById('discador-body');
+  if (!box) return;
+  const act = dialerAct();
+  if (!act) { box.innerHTML = dialerHead() + '<div class="integ-muted" style="margin-top:12px;">Selecione um cliente para usar o Discador.</div>'; return; }
+  if (_dial.q && normalizeActValue(_dial.q.act || _dial.act) === act) return dialerRenderRun();
+  _dial.act = act;
+  await Promise.all([ensureWaSettings(act).catch(() => {}), pipelinesReady(act)]);
+  const lines = dialerLines(act);
+  if (!lines.length) {
+    box.innerHTML = dialerHead() + `<div class="integ-card" style="margin-top:14px;padding:16px;">O Discador liga pelo WhatsApp conectado pela D-API, e este cliente ainda não tem um número assim. Conecte um em <a href="#" onclick="switchView('whatsapp');return false;">Conexões</a>.</div>`;
+    return;
+  }
+  box.innerHTML = dialerHead(true) + '<div class="integ-muted" style="margin-top:14px;">Carregando filas...</div>';
+  try {
+    const r = await dialerApi('list', { act });
+    _dial.list = r.queues || [];
+  } catch (e) { box.innerHTML = dialerHead(true) + `<div class="integ-error" style="margin-top:14px;">${escapeHtml(e.message)}</div>`; return; }
+  if (!dialerViewVisible() || dialerAct() !== act || _dial.q) return;
+  const rows = _dial.list.map(q => {
+    const c = q.counts || {};
+    const left = (c.pending || 0) + (c.retry || 0);
+    const pct = c.total ? Math.round(((c.done || 0) + (c.skipped || 0)) / c.total * 100) : 0;
+    const st = q.status === 'done' ? ['Concluída', 'var(--muted2)'] : q.status === 'running' ? ['Ligando' + (q.runnerName ? ' · ' + q.runnerName : ''), '#34d399'] : q.status === 'paused' ? ['Pausada', '#fbbf24'] : ['Pronta', 'var(--accent2)'];
+    return `<div class="integ-card dial-q" onclick="dialerOpen('${escapeJsString(q.id)}')">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;">
+        <div style="min-width:0;flex:1;">
+          <div style="font-weight:600;color:var(--text);">${escapeHtml(q.name)}</div>
+          <div class="integ-muted" style="font-size:12px;margin-top:2px;">${escapeHtml(q.source && q.source.label || '')} · ${escapeHtml(waLineLabel(act, q.line))} · criada por ${escapeHtml(q.createdByName || '-')}</div>
+        </div>
+        <span style="font-size:12px;font-weight:600;color:${st[1]};">${escapeHtml(st[0])}</span>
+      </div>
+      <div class="dial-bar"><span style="width:${pct}%"></span></div>
+      <div class="integ-muted" style="font-size:12px;">${c.done || 0} de ${c.total || 0} feitas · ${c.answered || 0} atendidas · ${left} na fila${c.talkSec ? ' · ' + dialerFmtDur(c.talkSec) + ' em ligação' : ''}</div>
+    </div>`;
+  }).join('');
+  box.innerHTML = dialerHead(true) + `<div style="display:flex;flex-direction:column;gap:10px;margin-top:16px;">${rows || '<div class="integ-muted">Nenhuma fila ainda. Crie a primeira em "Nova fila".</div>'}</div>`;
+}
+
+function dialerHead(withBtn) {
+  return `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+    <div><div class="huv-page-title" style="color:var(--text);margin-bottom:4px;">Discador</div>
+    <div style="font-size:13px;color:var(--muted);max-width:620px;">Liga em sequência pelo WhatsApp: não atendeu, passa para o próximo; atendeu, você marca o resultado e ele segue. Use fone e deixe esta aba aberta.</div></div>
+    ${withBtn ? `<button class="btn-save" style="width:auto;padding:9px 16px;" onclick="openDialerWizard()">+ Nova fila</button>` : ''}
+  </div>`;
+}
+
+// ---------- Nova fila (passo a passo) ----------
+function openDialerWizard(preset) {
+  const act = normalizeActValue((preset && preset.act) || dialerAct());
+  if (!act) return showToast('Selecione um cliente primeiro.', 'warning');
+  if (_dial.q && !_dial.paused) return showToast('Pause a fila atual antes de criar outra.', 'warning');
+  Promise.all([ensureWaSettings(act).catch(() => {}), pipelinesReady(act), getLeadsAsync()]).then(() => {
+    const lines = dialerLines(act);
+    if (!lines.length) return showToast('Este cliente não tem número conectado pela D-API.', 'warning');
+    const p = preset || {};
+    _dw = {
+      act, step: 1, kind: p.kind || 'funnel',
+      pipeline: p.pipeline || currentPipeline(act), stage: p.stage || '*', period: p.period || 'all', from: '', to: '',
+      listItems: p.items || [], listName: p.listName || '',
+      line: lines[0].id,
+      settings: { waitSec: 8, attempts: 2, perHour: 30, perDay: 150 },
+      results: DIALER_RESULTS_DEFAULT.map(r => ({ ...r, target: '' })),
+      name: '', preview: null
+    };
+    openHuvenModal('Nova fila de ligações', '<div id="dw-body"></div>', 600);
+    dialerWizRender();
+  });
+}
+
+function dialerWizItems() {
+  const w = _dw;
+  if (w.kind !== 'funnel') return w.listItems;
+  const stages = getStages(w.act, w.pipeline);
+  let leads = getLeads().filter(l => leadMatchesClient(l, w.act) && leadPipeline(l) === w.pipeline);
+  const stageOf = l => (typeof getArteAzulejoStageForBoard === 'function' ? getArteAzulejoStageForBoard(l, w.act) : l.stage);
+  if (w.stage !== '*') leads = leads.filter(l => stageOf(l) === w.stage);
+  else leads = leads.filter(l => stages.some(s => s.id === stageOf(l)));
+  const range = dialerPeriodRange(w);
+  if (range) leads = leads.filter(l => { const t = getLeadCrmSortTime(l); return t && t >= range[0] && t < range[1]; });
+  leads = sortCrmLeadsForKanban(leads, w.act);
+  return leads.map(l => ({ leadId: l.id, name: l.name || '', phone: l.phone || l.whatsappPhone || '', optOut: !!l.whatsappOptOut }));
+}
+
+function dialerPeriodRange(w) {
+  const now = new Date();
+  const day0 = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  if (w.period === 'month') return [new Date(now.getFullYear(), now.getMonth(), 1).getTime(), Infinity];
+  if (w.period === 'lastmonth') return [new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime(), new Date(now.getFullYear(), now.getMonth(), 1).getTime()];
+  if (w.period === '7d') return [day0(now) - 6 * 86400000, Infinity];
+  if (w.period === '30d') return [day0(now) - 29 * 86400000, Infinity];
+  if (w.period === 'custom' && (w.from || w.to)) return [w.from ? new Date(w.from + 'T00:00').getTime() : 0, w.to ? new Date(w.to + 'T00:00').getTime() + 86400000 : Infinity];
+  return null;
+}
+
+function dialerSourceLabel(w) {
+  if (w.kind === 'list') return 'Lista' + (w.listName ? ': ' + w.listName : '');
+  if (w.kind === 'contacts') return 'Contatos selecionados';
+  const st = w.stage === '*' ? 'Todas as colunas' : ((getStages(w.act, w.pipeline).find(s => s.id === w.stage) || {}).label || w.stage);
+  const per = { all: '', month: ' · este mês', lastmonth: ' · mês passado', '7d': ' · últimos 7 dias', '30d': ' · últimos 30 dias', custom: ' · ' + [w.from, w.to].filter(Boolean).map(d => d.split('-').reverse().join('/')).join(' a ') }[w.period] || '';
+  return (pipelineList(w.act).length > 1 ? pipelineName(w.act, w.pipeline) + ' › ' : '') + st + per;
+}
+
+function dialerWizRender() {
+  const w = _dw, box = document.getElementById('dw-body');
+  if (!w || !box) return;
+  const steps = ['Quem', 'Número', 'Regras', 'Conferir'];
+  const head = `<div class="dw-steps">${steps.map((s, i) => `<span class="${i + 1 === w.step ? 'on' : i + 1 < w.step ? 'ok' : ''}">${i + 1}. ${s}</span>`).join('')}</div>`;
+  let html = '';
+  if (w.step === 1) {
+    const n = dialerWizItems().length;
+    const pls = pipelineList(w.act);
+    html = `
+      <div class="dw-kinds">
+        <button class="chat-pill ${w.kind === 'funnel' ? 'active' : ''}" onclick="_dw.kind='funnel';dialerWizRender()">Do funil</button>
+        <button class="chat-pill ${w.kind === 'list' ? 'active' : ''}" onclick="_dw.kind='list';_dw.listItems=[];dialerWizRender()">Subir ou colar lista</button>
+        ${w.kind === 'contacts' ? '<button class="chat-pill active">Contatos selecionados</button>' : ''}
+      </div>
+      ${w.kind === 'funnel' ? `
+        ${pls.length > 1 ? `<label class="field-label">Funil</label><select class="field-input" onchange="_dw.pipeline=this.value;_dw.stage='*';dialerWizRender()">${pls.map(p => `<option value="${escapeHtml(p.id)}" ${p.id === w.pipeline ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}</select>` : ''}
+        <label class="field-label">Coluna</label>
+        <select class="field-input" onchange="_dw.stage=this.value;dialerWizRender()"><option value="*">Todas as colunas</option>${getStages(w.act, w.pipeline).map(s => `<option value="${escapeHtml(s.id)}" ${s.id === w.stage ? 'selected' : ''}>${escapeHtml(s.label)}</option>`).join('')}</select>
+        <label class="field-label">Quando o lead entrou</label>
+        <select class="field-input" onchange="_dw.period=this.value;dialerWizRender()">${[['all', 'Qualquer data'], ['month', 'Este mês'], ['lastmonth', 'Mês passado'], ['7d', 'Últimos 7 dias'], ['30d', 'Últimos 30 dias'], ['custom', 'Escolher as datas']].map(([v, t]) => `<option value="${v}" ${v === w.period ? 'selected' : ''}>${t}</option>`).join('')}</select>
+        ${w.period === 'custom' ? `<div style="display:flex;gap:8px;"><div style="flex:1;"><label class="field-label">De</label><input type="date" class="field-input" value="${escapeHtml(w.from)}" onchange="_dw.from=this.value;dialerWizRender()"></div><div style="flex:1;"><label class="field-label">Até</label><input type="date" class="field-input" value="${escapeHtml(w.to)}" onchange="_dw.to=this.value;dialerWizRender()"></div></div>` : ''}
+        <div class="integ-muted" style="font-size:12px;margin-top:4px;">A fila segue a ordem dos cards na coluna.</div>` : ''}
+      ${w.kind === 'list' ? `
+        <label class="field-label">Planilha (.xlsx ou .csv, com nome e telefone)</label>
+        <input type="file" class="field-input" accept=".xlsx,.xls,.csv,.txt" onchange="dialerLoadSheet(this)">
+        <label class="field-label">Ou cole aqui (uma pessoa por linha: nome e telefone)</label>
+        <textarea class="field-input" rows="5" placeholder="Maria Souza, 61 99999-0000&#10;61 98888-1111" oninput="dialerPasteList(this.value)">${escapeHtml(w.pasteRaw || '')}</textarea>` : ''}
+      <div class="dw-count"><b>${n}</b> contato${n === 1 ? '' : 's'} nesta seleção${n > 1000 ? ' (a fila leva os primeiros 1.000)' : ''}</div>
+      <div class="dw-foot"><span></span><button class="btn-save" style="width:auto;padding:9px 18px;" ${n ? '' : 'disabled'} onclick="_dw.step=2;dialerWizRender()">Continuar</button></div>`;
+  } else if (w.step === 2) {
+    const lines = dialerLines(w.act);
+    html = `
+      <label class="field-label">WhatsApp que vai ligar</label>
+      <select class="field-input" onchange="_dw.line=this.value;dialerWizUsage()">${lines.map(l => `<option value="${escapeHtml(l.id)}" ${l.id === w.line ? 'selected' : ''}>${escapeHtml(l.label)}</option>`).join('')}</select>
+      <div id="dw-usage" class="integ-muted" style="font-size:12.5px;margin-top:4px;"></div>
+      <div class="integ-card" style="margin-top:12px;padding:10px 12px;font-size:12.5px;line-height:1.5;">A ligação sai deste número, com o microfone e o fone deste computador. O contato vê a chamada no WhatsApp como vinda dele.</div>
+      <div class="dw-foot"><button class="chat-pill" onclick="_dw.step=1;dialerWizRender()">Voltar</button><button class="btn-save" style="width:auto;padding:9px 18px;" onclick="_dw.step=3;dialerWizRender()">Continuar</button></div>`;
+    setTimeout(dialerWizUsage, 0);
+  } else if (w.step === 3) {
+    const s = w.settings;
+    const num = (k, label, hint, min, max) => `<div class="dw-num"><label class="field-label">${label}</label><input type="number" class="field-input" min="${min}" max="${max}" value="${s[k]}" onchange="_dw.settings.${k}=Math.min(${max},Math.max(${min},Number(this.value)||${min}));this.value=_dw.settings.${k}"><div class="integ-muted" style="font-size:11.5px;">${hint}</div></div>`;
+    html = `
+      <label class="field-label">Nome da fila</label>
+      <input class="field-input" value="${escapeHtml(w.name || dialerSourceLabel(w))}" oninput="_dw.name=this.value" maxlength="80">
+      <div class="dw-nums">
+        ${num('waitSec', 'Espera entre ligações (s)', 'Depois de quem não atendeu', 3, 120)}
+        ${num('attempts', 'Tentativas por contato', 'Quem não atende volta para o fim', 1, 5)}
+        ${num('perHour', 'Máximo por hora', 'Protege o número de bloqueio', 1, 60)}
+        ${num('perDay', 'Máximo por dia', 'Soma todas as filas do número', 1, 400)}
+      </div>
+      <label class="field-label" style="margin-top:6px;">Resultados da ligação atendida (e para onde vai o card)</label>
+      ${w.results.map((r, i) => `<div style="display:flex;gap:8px;margin-bottom:6px;">
+        <input class="field-input" style="flex:1;margin:0;" value="${escapeHtml(r.label)}" maxlength="40" oninput="_dw.results[${i}].label=this.value">
+        <select class="field-input" style="flex:1;margin:0;" onchange="_dw.results[${i}].target=this.value"><option value="">Não mover o card</option>${funnelTargetOptions(w.act, r.target)}</select>
+      </div>`).join('')}
+      <div class="dw-foot"><button class="chat-pill" onclick="_dw.step=2;dialerWizRender()">Voltar</button><button class="btn-save" style="width:auto;padding:9px 18px;" onclick="_dw.step=4;_dw.preview=null;dialerWizRender();dialerWizPreview()">Continuar</button></div>`;
+  } else {
+    const p = w.preview;
+    const rm = p && p.removed || {};
+    const reasons = [[rm.noWhatsApp, 'sem WhatsApp'], [rm.optOut, 'pediram para sair'], [rm.dup, 'repetidos'], [rm.noPhone, 'sem telefone válido'], [rm.over, 'acima de 1.000']].filter(x => x[0]);
+    html = !p ? '<div class="integ-muted" style="padding:20px 0;">Conferindo quem tem WhatsApp...</div>' : p.error ? `<div class="integ-error">${escapeHtml(p.error)}</div><div class="dw-foot"><button class="chat-pill" onclick="_dw.step=3;dialerWizRender()">Voltar</button><span></span></div>` : `
+      <div class="dw-count" style="font-size:15px;"><b>${p.total}</b> contato${p.total === 1 ? '' : 's'} para ligar</div>
+      ${reasons.length ? `<div class="integ-muted" style="font-size:12.5px;margin-bottom:8px;">Ficaram de fora: ${reasons.map(x => x[0] + ' ' + x[1]).join(', ')}.</div>` : ''}
+      ${p.checked === false ? '<div class="integ-muted" style="font-size:12.5px;margin-bottom:8px;">Não deu para conferir o WhatsApp de todos agora; quem não tiver é pulado na hora.</div>' : ''}
+      <div class="integ-card" style="padding:10px 12px;font-size:12.5px;line-height:1.6;">
+        <b>${escapeHtml(w.name || dialerSourceLabel(w))}</b><br>
+        Número: ${escapeHtml(waLineLabel(w.act, w.line))} · espera ${w.settings.waitSec} s · ${w.settings.attempts} tentativa${w.settings.attempts > 1 ? 's' : ''} · até ${w.settings.perHour}/hora e ${w.settings.perDay}/dia
+      </div>
+      ${p.total > 40 ? '<div class="integ-muted" style="font-size:12px;margin-top:8px;">Muitas ligações seguidas para quem nunca falou com o número aumentam o risco de bloqueio no WhatsApp. Os limites acima seguram o ritmo.</div>' : ''}
+      <div class="dw-foot"><button class="chat-pill" onclick="_dw.step=3;dialerWizRender()">Voltar</button>
+        <div style="display:flex;gap:8px;"><button class="chat-pill" ${p.total ? '' : 'disabled'} onclick="dialerWizCreate(false)">Só criar</button><button class="btn-save" style="width:auto;padding:9px 18px;" ${p.total ? '' : 'disabled'} onclick="dialerWizCreate(true)">Criar e começar</button></div></div>`;
+  }
+  box.innerHTML = head + html;
+}
+
+async function dialerWizUsage() {
+  const el = document.getElementById('dw-usage');
+  if (!el || !_dw) return;
+  try { const u = await dialerApi('usage', { act: _dw.act, line: _dw.line }); el.textContent = `Hoje este número já ligou ${u.today} vez${u.today === 1 ? '' : 'es'} pelo Discador (${u.lastHour} na última hora).`; } catch (e) { el.textContent = ''; }
+}
+
+function dialerParseRows(rows) {
+  const out = [];
+  for (const r of rows) {
+    const cells = (Array.isArray(r) ? r : String(r).split(/[;,\t]/)).map(c => String(c == null ? '' : c).trim());
+    const pi = cells.findIndex(c => (c.replace(/\D/g, '').length >= 10));
+    if (pi === -1) continue;
+    const name = cells.filter((c, i) => i !== pi && c && c.replace(/\D/g, '').length < 8)[0] || '';
+    out.push({ name, phone: cells[pi] });
+  }
+  return out;
+}
+function dialerPasteList(v) {
+  _dw.pasteRaw = v;
+  _dw.listItems = dialerParseRows(String(v || '').split(/\r?\n/).filter(x => x.trim()));
+  _dw.listName = 'colada';
+  const c = document.querySelector('#dw-body .dw-count b');
+  if (c) { c.textContent = _dw.listItems.length; const btn = document.querySelector('#dw-body .dw-foot .btn-save'); if (btn) btn.disabled = !_dw.listItems.length; }
+}
+async function dialerLoadSheet(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  try {
+    let rows;
+    if (/\.(csv|txt)$/i.test(file.name)) rows = (await file.text()).split(/\r?\n/).filter(x => x.trim());
+    else { await ensureXlsxLoaded(); const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' }); rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' }); }
+    _dw.listItems = dialerParseRows(rows);
+    _dw.listName = file.name.replace(/\.[^.]+$/, '');
+    _dw.pasteRaw = '';
+    if (!_dw.listItems.length) showToast('Não achei telefones nessa planilha.', 'warning');
+    dialerWizRender();
+  } catch (e) { showToast('Não deu para ler a planilha: ' + e.message, 'error'); }
+}
+
+function dialerWizPayload(preview) {
+  const w = _dw;
+  return {
+    act: w.act, line: w.line, preview, name: (w.name || dialerSourceLabel(w)).trim(),
+    source: { kind: w.kind, label: dialerSourceLabel(w) },
+    settings: { ...w.settings, results: w.results.filter(r => String(r.label || '').trim()).map(r => { const t = r.target ? parseFunnelTarget(r.target) : null; return { id: r.id, label: r.label.trim(), stage: t ? t.stage : '', pipeline: t ? t.pipeline : '' }; }) },
+    items: dialerWizItems().slice(0, 5000)
+  };
+}
+async function dialerWizPreview() {
+  try { _dw.preview = await dialerApi('create', dialerWizPayload(true)); }
+  catch (e) { _dw.preview = { error: e.message }; }
+  if (_dw && _dw.step === 4) dialerWizRender();
+}
+async function dialerWizCreate(start) {
+  const btns = document.querySelectorAll('#dw-body .dw-foot button');
+  btns.forEach(b => b.disabled = true);
+  try {
+    const r = await dialerApi('create', dialerWizPayload(false));
+    closeHuvenModal();
+    _dw = null;
+    showToast(`Fila criada com ${r.total} contato${r.total === 1 ? '' : 's'}.`, 'success');
+    if (!dialerViewVisible()) switchView('discador');
+    await dialerOpen(r.id);
+    if (start) dialerResume();
+  } catch (e) { btns.forEach(b => b.disabled = false); showToast(e.message, 'error'); }
+}
+
+// ---------- Rodando a fila ----------
+async function dialerOpen(id) {
+  try {
+    const r = await dialerApi('get', { act: dialerAct() || _dial.act, id });
+    const q = r.queue;
+    q.act = dialerAct() || _dial.act;
+    const me = (chatMe() || {}).name || '';
+    if (q.status === 'running' && q.runnerName && q.runnerName !== me && Date.now() - Date.parse(q.runnerAt || 0) < 3 * 60000) showToast(`${q.runnerName} está ligando por esta fila agora.`, 'warning', 6000);
+    Object.assign(_dial, { act: q.act, q, cur: -1, phase: 'idle', paused: true, last: null, msgs: null, err: '' });
+    dialerClearTimers();
+    dialerRenderRun();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+function dialerClearTimers() { clearTimeout(_dial.timer); clearInterval(_dial.tick); _dial.timer = null; _dial.tick = null; _dial.until = 0; }
+
+function dialerNextIndex() {
+  const items = (_dial.q && _dial.q.items) || [];
+  const p = items.findIndex(x => x.st === 'pending' || !x.st);
+  if (p !== -1) return p;
+  let best = -1;
+  items.forEach((x, i) => { if (x.st === 'retry' && (best === -1 || String(x.endAt || '') < String(items[best].endAt || ''))) best = i; });
+  return best;
+}
+
+async function dialerResume() {
+  if (!_dial.q) return;
+  if (_dapiCall && !_dapiCall.over) return showToast('Termine a ligação atual primeiro.', 'warning');
+  try { await navigator.mediaDevices.getUserMedia({ audio: true }).then(s => s.getTracks().forEach(t => t.stop())); }
+  catch (e) { return showToast('Libere o microfone para o CRM no navegador.', 'error'); }
+  _dial.paused = false; _dial.err = '';
+  dialerApi('state', { id: _dial.q.id, status: 'running' }).catch(() => {});
+  dialerCallNext();
+}
+
+async function dialerPause() {
+  if (!_dial.q) return;
+  _dial.paused = true;
+  if (_dial.phase === 'waiting' || _dial.phase === 'blocked') { dialerClearTimers(); _dial.phase = 'idle'; }
+  if (!(_dapiCall && !_dapiCall.over) && _dial.phase !== 'result') {
+    _dial.q.items.forEach(x => { if (x.st === 'calling') x.st = x.tries > 0 ? 'retry' : 'pending'; });
+    dialerApi('state', { id: _dial.q.id, status: 'paused' }).catch(() => {});
+  }
+  dialerRender();
+}
+
+async function dialerFinish() {
+  if (!_dial.q) return;
+  if (_dapiCall && !_dapiCall.over) return showToast('Termine a ligação atual primeiro.', 'warning');
+  if (!confirm('Encerrar esta fila? Quem ainda não recebeu ligação fica sem ligar.')) return;
+  dialerClearTimers();
+  await dialerApi('state', { id: _dial.q.id, status: 'done' }).catch(() => {});
+  dialerClose();
+}
+
+function dialerClose() {
+  if (_dapiCall && !_dapiCall.over && _dapiCall.dialer) return showToast('Termine a ligação atual primeiro.', 'warning');
+  if (_dial.q && !_dial.paused) { _dial.paused = true; dialerApi('state', { id: _dial.q.id, status: 'paused' }).catch(() => {}); }
+  dialerClearTimers();
+  _dial.q = null; _dial.cur = -1; _dial.phase = 'idle';
+  const p = document.getElementById('dapi-call-panel'); if (p && (!_dapiCall || _dapiCall.dialer)) p.remove();
+  renderDiscadorView();
+}
+
+async function dialerCallNext(forceIndex) {
+  const q = _dial.q;
+  if (!q || _dial.paused) return dialerRender();
+  dialerClearTimers();
+  const idx = forceIndex !== undefined ? forceIndex : dialerNextIndex();
+  if (idx === -1) {
+    _dial.paused = true; _dial.phase = 'finished'; _dial.cur = -1;
+    dialerApi('state', { id: q.id, status: 'done' }).catch(() => {});
+    dialerRender();
+    showToast('Fila concluída.', 'success');
+    return;
+  }
+  _dial.cur = idx; _dial.phase = 'starting'; _dial.last = null; _dial.msgs = null;
+  dialerRender();
+  dialerLoadMsgs(idx);
+  let r;
+  try { r = await dialerApi('start', { id: q.id, index: idx }); }
+  catch (e) { _dial.paused = true; _dial.phase = 'idle'; _dial.err = e.message; return dialerRender(); }
+  if (r.blocked) {
+    _dial.phase = 'blocked'; _dial.err = r.message;
+    if (r.blocked === 'hour' && r.waitSec) { _dial.until = Date.now() + r.waitSec * 1000; _dial.tick = setInterval(dialerRender, 1000); _dial.timer = setTimeout(() => dialerCallNext(), r.waitSec * 1000); }
+    else { _dial.paused = true; dialerApi('state', { id: q.id, status: 'paused' }).catch(() => {}); }
+    return dialerRender();
+  }
+  const it = q.items[idx];
+  it.st = 'calling'; it.tries = r.tries; it.at = new Date().toISOString();
+  _dial.phase = 'calling';
+  const lead = it.lead ? findLead(it.lead) : null;
+  const digits = String(it.phone).replace(/\D/g, '');
+  const started = Date.now();
+  // Sem resposta do WhatsApp em 70 s: desliga e segue.
+  _dial.timer = setTimeout(() => { if (_dapiCall && _dapiCall.dialer && !_dapiCall.over && !_dapiCall.startedAt) dapiCallHangup(); }, 70000);
+  dapiCallStart({ act: q.act, line: q.line, name: it.name || (lead && lead.name) || chatFormatPhone(digits), chatKey: dialerChatKey(q.line, digits), dialer: true,
+    onEnd: res => dialerOnEnd(idx, res, started) }, digits, lead);
+}
+
+async function dialerOnEnd(idx, res, started) {
+  clearTimeout(_dial.timer);
+  const q = _dial.q;
+  if (!q || _dial.cur !== idx) return;
+  const it = q.items[idx];
+  if (res && res.error) {
+    // Erro na ligação (microfone, conexão): pausa para não queimar a fila.
+    _dial.paused = true; _dial.phase = 'idle'; _dial.err = res.error;
+    it.st = it.tries > 0 ? 'retry' : 'pending';
+    dialerApi('result', { id: q.id, index: idx, answered: false, why: 'erro' }).catch(() => {});
+    dialerApi('state', { id: q.id, status: 'paused' }).catch(() => {});
+    return dialerRender();
+  }
+  _dial.last = res;
+  if (res.answered) { _dial.phase = 'result'; return dialerRender(); }
+  const s = q.settings || {};
+  const again = (it.tries || 0) < (Number(s.attempts) || 1);
+  it.st = again ? 'retry' : 'done'; it.ans = false; it.endAt = new Date().toISOString(); it.why = res.type || '';
+  dialerApi('result', { id: q.id, index: idx, answered: false, why: res.type || '' }).catch(e => showToast('Resultado não salvo: ' + e.message, 'warning'));
+  dialerWait();
+}
+
+function dialerWait() {
+  if (_dial.paused) { _dial.phase = 'idle'; return dialerRender(); }
+  const sec = Math.max(3, Number((_dial.q.settings || {}).waitSec) || 8);
+  _dial.phase = 'waiting'; _dial.until = Date.now() + sec * 1000;
+  _dial.tick = setInterval(dialerRender, 1000);
+  _dial.timer = setTimeout(() => dialerCallNext(), sec * 1000);
+  dialerRender();
+}
+
+async function dialerSaveResult(resId) {
+  const q = _dial.q, idx = _dial.cur;
+  if (!q || idx < 0 || _dial.phase !== 'result') return;
+  const it = q.items[idx];
+  const r = ((q.settings || {}).results || []).find(x => x.id === resId) || { id: resId, label: resId === 'none' ? 'Sem resultado' : resId };
+  const note = (document.getElementById('dial-note') || {}).value || '';
+  const dur = (_dial.last && _dial.last.dur) || 0;
+  _dial.phase = 'saving'; dialerRender();
+  try { await dialerApi('result', { id: q.id, index: idx, answered: true, final: true, res: r.id, resLabel: r.label, note, dur }); }
+  catch (e) { _dial.phase = 'result'; dialerRender(); return showToast('Não salvou: ' + e.message, 'error'); }
+  Object.assign(it, { st: 'done', ans: true, res: r.id, resLabel: r.label, note, dur: (Number(it.dur) || 0) + dur, endAt: new Date().toISOString() });
+  if (it.lead && r.stage && findLead(it.lead)) { try { moveLeadTo(it.lead, r.stage, r.pipeline && r.pipeline !== 'principal' ? r.pipeline : undefined); } catch (e) {} }
+  const u = chatMe();
+  window._fb.addChatNote({ act: q.act, chatKey: dialerChatKey(q.line, it.phone), chatName: it.name || chatFormatPhone(it.phone), text: `📞 Discador: ${r.label}${note ? ' · ' + note : ''}`, by: u.name, byUid: u.uid, at: new Date().toISOString(), done: true, call: 'whatsapp' }).catch(() => {});
+  dialerWait();
+}
+
+async function dialerSkip(idx) {
+  const q = _dial.q;
+  if (!q) return;
+  if (idx === undefined) idx = _dial.phase === 'waiting' ? dialerNextIndex() : _dial.cur;
+  if (idx < 0 || !q.items[idx]) return;
+  if (_dapiCall && !_dapiCall.over && _dial.cur === idx) return showToast('Desligue antes de pular.', 'warning');
+  q.items[idx].st = 'skipped';
+  dialerApi('result', { id: q.id, index: idx, skip: true }).catch(() => {});
+  dialerRender();
+}
+
+function dialerCallNow(idx) {
+  if (!_dial.q || (_dapiCall && !_dapiCall.over)) return;
+  if (['calling', 'starting', 'saving'].includes(_dial.phase)) return;
+  if (_dial.phase === 'result') return showToast('Marque o resultado da ligação atual primeiro.', 'warning');
+  _dial.paused = false;
+  dialerApi('state', { id: _dial.q.id, status: 'running' }).catch(() => {});
+  dialerCallNext(idx);
+}
+
+async function dialerRequeue() {
+  if (!_dial.q) return;
+  await dialerApi('requeue', { id: _dial.q.id }).catch(e => showToast(e.message, 'error'));
+  dialerOpen(_dial.q.id);
+}
+
+async function dialerDelete() {
+  if (!_dial.q || !_dial.paused) return;
+  if (!confirm('Apagar esta fila? O histórico de ligações dela some (as anotações no Chat ficam).')) return;
+  await dialerApi('delete', { id: _dial.q.id }).catch(e => showToast(e.message, 'error'));
+  _dial.q = null;
+  renderDiscadorView();
+}
+
+function dialerLoadMsgs(idx) {
+  const q = _dial.q, it = q && q.items[idx];
+  if (!it || !window._fb.listenInboxMessages) return;
+  try {
+    let unsub = null;
+    unsub = window._fb.listenInboxMessages(q.act, dialerChatKey(q.line, it.phone), 6, msgs => {
+      if (_dial.cur === idx) { _dial.msgs = (msgs || []).slice(-6); dialerRender(); }
+      setTimeout(() => { try { unsub && unsub(); } catch (e) {} }, 0);
+    });
+  } catch (e) {}
+}
+
+// A ligação mudou de estado (chamando, em ligação, encerrada): redesenha a tela ou o painel flutuante.
+function dialerOnCallUpdate() { dialerRender(); }
+function dialerRender() {
+  if (dialerViewVisible() && _dial.q) { const p = document.getElementById('dapi-call-panel'); if (p) p.remove(); return dialerRenderRun(); }
+  dialerRenderMini();
+}
+
+function dialerStatusLine() {
+  const c = _dapiCall && _dapiCall.dialer ? _dapiCall : null;
+  const secs = c && c.startedAt ? Math.floor((Date.now() - c.startedAt) / 1000) : 0;
+  const t = secs ? ` · ${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}` : '';
+  if (_dial.phase === 'starting') return 'Preparando a ligação...';
+  if (_dial.phase === 'calling') return (c ? c.status : 'Chamando...') + t;
+  if (_dial.phase === 'result') return 'Ligação encerrada · ' + dialerFmtDur((_dial.last && _dial.last.dur) || 0) + '. Como foi?';
+  if (_dial.phase === 'saving') return 'Salvando...';
+  if (_dial.phase === 'waiting') return `${c && c.status && !(_dial.last && _dial.last.answered) ? c.status + '. ' : ''}Próxima em ${Math.max(0, Math.ceil((_dial.until - Date.now()) / 1000))} s`;
+  if (_dial.phase === 'blocked') return _dial.err + (_dial.until ? ` (${Math.max(0, Math.ceil((_dial.until - Date.now()) / 60000))} min)` : '');
+  if (_dial.phase === 'finished') return 'Fila concluída.';
+  return _dial.err ? _dial.err : 'Pausada.';
+}
+
+function dialerCounts() {
+  const items = (_dial.q && _dial.q.items) || [];
+  const c = { total: items.length, done: 0, ans: 0, left: 0, talk: 0 };
+  items.forEach(x => { if (x.st === 'done') { c.done++; if (x.ans) c.ans++; } if (['pending', 'retry', 'calling'].includes(x.st || 'pending')) c.left++; c.talk += Number(x.dur) || 0; });
+  return c;
+}
+
+function dialerRenderMini() {
+  if (!_dial.q || (_dial.paused && !['calling', 'result', 'saving'].includes(_dial.phase))) {
+    if (_dapiCall && _dapiCall.dialer) { const p = document.getElementById('dapi-call-panel'); if (p && _dapiCall.over && _dial.phase !== 'result') p.remove(); }
+    return;
+  }
+  const it = _dial.cur >= 0 ? _dial.q.items[_dial.cur] : null;
+  const live = _dapiCall && _dapiCall.dialer && !_dapiCall.over;
+  const c = dialerCounts();
+  dapiCallPanel(`
+    <div style="font-size:12px;color:var(--muted2);">Discador · ${c.done} de ${c.total}</div>
+    <div style="font-size:15px;font-weight:600;margin:3px 0 2px;">${escapeHtml(it ? it.name || chatFormatPhone(it.phone) : '')}</div>
+    <div style="font-size:12.5px;margin-bottom:10px;">${escapeHtml(dialerStatusLine())}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      ${live ? `<button class="chat-pill" onclick="dapiCallMute()">${_dapiCall.muted ? 'Ativar mic' : 'Mudo'}</button><button class="chat-pill" style="background:#dc2626;color:#fff;border-color:#dc2626;" onclick="dapiCallHangup()">Desligar</button>` : ''}
+      ${!_dial.paused ? `<button class="chat-pill" onclick="dialerPause()">${uiIco('pause', 12)} Pausar</button>` : ''}
+      <button class="chat-pill active" onclick="switchView('discador')">Abrir discador</button>
+    </div>`);
+}
+
+function dialerRenderRun() {
+  const box = document.getElementById('discador-body');
+  const q = _dial.q;
+  if (!box || !q) return;
+  const act = q.act;
+  const it = _dial.cur >= 0 ? q.items[_dial.cur] : null;
+  const lead = it && it.lead ? findLead(it.lead) : null;
+  const c = dialerCounts();
+  const pct = c.total ? Math.round((c.total - c.left) / c.total * 100) : 0;
+  const live = _dapiCall && _dapiCall.dialer && !_dapiCall.over;
+  const stageLabel = lead ? ((getAllStages(act).find(s => s.id === lead.stage) || {}).label || '') : '';
+  const results = (q.settings && q.settings.results && q.settings.results.length ? q.settings.results : DIALER_RESULTS_DEFAULT);
+  const busy = ['calling', 'starting', 'saving', 'result'].includes(_dial.phase) || live;
+  const stColor = { pending: 'var(--muted2)', retry: '#fbbf24', calling: '#34d399', done: 'var(--muted2)', skipped: 'var(--muted2)' };
+  const itemLabel = x => x.st === 'done' ? (x.ans ? (x.resLabel || 'Atendeu') : ({ rejected: 'Recusou', busy: 'Ocupado' }[x.why] || 'Não atendeu')) : x.st === 'retry' ? `Tentar de novo (${x.tries})` : x.st === 'skipped' ? 'Pulado' : x.st === 'calling' ? 'Ligando' : 'Na fila';
+  // Próximos primeiro, depois os feitos (mais recentes em cima).
+  const order = q.items.map((x, i) => i);
+  const nextIdx = dialerNextIndex();
+  const upcoming = order.filter(i => ['pending', 'retry'].includes(q.items[i].st || 'pending') && i !== _dial.cur);
+  const finished = order.filter(i => ['done', 'skipped'].includes(q.items[i].st)).sort((a, b) => String(q.items[b].endAt || '').localeCompare(String(q.items[a].endAt || '')));
+  const row = i => { const x = q.items[i]; return `<div class="dial-item ${i === _dial.cur ? 'cur' : ''}">
+      <div style="min-width:0;flex:1;"><div class="dial-item-name">${escapeHtml(x.name || chatFormatPhone(x.phone))}</div><div class="integ-muted" style="font-size:11.5px;">${escapeHtml(chatFormatPhone(x.phone))}</div></div>
+      <span style="font-size:11.5px;color:${stColor[x.st || 'pending']};white-space:nowrap;">${escapeHtml(itemLabel(x))}</span>
+      ${['pending', 'retry'].includes(x.st || 'pending') && !busy ? `<button class="chat-pill" title="Ligar agora" onclick="dialerCallNow(${i})">${uiIco('phone', 12)}</button><button class="chat-pill" title="Tirar da fila" onclick="dialerSkip(${i})">×</button>` : ''}
+    </div>`; };
+  const msgs = (_dial.msgs || []).map(m => `<div class="dial-msg ${m.fromMe ? 'out' : 'in'}">${escapeHtml(String(m.text || (m.type && m.type !== 'text' ? '[' + m.type + ']' : '')).slice(0, 160))}</div>`).join('');
+  box.innerHTML = `
+    <div class="dial-top">
+      <button class="chat-pill" onclick="dialerClose()">← Filas</button>
+      <div style="min-width:0;flex:1;"><div style="font-weight:600;color:var(--text);font-size:16px;">${escapeHtml(q.name)}</div>
+        <div class="integ-muted" style="font-size:12px;">${escapeHtml(waLineLabel(act, q.line))} · ${escapeHtml((q.source && q.source.label) || '')}</div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${_dial.paused ? (c.left ? `<button class="btn-save" style="width:auto;padding:8px 16px;" ${busy ? 'disabled' : ''} onclick="dialerResume()">${uiIco('play', 13)} ${c.left === c.total ? 'Começar' : 'Continuar'}</button>` : '') : `<button class="chat-pill" onclick="dialerPause()">${uiIco('pause', 13)} Pausar</button>`}
+        ${_dial.paused && !busy ? `${c.done - c.ans > 0 ? `<button class="chat-pill" onclick="dialerRequeue()" title="Quem não atendeu volta para a fila">Ligar de novo para quem não atendeu</button>` : ''}<button class="chat-pill" onclick="dialerFinish()">Encerrar</button><button class="chat-pill" title="Apagar fila" onclick="dialerDelete()">${uiIco('trash', 13)}</button>` : ''}
+      </div>
+    </div>
+    <div class="dial-bar" style="margin:12px 0 4px;"><span style="width:${pct}%"></span></div>
+    <div class="dial-score"><span><b>${c.total - c.left}</b> de ${c.total} feitas</span><span><b>${c.ans}</b> atendidas</span><span><b>${c.done - c.ans}</b> não atenderam</span><span><b>${c.left}</b> na fila</span><span><b>${dialerFmtDur(c.talk)}</b> em ligação</span></div>
+    <div class="dial-grid">
+      <div class="dial-main">
+        ${it ? `
+          <div class="dial-status ${live ? 'live' : ''}">${escapeHtml(dialerStatusLine())}</div>
+          <div class="dial-lead-name">${escapeHtml(it.name || (lead && lead.name) || chatFormatPhone(it.phone))}</div>
+          <div class="integ-muted" style="font-size:13px;">${escapeHtml(chatFormatPhone(it.phone))}${stageLabel ? ' · ' + escapeHtml(stageLabel) : ''}${lead && lead.origem ? ' · ' + escapeHtml(lead.origem) : ''}${it.tries > 1 ? ' · tentativa ' + it.tries : ''}</div>
+          ${lead && lead.obs ? `<div class="dial-obs">${escapeHtml(String(lead.obs).slice(0, 400))}</div>` : ''}
+          ${live ? `<div style="display:flex;gap:8px;margin-top:14px;"><button class="chat-pill" onclick="dapiCallMute()">${_dapiCall.muted ? 'Ativar microfone' : 'Mudo'}</button><button class="chat-pill" style="background:#dc2626;color:#fff;border-color:#dc2626;" onclick="dapiCallHangup()">Desligar</button></div>` : ''}
+          ${_dial.phase === 'result' ? `
+            <div class="dial-results">${results.map(r => `<button class="dial-res" onclick="dialerSaveResult('${escapeJsString(r.id)}')">${escapeHtml(r.label)}${r.stage ? `<small>move para ${escapeHtml((getAllStages(act).find(s => s.id === r.stage) || {}).label || '')}</small>` : ''}</button>`).join('')}</div>
+            <textarea id="dial-note" class="field-input" rows="2" placeholder="Anotação (opcional)" style="margin-top:10px;"></textarea>
+            <div style="text-align:right;margin-top:6px;"><a href="#" style="font-size:12px;" onclick="dialerSaveResult('none');return false;">Seguir sem marcar</a></div>` : ''}
+          ${_dial.phase === 'waiting' ? `<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;"><button class="btn-save" style="width:auto;padding:8px 16px;" onclick="dialerCallNext()">Ligar agora</button>${nextIdx !== -1 ? `<button class="chat-pill" onclick="dialerSkip(${nextIdx})">Pular o próximo</button>` : ''}</div>` : ''}
+          ${msgs ? `<div class="dial-msgs"><div class="integ-muted" style="font-size:11.5px;margin-bottom:4px;">Últimas mensagens no Chat</div>${msgs}</div>` : ''}
+        ` : `<div class="dial-status">${escapeHtml(dialerStatusLine())}</div>
+             <div class="integ-muted" style="font-size:13px;margin-top:6px;">${c.left ? `Clique em ${c.left === c.total ? '"Começar"' : '"Continuar"'} para ligar para o próximo da fila. Use fone de ouvido.` : 'Não há mais ninguém para ligar nesta fila.'}</div>`}
+      </div>
+      <div class="dial-side">
+        <div class="integ-muted" style="font-size:12px;font-weight:600;margin-bottom:6px;">Próximos (${upcoming.length})</div>
+        ${upcoming.slice(0, 12).map(row).join('') || '<div class="integ-muted" style="font-size:12px;">Ninguém na fila.</div>'}
+        ${upcoming.length > 12 ? `<div class="integ-muted" style="font-size:11.5px;margin:4px 0 0;">e mais ${upcoming.length - 12}</div>` : ''}
+        ${finished.length ? `<div class="integ-muted" style="font-size:12px;font-weight:600;margin:12px 0 6px;">Feitas (${finished.length})</div>${finished.slice(0, 15).map(row).join('')}` : ''}
+      </div>
+    </div>`;
+}
+
+// Atalhos: coluna do funil e contatos selecionados.
+function dialerFromColumn(stageId) {
+  const act = dialerAct();
+  openDialerWizard({ act, kind: 'funnel', pipeline: currentPipeline(act), stage: stageId });
+}
+function dialerFromContacts() {
+  const act = contatosAct();
+  const items = _contatosEntries.filter(e => _contatosSelected.has(e.key) && e.phone).map(e => ({ leadId: String(e.key).startsWith('L:') ? String(e.key).slice(2) : '', name: e.name || '', phone: e.phone }));
+  if (!items.length) return showToast('Selecione contatos com telefone.', 'warning');
+  openDialerWizard({ act, kind: 'contacts', items });
+}
+
+window.addEventListener('beforeunload', e => { if (dialerIsOn() || (_dapiCall && _dapiCall.dialer && !_dapiCall.over)) { e.preventDefault(); e.returnValue = ''; } });
+Object.assign(window, { renderDiscadorView, openDialerWizard, dialerWizRender, dialerWizUsage, dialerPasteList, dialerLoadSheet, dialerWizCreate, dialerOpen, dialerResume, dialerPause, dialerFinish, dialerClose, dialerCallNext, dialerSaveResult, dialerSkip, dialerCallNow, dialerRequeue, dialerDelete, dialerFromColumn, dialerFromContacts });
 
 
 function openMobileMore() {
@@ -27310,7 +27966,7 @@ function onMobileClientChange() {
 // ===== Logins extras do cliente: o admin escolhe quais áreas cada login enxerga =====
 const SUB_LOGIN_VIEWS = [
   ['report', 'Dashboard'], ['analise', 'Atendimento'], ['crm', 'Funil de vendas'], ['chat', 'Chat'], ['contatos', 'Contatos'], ['calendario', 'Calendário'],
-  ['automacoes', 'Automações'], ['capi', 'Conversões Meta'], ['historico', 'Histórico'], ['instagram', 'Instagram'], ['posts', 'Postagens'], ['prospeccao', 'Prospecção'], ['campanhas', 'Campanhas'], ['cadencia', 'Cadência'], ['whatsapp', 'Conexões'], ['integracoes', 'Integrações'], ['modelos', 'Modelos API oficial']
+  ['automacoes', 'Automações'], ['capi', 'Conversões Meta'], ['historico', 'Histórico'], ['instagram', 'Instagram'], ['posts', 'Postagens'], ['prospeccao', 'Prospecção'], ['campanhas', 'Campanhas'], ['discador', 'Discador'], ['cadencia', 'Cadência'], ['whatsapp', 'Conexões'], ['integracoes', 'Integrações'], ['modelos', 'Modelos API oficial']
 ];
 let SUB_LOGINS = [];
 let _subVault = {};
@@ -27325,6 +27981,8 @@ function userCanView(view) {
   if (view === 'cfgclientes' && isPartnerUser()) return false;
   if (view === 'ajuda' || view === 'conta' || view === 'atividades') return true;
   const v = userAllowedViews();
+  // Discador: liberado para quem já vê o Funil (logins de vendas), além de quem tem a área marcada.
+  if (view === 'discador') return !v || v.includes('discador') || v.includes('crm');
   if (v && view === 'integracoes') {
     const p = window._fb && window._fb.getProfile && window._fb.getProfile();
     if (p && p.perms && p.perms.mcp) return true; // MCP liberado: Integrações → MCP precisa abrir
