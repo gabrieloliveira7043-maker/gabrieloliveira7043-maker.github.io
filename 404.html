@@ -26185,7 +26185,7 @@ async function dialerResume() {
   try { await navigator.mediaDevices.getUserMedia({ audio: true }).then(s => s.getTracks().forEach(t => t.stop())); }
   catch (e) { return showToast('Libere o microfone para o CRM no navegador.', 'error'); }
   _dial.paused = false; _dial.err = '';
-  dialerApi('state', { id: _dial.q.id, status: 'running' }).catch(() => {});
+  await dialerApi('state', { id: _dial.q.id, status: 'running' }).catch(() => {});
   dialerCallNext();
 }
 
@@ -26313,12 +26313,12 @@ async function dialerSkip(idx) {
   dialerRender();
 }
 
-function dialerCallNow(idx) {
+async function dialerCallNow(idx) {
   if (!_dial.q || (_dapiCall && !_dapiCall.over)) return;
   if (['calling', 'starting', 'saving'].includes(_dial.phase)) return;
   if (_dial.phase === 'result') return showToast('Marque o resultado da ligação atual primeiro.', 'warning');
   _dial.paused = false;
-  dialerApi('state', { id: _dial.q.id, status: 'running' }).catch(() => {});
+  await dialerApi('state', { id: _dial.q.id, status: 'running' }).catch(() => {});
   dialerCallNext(idx);
 }
 
