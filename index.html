@@ -2812,12 +2812,24 @@ html.is-partner #admin-logins-list .admin-login-card > div:has(> [onclick^="save
       const snap = await getDocs(query(collection(db, 'inbox', normalizeAct(act), 'chats'), where('line', '==', String(line)), orderBy('lastAt', 'desc'), limit(max || 1000)));
       return snap.docs.map(d => ({ id: d.id, ...d.data() }));
     },
-    async getChatsByPhones(act, phones) {
-      const out = [];
+    // Login restrito a alguns WhatsApps: o banco só aceita a busca dentro dos números dele (um por vez).
+    // onlyLines: limita aos números de uma campanha, por exemplo.
+    async getChatsByPhones(act, phones, onlyLines) {
+      const out = [], seen = new Set();
       const list = [...new Set(phones)].slice(0, 3000);
+      const mine = currentProfile && currentProfile.role === 'client' && CHAT_LINE_LOCK && currentProfile.perms && Array.isArray(currentProfile.perms.chatLines) ? currentProfile.perms.chatLines.map(String).filter(Boolean) : [];
+      let lines = mine.length ? mine : null;
+      if (lines && Array.isArray(onlyLines) && onlyLines.length) lines = lines.filter(l => onlyLines.includes(l));
+      const base = collection(db, 'inbox', normalizeAct(act), 'chats');
       for (let i = 0; i < list.length; i += 30) {
-        const snap = await getDocs(query(collection(db, 'inbox', normalizeAct(act), 'chats'), where('phone', 'in', list.slice(i, i + 30))));
-        snap.docs.forEach(d => out.push({ id: d.id, ...d.data() }));
+        const chunk = list.slice(i, i + 30);
+        const qs = lines ? lines.map(l => query(base, where('line', '==', l), where('phone', 'in', chunk))) : [query(base, where('phone', 'in', chunk))];
+        for (const q of qs) {
+          try {
+            const snap = await getDocs(q);
+            snap.docs.forEach(d => { if (!seen.has(d.id)) { seen.add(d.id); out.push({ id: d.id, ...d.data() }); } });
+          } catch (e) { console.warn('Chat por telefone:', e && e.message); }
+        }
       }
       return out;
     },
@@ -17057,7 +17069,7 @@ async function setChatCampFilter(id) {
     const have = new Set(_chatItems.map(x => chatPhoneKey(x.phone)));
     const missing = phones.filter(p => !have.has(chatPhoneKey(p)));
     if (missing.length) {
-      const extra = await window._fb.getChatsByPhones(_chatAct, missing);
+      const extra = await window._fb.getChatsByPhones(_chatAct, missing, Array.isArray(c.lines) ? c.lines : null);
       if (_chatCampFilter !== id) return;
       // Entram como conversas extras do Chat (continuam lá ao abrir, responder e quando a lista atualiza).
       extra.filter(chatVisibleFilter(_chatAct)).forEach(x => { _chatExtra[x.id] = x; if (!_chatItems.some(y => y.id === x.id)) _chatItems.push(x); });
