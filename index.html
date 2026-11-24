@@ -2214,6 +2214,10 @@ html.ui-vidro .ntc-box { background: var(--ui-glass); -webkit-backdrop-filter: b
 .dw-steps span { padding: 4px 10px; border-radius: 20px; background: var(--surface2); color: var(--muted2); }
 .dw-steps span.on { background: var(--accent2); color: #fff; }
 .dw-steps span.ok { color: var(--text); }
+.dw-cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; margin-bottom: 8px; }
+.dw-col { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface2); font-size: 13px; color: var(--text); cursor: pointer; }
+.dw-col input { margin: 0; accent-color: var(--accent2); }
+.dw-col.all { grid-column: 1 / -1; font-weight: 600; }
 .dw-kinds { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
 .dw-count { margin: 12px 0 4px; font-size: 13px; color: var(--muted); }
 .dw-count b { color: var(--text); font-size: 18px; }
@@ -25966,7 +25970,7 @@ function openDialerWizard(preset) {
     const p = preset || {};
     _dw = {
       act, step: 1, kind: p.kind || 'funnel',
-      pipeline: p.pipeline || currentPipeline(act), stage: p.stage || '*', period: p.period || 'all', from: '', to: '',
+      pipeline: p.pipeline || currentPipeline(act), stages: p.stages || (p.stage ? [p.stage] : []), period: p.period || 'all', from: '', to: '',
       listItems: p.items || [], listName: p.listName || '',
       line: lines[0].id,
       settings: { waitSec: 8, attempts: 2, perHour: 30, perDay: 150 },
@@ -25984,13 +25988,23 @@ function dialerWizItems() {
   const stages = getStages(w.act, w.pipeline);
   let leads = getLeads().filter(l => leadMatchesClient(l, w.act) && leadPipeline(l) === w.pipeline);
   const stageOf = l => (typeof getArteAzulejoStageForBoard === 'function' ? getArteAzulejoStageForBoard(l, w.act) : l.stage);
-  if (w.stage !== '*') leads = leads.filter(l => stageOf(l) === w.stage);
+  if (w.stages.length) leads = leads.filter(l => w.stages.includes(stageOf(l)));
   else leads = leads.filter(l => stages.some(s => s.id === stageOf(l)));
   const range = dialerPeriodRange(w);
   if (range) leads = leads.filter(l => { const t = getLeadCrmSortTime(l); return t && t >= range[0] && t < range[1]; });
-  leads = sortCrmLeadsForKanban(leads, w.act);
+  // Coluna por coluna, na ordem do funil; dentro de cada uma, na ordem dos cards.
+  leads = stages.flatMap(st => sortCrmLeadsForKanban(leads.filter(l => stageOf(l) === st.id), w.act));
   return leads.map(l => ({ leadId: l.id, name: l.name || '', phone: l.phone || l.whatsappPhone || '', optOut: !!l.whatsappOptOut }));
 }
+
+function dialerToggleStage(id, on) {
+  const set = new Set(_dw.stages);
+  if (on) set.add(id); else set.delete(id);
+  // Mantém a ordem das colunas do funil (a fila segue essa ordem).
+  _dw.stages = getStages(_dw.act, _dw.pipeline).map(s => s.id).filter(x => set.has(x));
+  dialerWizRender();
+}
+window.dialerToggleStage = dialerToggleStage;
 
 function dialerPeriodRange(w) {
   const now = new Date();
@@ -26006,7 +26020,8 @@ function dialerPeriodRange(w) {
 function dialerSourceLabel(w) {
   if (w.kind === 'list') return 'Lista' + (w.listName ? ': ' + w.listName : '');
   if (w.kind === 'contacts') return 'Contatos selecionados';
-  const st = w.stage === '*' ? 'Todas as colunas' : ((getStages(w.act, w.pipeline).find(s => s.id === w.stage) || {}).label || w.stage);
+  const labels = getStages(w.act, w.pipeline).filter(s => w.stages.includes(s.id)).map(s => s.label);
+  const st = !labels.length ? 'Todas as colunas' : labels.length <= 3 ? labels.join(', ') : labels.slice(0, 2).join(', ') + ' e mais ' + (labels.length - 2);
   const per = { all: '', month: ' · este mês', lastmonth: ' · mês passado', '7d': ' · últimos 7 dias', '30d': ' · últimos 30 dias', custom: ' · ' + [w.from, w.to].filter(Boolean).map(d => d.split('-').reverse().join('/')).join(' a ') }[w.period] || '';
   return (pipelineList(w.act).length > 1 ? pipelineName(w.act, w.pipeline) + ' › ' : '') + st + per;
 }
@@ -26027,13 +26042,16 @@ function dialerWizRender() {
         ${w.kind === 'contacts' ? '<button class="chat-pill active">Contatos selecionados</button>' : ''}
       </div>
       ${w.kind === 'funnel' ? `
-        ${pls.length > 1 ? `<label class="field-label">Funil</label><select class="field-input" onchange="_dw.pipeline=this.value;_dw.stage='*';dialerWizRender()">${pls.map(p => `<option value="${escapeHtml(p.id)}" ${p.id === w.pipeline ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}</select>` : ''}
-        <label class="field-label">Coluna</label>
-        <select class="field-input" onchange="_dw.stage=this.value;dialerWizRender()"><option value="*">Todas as colunas</option>${getStages(w.act, w.pipeline).map(s => `<option value="${escapeHtml(s.id)}" ${s.id === w.stage ? 'selected' : ''}>${escapeHtml(s.label)}</option>`).join('')}</select>
+        ${pls.length > 1 ? `<label class="field-label">Funil</label><select class="field-input" onchange="_dw.pipeline=this.value;_dw.stages=[];dialerWizRender()">${pls.map(p => `<option value="${escapeHtml(p.id)}" ${p.id === w.pipeline ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}</select>` : ''}
+        <label class="field-label">Colunas (marque quantas quiser)</label>
+        <div class="dw-cols">
+          <label class="dw-col all"><input type="checkbox" ${!w.stages.length ? 'checked' : ''} onchange="_dw.stages=[];dialerWizRender()"> Todas as colunas</label>
+          ${getStages(w.act, w.pipeline).map(s => `<label class="dw-col"><input type="checkbox" ${w.stages.includes(s.id) ? 'checked' : ''} onchange="dialerToggleStage('${escapeJsString(s.id)}', this.checked)"> ${escapeHtml(s.label)}</label>`).join('')}
+        </div>
         <label class="field-label">Quando o lead entrou</label>
         <select class="field-input" onchange="_dw.period=this.value;dialerWizRender()">${[['all', 'Qualquer data'], ['month', 'Este mês'], ['lastmonth', 'Mês passado'], ['7d', 'Últimos 7 dias'], ['30d', 'Últimos 30 dias'], ['custom', 'Escolher as datas']].map(([v, t]) => `<option value="${v}" ${v === w.period ? 'selected' : ''}>${t}</option>`).join('')}</select>
         ${w.period === 'custom' ? `<div style="display:flex;gap:8px;"><div style="flex:1;"><label class="field-label">De</label><input type="date" class="field-input" value="${escapeHtml(w.from)}" onchange="_dw.from=this.value;dialerWizRender()"></div><div style="flex:1;"><label class="field-label">Até</label><input type="date" class="field-input" value="${escapeHtml(w.to)}" onchange="_dw.to=this.value;dialerWizRender()"></div></div>` : ''}
-        <div class="integ-muted" style="font-size:12px;margin-top:4px;">A fila segue a ordem dos cards na coluna.</div>` : ''}
+        <div class="integ-muted" style="font-size:12px;margin-top:4px;">A fila segue a ordem das colunas no funil e dos cards em cada coluna.</div>` : ''}
       ${w.kind === 'list' ? `
         <label class="field-label">Planilha (.xlsx ou .csv, com nome e telefone)</label>
         <input type="file" class="field-input" accept=".xlsx,.xls,.csv,.txt" onchange="dialerLoadSheet(this)">
@@ -26462,7 +26480,7 @@ function dialerRenderRun() {
 // Atalhos: coluna do funil e contatos selecionados.
 function dialerFromColumn(stageId) {
   const act = dialerAct();
-  openDialerWizard({ act, kind: 'funnel', pipeline: currentPipeline(act), stage: stageId });
+  openDialerWizard({ act, kind: 'funnel', pipeline: currentPipeline(act), stages: [stageId] });
 }
 function dialerFromContacts() {
   const act = contatosAct();
