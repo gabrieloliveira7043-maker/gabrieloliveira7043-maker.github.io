@@ -2370,7 +2370,7 @@ html.is-partner #admin-logins-list .admin-login-card > div:has(> [onclick^="save
     appId: "1:487634114917:web:2396633f717bc6da78e98c"
   };
 
-  // O cliente digita só o login (ex: "petland"); no Firebase Auth ele vira um e-mail interno.
+  // O cliente digita só o login (ex: "maria"); no Firebase Auth ele vira um e-mail interno.
   const LOGIN_EMAIL_DOMAIN = 'crm.huven.com.br';
   const ADMIN_API_URL = 'https://huven-crm-admin.gabrieloliveira7043.workers.dev';
 
@@ -4587,7 +4587,7 @@ html.is-partner #admin-logins-list .admin-login-card > div:has(> [onclick^="save
           <div class="cfgc-form">
             <div class="field-group full">
               <label class="field-label">Nome do cliente</label>
-              <input type="text" class="field-input" id="cfg-name" placeholder="Ex: Clínica Vital">
+              <input type="text" class="field-input" id="cfg-name" placeholder="Ex: Clínica Sorriso">
             </div>
             <div class="field-group">
               <label class="field-label">Login (sem espaços)</label>
@@ -4886,19 +4886,9 @@ function selectClient(name) {
   renderSidebar();
 }
 
+// Os nomes dos clientes vêm do banco (extra_clients), não ficam mais no código público.
 function getBaseClientNames() {
-  return {
-    "act_1324786597927962": "Raquel Odonto",
-    "act_1311713804053571": "Clínica Vital",
-    "act_728532149829958": "Petland Campinas",
-    "act_1515794876111984": "Contabiliza Tech",
-    "act_2690757151096950": "English Sniper",
-    "act_1281304275983449": "Thayelli Registro de Marcas",
-    "act_456685107743703": "Adriana Jimenez",
-    "act_379348482601330": "Travi",
-    "act_1712273919281701": "Catapulta Boleto",
-    "act_457365536961711": "Arte Em Azulejo"
-  };
+  return {};
 }
 
 function getClientDisplayName(act) {
@@ -5139,20 +5129,20 @@ async function loadData() {
 
     // Lógica de ocultação por cliente
     const act = activeClient ? activeClient.account : '';
-    const isPetland     = act === 'act_728532149829958';
-    const isTravi       = act === 'act_379348482601330';
-    const isContabiliza = act === 'act_1515794876111984';
+    const showLeadsAct     = act === 'act_728532149829958';
+    const hideConvAct       = act === 'act_379348482601330';
+    const hideLeadsAct = act === 'act_1515794876111984';
 
     const tableHeader = document.getElementById('table-header-row');
     if (tableHeader) {
       const table = tableHeader.closest('table');
       if (table) {
-        // Leads/CPL visiveis na Petland
+        // Leads/CPL visíveis nesta conta
         table.classList.remove('hide-leads-cols');
-        // Travi: oculta conv/custo-conv
-        if (isTravi) table.classList.add('hide-conv-cols'); else table.classList.remove('hide-conv-cols');
-        // Contabiliza: oculta leads/CPL
-        if (isContabiliza) table.classList.add('hide-leads-cols2'); else table.classList.remove('hide-leads-cols2');
+        // Conta que oculta conv/custo-conv
+        if (hideConvAct) table.classList.add('hide-conv-cols'); else table.classList.remove('hide-conv-cols');
+        // Conta que oculta leads/CPL
+        if (hideLeadsAct) table.classList.add('hide-leads-cols2'); else table.classList.remove('hide-leads-cols2');
       }
     }
 
@@ -5168,8 +5158,8 @@ async function loadData() {
     if (cardCplLabel) cardCplLabel.textContent = 'CPL';
     if (cardCplSub)   cardCplSub.textContent = 'custo por lead';
     animVal('m-cpl', totalLeads ? fmtBRL(cpl) : '—');
-    // Travi: oculta conversas iniciadas e custo/conversa
-    if (isTravi) {
+    // Conta que oculta conversas iniciadas e custo/conversa
+    if (hideConvAct) {
       if (cardConv)   cardConv.style.display = 'none';
       if (cardCpconv) cardCpconv.style.display = 'none';
     } else {
@@ -5177,8 +5167,8 @@ async function loadData() {
       if (cardCpconv) cardCpconv.style.display = '';
     }
 
-    // Contabiliza: oculta leads e CPL
-    if (isContabiliza) {
+    // Conta que oculta leads e CPL
+    if (hideLeadsAct) {
       if (cardLeads)  cardLeads.style.display = 'none';
       if (cardCpl)    cardCpl.style.display = 'none';
     } else {
@@ -5200,7 +5190,7 @@ async function loadData() {
       },
       raw: { totalSpend, totalLeads, totalConv, cpl, cpConv },
       visible: [...document.querySelectorAll('[data-dashboard-metric]')].filter(el => el.style.display !== 'none' && !(el.closest('[style*="display: none"]'))).map(el => el.getAttribute('data-dashboard-metric')),
-      hideConv: isTravi, hideLeads: isContabiliza
+      hideConv: hideConvAct, hideLeads: hideLeadsAct
     };
 
     lastCampaignsData = { data, statusMap };
@@ -5486,17 +5476,7 @@ const actFromUrl = null;
 if (IS_CLIENT_LINK) { localStorage.removeItem(STORAGE_KEY); document.getElementById('login-overlay').style.display = 'none'; }
 if (actFromUrl) {
   const accountId = actFromUrl.startsWith('act_') ? actFromUrl : 'act_' + actFromUrl;
-  const clientMap = {
-    "act_1324786597927962": "Raquel Odonto",
-    "act_1311713804053571": "Clínica Vital",
-    "act_728532149829958": "Petland Campinas",
-    "act_1515794876111984": "Contabiliza Tech",
-    "act_2690757151096950": "English Sniper",
-    "act_1281304275983449": "Thayelli Registro de Marcas",
-    "act_456685107743703": "Adriana Jimenez",
-    "act_379348482601330": "Travi",
-    "act_1712273919281701": "Catapulta Boleto",
-  };
+  const clientMap = {};
   const clientName = clientMap[accountId] || accountId;
   if (accountId) {
     activeClient = { name: clientName, account: accountId };
@@ -6062,32 +6042,14 @@ async function loadDailyData(account, from, to) {
 }
 
 
+// Logins dos clientes: carregados do banco em loadExtraClients (antes ficavam escritos aqui, no código público).
 const CREDENTIALS = {
   "admin":      { pass: null, act: null },
-  "raquel":     { pass: null,   act: "act_1324786597927962" },
-  "vital":      { pass: null,    act: "act_1311713804053571" },
-  "petland":    { pass: null,  act: "act_728532149829958"  },
-  "contabiliza":{ pass: null,   act: "act_1515794876111984" },
-  "english":    { pass: null,  act: "act_2690757151096950" },
-  "thayelli":   { pass: null, act: "act_1281304275983449" },
-  "adriana":    { pass: null,  act: "act_456685107743703"  },
-  "travi":      { pass: null,    act: "act_379348482601330"  },
-  "boleto":     { pass: null,    act: "act_1712273919281701" },
 };
 // Logins que vêm do código (não foram criados pelo painel); não podem ser removidos pelo painel.
-const FIXED_CLIENT_LOGINS = Object.keys(CREDENTIALS);
+const FIXED_CLIENT_LOGINS = [];
 
-const CLIENT_NAMES = {
-  "act_1324786597927962": "Raquel Odonto",
-  "act_1311713804053571": "Clínica Vital",
-  "act_728532149829958":  "Petland Campinas",
-  "act_1515794876111984": "Contabiliza Tech",
-  "act_2690757151096950": "English Sniper",
-  "act_1281304275983449": "Thayelli Registro de Marcas",
-  "act_456685107743703":  "Adriana Jimenez",
-  "act_379348482601330":  "Travi",
-  "act_1712273919281701": "Catapulta Boleto",
-  };
+const CLIENT_NAMES = {};
 
 function abrirWhatsAppPopup() {
   const largura = 500;
@@ -6958,7 +6920,7 @@ function getArteAzulejoStageForBoard(lead, boardAct) {
   return rawStage;
 }
 
-const CLINICA_ACTS = ['act_1324786597927962', 'act_1311713804053571', 'act_728532149829958', 'act_379348482601330', 'act_456685107743703', 'act_457365536961711'];
+const CLINICA_ACTS = []; // preenchido pelo layout gravado no banco de cada cliente
 
 function getArteStagesMigrationKey(act) {
   return 'arte_stages_default_migrated_' + act;
@@ -8916,7 +8878,7 @@ function subLoginsHtml(parentLogin, team) {
       <div class="sub-new-t">Novo login para a equipe deste cliente</div>
       <div class="sub-grid">
         <input class="field-input sub-name" placeholder="Nome da pessoa (ex.: Maria)">
-        <input class="field-input sub-login mono" placeholder="Login (ex.: maria.petland)" autocomplete="off">
+        <input class="field-input sub-login mono" placeholder="Login (ex.: maria.loja)" autocomplete="off">
         <input class="field-input sub-pass mono" placeholder="Senha (mín. 6)" autocomplete="off">
       </div>
       ${subViewChecks(null)}
@@ -9034,7 +8996,7 @@ function renameLoginHtml(login) {
   return `<div class="rename-box" style="display:none;">
     <div class="sub-new-t">Novo login para quem hoje entra com <b class="mono">${escapeHtml(login)}</b></div>
     <div class="sub-grid">
-      <input class="field-input rename-new mono" placeholder="Novo login (ex.: maria.petland)" autocomplete="off">
+      <input class="field-input rename-new mono" placeholder="Novo login (ex.: maria.loja)" autocomplete="off">
       ${hasPass ? '' : '<input class="field-input rename-pass mono" placeholder="Senha (mín. 6)" autocomplete="off">'}
     </div>
     <div class="rename-note">${hasPass ? 'A senha continua a mesma.' : 'A senha atual não está guardada no cofre, então defina uma senha para o novo login.'} O login antigo para de funcionar.</div>
@@ -12699,7 +12661,7 @@ async function renderProspeccaoView() {
     </div>
     <div id="pr-mode-empresa" style="display:${_prMode === 'empresa' ? 'block' : 'none'};">
       <div class="pr-filters">
-        <label style="flex:3;min-width:260px;">CNPJ ou nome da empresa<input class="field-input" id="pr-q" placeholder="Ex.: 12.345.678/0001-90 ou Arte em Azulejo" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();prosOneSearch();}"></label>
+        <label style="flex:3;min-width:260px;">CNPJ ou nome da empresa<input class="field-input" id="pr-q" placeholder="Ex.: 12.345.678/0001-90 ou Padaria Central" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();prosOneSearch();}"></label>
         <label style="max-width:180px;">Estado (opcional)<select class="field-input" id="pr-q-uf"><option value="">Todos</option>${PR_UFS.map(u => `<option value="${u}">${u}</option>`).join('')}</select></label>
         <label style="flex:0;min-width:auto;justify-content:flex-end;"><span>&nbsp;</span><button class="btn-add-lead" style="height:40px;padding:0 18px;" onclick="prosOneSearch()">Buscar</button></label>
       </div>
@@ -28094,6 +28056,7 @@ async function loadExtraClients() {
     extras.filter(c => !c.parentLogin).forEach(c => {
       (c.renamedFrom || []).forEach(old => { if (CREDENTIALS[old] && CREDENTIALS[old].act === c.act) delete CREDENTIALS[old]; });
       CREDENTIALS[c.login] = { pass: null, act: c.act };
+      if (c.fixed && !FIXED_CLIENT_LOGINS.includes(c.login)) FIXED_CLIENT_LOGINS.push(c.login);
       CLIENT_NAMES[c.act] = c.name;
       if (c.adAccount !== undefined) AD_ACCOUNTS[c.act] = c.adAccount || '';
       if (c.layout === 'clinica' && !CLINICA_ACTS.includes(c.act)) {
