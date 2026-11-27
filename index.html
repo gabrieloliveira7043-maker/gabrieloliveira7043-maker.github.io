@@ -10754,6 +10754,10 @@ async function saveCampaign(start) {
       const bad = new Set((chk.without || []).map(n => String(n).slice(-10)));
       if (bad.size) {
         const before = _campaignDraft.recipients.length;
+        // Tira de cada fonte (e refaz a junção), para a contagem por fonte da confirmação bater com a lista.
+        const keep = r => { const p = normalizeCampaignPhone(r.phone); return !p || !bad.has(p.slice(-10)); };
+        Object.values(_campaignDraft.parts || {}).forEach(part => { part.list = (part.list || []).filter(keep); });
+        mergeCampaignAudience();
         _campaignDraft.recipients = _campaignDraft.recipients.filter(r => !r.phone || !bad.has(String(r.phone).replace(/\D/g, '').slice(-10)));
         showToast(`${before - _campaignDraft.recipients.length} número(s) sem WhatsApp saíram da lista.`, 'info', 7000);
       }
@@ -14974,7 +14978,7 @@ function renderCloudCadenceEditor() {
       <button class="huv-btn" onclick="_cc.data.draft = false; saveCloudCadence(false)">Salvar</button>
       ${d.active ? `<button class="huv-btn" style="color:var(--red);border-color:var(--red);" onclick="setCloudCadenceActive(false)">Desligar</button>` : `<button class="btn-save" style="width:auto;padding:9px 16px;" onclick="setCloudCadenceActive(true)">Ligar cadência</button>`}
       ${_cc.id ? `<button class="huv-btn" onclick="openCloudProgress('${escapeJsString(_cc.id)}')">Andamento</button>` : ''}
-      ${_cc.id && d.active ? `<button class="huv-btn" onclick="openCadenceAudience('${escapeJsString(_cc.id)}')" title="Leads da coluna, planilhas ou os dois juntos">Colocar contatos</button>` : ''}
+      ${_cc.id && d.active ? `<button class="huv-btn" onclick="openCadenceAudience('${escapeJsString(_cc.id)}', true)" title="Leads da coluna, planilhas ou os dois juntos">Colocar contatos</button>` : ''}
       <span id="cc-fb" class="integ-muted" style="font-size:12.5px;">${d.active ? 'Ligada.' : 'Desligada.'}</span>
     </div>`;
 }
@@ -15063,7 +15067,7 @@ async function setCloudCadenceActive(on) {
   if (!on) return showToast('Cadência desligada. Os leads que estavam nela param de receber.', 'success');
   showToast('Cadência ligada. Os leads que chegarem na coluna entram nela.', 'success', 6000);
   // Quem mais entra agora: os leads que já estão na coluna, planilhas, ou os dois juntos.
-  openCadenceAudience(_cc.id);
+  openCadenceAudience(_cc.id, !!document.getElementById('cc-body'));
 }
 async function toggleCloudCadence(id, on) {
   const f = (_flowList || []).find(x => x.id === id);
@@ -15077,12 +15081,13 @@ async function toggleCloudCadence(id, on) {
 // é lead vira um card na coluna do gatilho (origem "Planilha ...", sem a 1ª mensagem automática) e entra na cadência.
 // O mesmo telefone (só dígitos, com 55; o 9 extra não conta) entra uma vez só.
 let _cadAud = null;
-function openCadenceAudience(id) {
+// backToList: aberta a partir do editor em lista (que ocupa a mesma janela); "Agora não" volta para ele.
+function openCadenceAudience(id, backToList) {
   const auto = (_flowList || []).find(x => x.id === id) || (_cc && _cc.id === id ? _cc.data : null);
   if (!auto || auto.channel !== 'cloud') return showToast('Cadência não encontrada. Salve a cadência antes.', 'warning');
   const act = normalizeActValue(auto.act || flowAct());
   const inCol = cadAudColumnLeads(act, id, auto.triggerStage).length;
-  _cadAud = { act, id, auto, sheets: [], parts: {}, useCol: inCol > 0, moveOther: false };
+  _cadAud = { act, id, auto, sheets: [], parts: {}, useCol: inCol > 0, moveOther: false, backToList: !!backToList };
   openHuvenModal('Colocar contatos na cadência', `
     <div class="integ-muted" style="font-size:12.5px;line-height:1.55;margin-bottom:10px;">Marque uma ou mais fontes. O mesmo telefone entra uma vez só. Quem chegar na coluna "${escapeHtml(autoStageLabel(act, auto.triggerStage))}" depois continua entrando sozinho.</div>
     <label class="integ-toggle" style="display:flex;margin-bottom:8px;"><input type="checkbox" id="cad-aud-col" ${_cadAud.useCol ? 'checked' : ''} onchange="_cadAud.useCol = this.checked; renderCadenceAudience()"> Leads do CRM que já estão na coluna "${escapeHtml(autoStageLabel(act, auto.triggerStage))}"</label>
@@ -15096,10 +15101,17 @@ function openCadenceAudience(id) {
     <div id="cad-aud-summary" style="margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text);"></div>
     <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap;">
       <button class="btn-save" id="cad-aud-go" style="width:auto;padding:9px 16px;" onclick="applyCadenceAudience()">Colocar na cadência</button>
-      <button class="huv-btn" onclick="closeHuvenModal()">Agora não</button>
+      <button class="huv-btn" onclick="closeCadenceAudience()">${_cadAud.backToList ? 'Voltar para a cadência' : 'Agora não'}</button>
       <span id="cad-aud-fb" class="integ-muted" style="font-size:12.5px;"></span>
     </div>`, 620);
   renderCadenceAudience();
+}
+
+function closeCadenceAudience() {
+  const s = _cadAud;
+  _cadAud = null;
+  closeHuvenModal();
+  if (s && s.backToList) openCloudCadenceList(s.id);
 }
 
 // Leads da coluna que ainda podem entrar: com telefone, sem pedido de saída e que não passaram por esta cadência nesta coluna.
