@@ -113,12 +113,37 @@
   .done h2 { margin-bottom: 10px; }
   .done p { color: var(--muted); font-size: 15px; line-height: 1.6; margin: 0 0 8px; }
 
+
+  /* Igual à tela de entrar do CRM: luz correndo pela borda, cartão que inclina com o mouse e reflexo no cursor. */
+  @property --ang { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+  .card { overflow: hidden; border-radius: 26px; box-shadow: 0 30px 80px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.18);
+    transform: perspective(1100px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(var(--lift, 0px));
+    transition: transform .6s cubic-bezier(.2,.8,.2,1), box-shadow .6s; will-change: transform; }
+  .card::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; pointer-events: none; z-index: 3;
+    background: conic-gradient(from var(--ang), transparent 0 72%, rgba(255,255,255,.85) 82%, transparent 92%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+    animation: ang 5s linear infinite; }
+  @keyframes ang { to { --ang: 360deg; } }
+  .card::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 2;
+    background: radial-gradient(380px circle at var(--gx, 50%) var(--gy, 0%), rgba(255,255,255,.16), transparent 55%);
+    opacity: 0; transition: opacity .35s ease; }
+  .card.tilting { --lift: -6px; transition: transform .14s ease-out, box-shadow .3s; box-shadow: 0 40px 90px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.2); }
+  .card.tilting::after { opacity: 1; }
+  .card.ready { animation: none; opacity: 1; } /* a entrada segura o transform; depois dela a inclinação assume */
+  .card > * { position: relative; z-index: 1; }
+  .photo { transition: translate .8s cubic-bezier(.2,.8,.2,1); translate: var(--px, 0px) var(--py, 0px); }
+  button { overflow: hidden; }
+  button::before { content: ""; position: absolute; top: 0; bottom: 0; width: 40%; left: -60%; background: linear-gradient(100deg, transparent, rgba(255,255,255,.35), transparent); animation: shine 3.2s ease-in-out infinite 1.2s; }
+  @keyframes shine { 0% { left: -60%; } 60%, 100% { left: 130%; } }
+  button.loading::before { display: none; }
+
   /* Entrada suave */
   .up { opacity: 0; animation: up .7s cubic-bezier(.2,.7,.2,1) forwards; animation-delay: var(--d, 0s); }
   @keyframes up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 
   @media (prefers-reduced-motion: reduce) {
-    .photo, .up, .done.show, .done.show .ok path { animation: none !important; }
+    .photo, .up, .done.show, .done.show .ok path, .card::before, button::before { animation: none !important; }
     .up { opacity: 1; }
     .done.show .ok path { stroke-dashoffset: 0; }
   }
@@ -216,6 +241,30 @@
 </main>
 
 <script>
+// Cartão do formulário inclina seguindo o mouse (só com mouse ou trackpad), como na tela de entrar do CRM.
+(function () {
+  var box = document.querySelector(".card"), photo = document.querySelector(".photo");
+  if (!box) return;
+  box.addEventListener("animationend", function (e) { if (e.target === box) box.classList.add("ready"); });
+  setTimeout(function () { box.classList.add("ready"); }, 1500);
+  if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  var raf = 0, px = 0, py = 0, clamp = function (v) { return Math.max(-1, Math.min(1, v)); };
+  function update() {
+    raf = 0;
+    var r = box.getBoundingClientRect(); if (!r.width) return;
+    var x = clamp((px - (r.left + r.width / 2)) / (r.width * 0.75)), y = clamp((py - (r.top + r.height / 2)) / (r.height * 0.75));
+    box.style.setProperty("--rx", (-y * 8).toFixed(2) + "deg"); box.style.setProperty("--ry", (x * 10).toFixed(2) + "deg");
+    box.style.setProperty("--gx", ((px - r.left) / r.width * 100).toFixed(1) + "%"); box.style.setProperty("--gy", ((py - r.top) / r.height * 100).toFixed(1) + "%");
+    photo.style.setProperty("--px", (-x * 14).toFixed(1) + "px"); photo.style.setProperty("--py", (-y * 10).toFixed(1) + "px");
+    box.classList.add("tilting");
+  }
+  window.addEventListener("pointermove", function (e) { if (e.pointerType === "touch") return; px = e.clientX; py = e.clientY; if (!raf) raf = requestAnimationFrame(update); });
+  document.documentElement.addEventListener("pointerleave", function () {
+    box.style.setProperty("--rx", "0deg"); box.style.setProperty("--ry", "0deg");
+    photo.style.setProperty("--px", "0px"); photo.style.setProperty("--py", "0px"); box.classList.remove("tilting");
+  });
+})();
+
 // Prévia do funil: os cards andam de etapa com calma, como no CRM (nomes fictícios).
 (function () {
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
