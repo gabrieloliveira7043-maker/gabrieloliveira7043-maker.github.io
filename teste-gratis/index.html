@@ -10,7 +10,7 @@
 <link rel="preload" as="image" href="/fundos/sala.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
     --gold: #D4A53C;
@@ -42,10 +42,9 @@
   .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 40px; }
   .brand svg { width: 30px; height: 30px; }
   .brand span { font-weight: 800; letter-spacing: 0.16em; font-size: 14px; }
-  .tag { display: inline-block; font-size: 13px; font-weight: 600; color: var(--gold-ink); margin-bottom: 14px; }
-  .tag::before { content: ''; display: inline-block; width: 18px; height: 1px; background: var(--gold); vertical-align: middle; margin-right: 10px; }
-  h1 { font-family: 'Fraunces', Georgia, serif; font-weight: 500; font-size: clamp(36px, 4.6vw, 56px); line-height: 1.04; letter-spacing: -0.015em; margin: 0 0 18px; }
-  h1 em { font-style: italic; color: var(--gold-ink); }
+  .tag { display: inline-block; font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold-ink); margin-bottom: 16px; }
+  h1 { font-weight: 800; font-size: clamp(34px, 4.2vw, 52px); line-height: 1.08; letter-spacing: -0.025em; margin: 0 0 18px; }
+  h1 em { font-style: normal; color: var(--gold-ink); }
   .lead { font-size: 17px; line-height: 1.6; color: var(--muted); margin: 0 0 30px; max-width: 500px; }
 
   .glass { background: var(--glass); border: 1px solid var(--line); border-radius: 20px;
@@ -76,7 +75,7 @@
 
   /* Formulário */
   .card { padding: 30px; position: sticky; top: 24px; }
-  .card h2 { font-family: 'Fraunces', Georgia, serif; font-weight: 500; font-size: 27px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .card h2 { font-weight: 800; font-size: 24px; margin: 0 0 6px; letter-spacing: -0.015em; }
   .card .sub { font-size: 14px; color: var(--muted); margin: 0 0 22px; line-height: 1.5; }
   label { display: block; font-size: 13px; font-weight: 600; margin: 0 0 6px; }
   .field { margin-bottom: 15px; }
